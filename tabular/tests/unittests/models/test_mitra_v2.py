@@ -1224,6 +1224,38 @@ def test_prediction_handles_runtime_errors_without_hiding_other_failures(memory_
             assert trainer._predict_transformed.call_count == 1
 
 
+@pytest.mark.parametrize("memory_error", [True, False])
+def test_evaluation_handles_runtime_errors_without_hiding_other_failures(memory_error):
+    from autogluon.tabular.models.mitra._internal.core.trainer_finetune_v2 import TrainerFinetuneV2
+
+    trainer = TrainerFinetuneV2.__new__(TrainerFinetuneV2)
+    trainer.cfg = SimpleNamespace(
+        hyperparams={
+            "fast_loop": True,
+            "max_samples_query": 2,
+            "eval_max_samples_query": 8,
+        }
+    )
+    trainer.preprocessor = SimpleNamespace(
+        transform_X=lambda x: x,
+        transform_y=lambda y: y,
+    )
+    trainer.metric = "log_loss"
+    trainer._evaluation_cache = None
+    message = "CUDA out of memory in attention" if memory_error else "invalid attention shape"
+    metrics = SimpleNamespace(metrics={"log_loss": 0.2}, loss=None)
+    trainer._evaluate_transformed = mock.Mock(side_effect=[RuntimeError(message), metrics])
+    with mock.patch("torch.cuda.empty_cache"):
+        if memory_error:
+            result = trainer.evaluate(np.zeros((4, 2)), np.zeros(4), np.zeros((8, 2)), np.zeros(8))
+            assert result.loss == pytest.approx(0.2)
+            assert [call.kwargs["query_chunk"] for call in trainer._evaluate_transformed.call_args_list] == [8, 4]
+        else:
+            with pytest.raises(RuntimeError, match=message):
+                trainer.evaluate(np.zeros((4, 2)), np.zeros(4), np.zeros((8, 2)), np.zeros(8))
+            assert trainer._evaluate_transformed.call_count == 1
+
+
 def test_training_oom_retry_terminates():
     import torch
 
@@ -1263,6 +1295,7 @@ def test_fitted_context_is_reused_and_can_shrink_again():
 
     def fit(rows):
         estimator = finetune.MitraFinetuneClassifier(device="cpu")
+        estimator._fit_context_id = "shared-fit"
         estimator.fit(np.zeros((rows, 4)), np.arange(rows) % 2, X_val=np.zeros((2, 4)), y_val=np.array([0, 1]))
         assert "_fitted_context_key" not in estimator.__dict__
 
@@ -1311,6 +1344,7 @@ def test_fitted_context_does_not_cross_fit_settings(change):
         mock.patch.object(MitraBase, "_train_ensemble", train),
     ):
         first = finetune.MitraFinetuneClassifier(device="cpu")
+        first._fit_context_id = "shared-fit"
         first.fit(np.zeros((4096, 4)), np.arange(4096) % 2, X_val=np.zeros((2, 4)), y_val=np.array([0, 1]))
         rows, features, kwargs = 4096, 4, {"device": "cpu"}
         if change == "features":
@@ -1328,6 +1362,7 @@ def test_fitted_context_does_not_cross_fit_settings(change):
         elif change == "legacy_recipe":
             kwargs["fine_tune_recipe"] = "1"
         second = finetune.MitraFinetuneClassifier(**kwargs)
+        second._fit_context_id = "shared-fit"
         second.fit(
             np.zeros((rows, features)),
             np.arange(rows) % 2,
@@ -1339,6 +1374,51 @@ def test_fitted_context_does_not_cross_fit_settings(change):
             512 if change == "query_limit" else 1024,
         )
         assert starts == [(16384, 1024), expected]
+
+
+def test_fitted_context_does_not_cross_unrelated_fits():
+    from autogluon.tabular.models.mitra import finetune
+    from autogluon.tabular.models.mitra.sklearn_interface import MitraBase
+
+    starts = []
+
+    def train(estimator, X_train, y_train, X_valid, y_valid, task, dim_output, **kwargs):
+        cfg, _ = estimator._create_config(task, dim_output)
+        starts.append(cfg.hyperparams["max_samples_support"])
+        cfg.hyperparams["max_samples_support"] = 2048
+        estimator.trainers = [SimpleNamespace(cfg=cfg)]
+        return estimator
+
+    with (
+        mock.patch.dict(finetune._FITTED_CONTEXT_MEMO, clear=True),
+        mock.patch.object(MitraBase, "_train_ensemble", train),
+    ):
+        for _ in range(2):
+            estimator = finetune.MitraFinetuneClassifier(device="cpu")
+            estimator.fit(
+                np.zeros((4096, 4)),
+                np.arange(4096) % 2,
+                X_val=np.zeros((2, 4)),
+                y_val=np.array([0, 1]),
+            )
+    assert starts == [16384, 16384]
+
+
+@pytest.mark.parametrize(
+    "recipes,expected_max_rows",
+    [
+        (("1",), 10_000),
+        (("1", "2"), 1_000_000),
+    ],
+)
+def test_recipe_search_space_uses_safe_auxiliary_constraints(recipes, expected_max_rows):
+    from autogluon.common import space
+
+    model = MitraModel(
+        problem_type="binary",
+        hyperparameters={"fine_tune_recipe": space.Categorical(*recipes)},
+    )
+    assert model._get_default_auxiliary_params()["max_rows"] == expected_max_rows
 
 
 def test_failed_fit_does_not_record_a_fitted_context():

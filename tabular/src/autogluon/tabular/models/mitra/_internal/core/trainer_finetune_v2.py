@@ -31,6 +31,10 @@ class DeviceCheckpoint:
         model.load_state_dict(self.best_model)
 
 
+def _is_out_of_memory(error):
+    return isinstance(error, torch.cuda.OutOfMemoryError) or "out of memory" in str(error).lower()
+
+
 class PredictionDataset(DatasetFinetune):
     """Balance capped binary support; reuse a full support draw across query chunks."""
 
@@ -228,7 +232,9 @@ class TrainerFinetuneV2(TrainerFinetune):
             try:
                 metrics = self._evaluate_transformed(*self._evaluation_cache[2], query_chunk=query_chunk)
                 break
-            except torch.cuda.OutOfMemoryError:
+            except RuntimeError as error:
+                if not _is_out_of_memory(error):
+                    raise
                 if query_chunk <= query_floor:
                     raise
                 torch.cuda.empty_cache()
@@ -285,7 +291,7 @@ class TrainerFinetuneV2(TrainerFinetune):
             try:
                 return self._predict_transformed(*transformed, support_cap, query_chunk, prediction=True)
             except RuntimeError as error:
-                if not isinstance(error, torch.cuda.OutOfMemoryError) and "out of memory" not in str(error).lower():
+                if not _is_out_of_memory(error):
                     raise
                 # HF keeps draws consumed by failed forwards. Rewinding here
                 # changes the support sampled for the successful prediction.

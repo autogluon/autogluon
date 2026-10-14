@@ -7,6 +7,7 @@ Configuration belongs to each estimator; no process-wide patches are installed.
 from __future__ import annotations
 
 import time
+import uuid
 
 import numpy as np
 
@@ -19,8 +20,8 @@ from .sklearn_interface import DEFAULT_DEVICE, MitraClassifier, MitraRegressor
 
 
 # Bag children in the same process reuse the context that fit, as in the HF
-# implementation. Device and checkpoint scope prevent unrelated fits from
-# inheriting another model's memory limit.
+# implementation. Fit identity, device, and checkpoint scope prevent unrelated
+# fits from inheriting another model's memory limit.
 _FITTED_CONTEXT_MEMO: dict[tuple, tuple[int, int]] = {}
 
 
@@ -149,7 +150,7 @@ class MitraFinetuneMixin:
             fast_predict=get_finetune_recipe(self.fine_tune_recipe)["fast_predict"],
         )
         pending = getattr(self, "_fitted_context_key", None)
-        if pending is not None and len(pending) == 6:
+        if pending is not None and len(pending) == 7:
             requested = (int(cfg.hyperparams["max_samples_support"]), int(cfg.hyperparams["max_samples_query"]))
             self._fitted_context_key = pending + requested
             fitted = _FITTED_CONTEXT_MEMO.get(self._fitted_context_key)
@@ -160,7 +161,12 @@ class MitraFinetuneMixin:
     def _train_ensemble(self, X_train, y_train, X_valid, y_valid, task, dim_output, n_classes=0, time_limit=None):
         if get_finetune_recipe(self.fine_tune_recipe)["fast_loop"]:
             shape = np.shape(X_train)
+            fit_context_id = getattr(self, "_fit_context_id", None)
+            if fit_context_id is None:
+                fit_context_id = uuid.uuid4().hex
+                self._fit_context_id = fit_context_id
             self._fitted_context_key = (
+                fit_context_id,
                 str(task),
                 int(shape[1]) if len(shape) > 1 else 1,
                 int(round(int(shape[0]) / 256)),
@@ -173,7 +179,7 @@ class MitraFinetuneMixin:
                 X_train, y_train, X_valid, y_valid, task, dim_output, n_classes=n_classes, time_limit=time_limit
             )
             key = getattr(self, "_fitted_context_key", None)
-            if key is not None and len(key) == 8 and self.trainers:
+            if key is not None and len(key) == 9 and self.trainers:
                 hp = self.trainers[0].cfg.hyperparams
                 _FITTED_CONTEXT_MEMO[key] = (int(hp["max_samples_support"]), int(hp["max_samples_query"]))
             return result
@@ -215,6 +221,8 @@ class MitraFinetuneClassifier(MitraFinetuneMixin, MitraClassifier):
         if not np.array_equal(classes, np.arange(classes.size)):
             raise ValueError("Mitra hierarchy labels must be contiguous integers starting at zero.")
         y = y.astype(np.int64, copy=False)
+        if getattr(self, "_fit_context_id", None) is None:
+            self._fit_context_id = uuid.uuid4().hex
         internal_validation = X_val is None
         if X_val is None:
             _, counts = np.unique(y, return_counts=True)
@@ -266,6 +274,7 @@ class MitraFinetuneClassifier(MitraFinetuneMixin, MitraClassifier):
             params = self.get_params()
             params["seed"] = self.seed + i
             estimator = MitraFinetuneClassifier(**params)
+            estimator._fit_context_id = getattr(self, "_fit_context_id", None)
             estimator._num_samples_total = len(train_labels)
             estimator.fit(
                 X_train[train_mask],
