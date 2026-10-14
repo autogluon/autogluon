@@ -794,7 +794,7 @@ def test_string_dtype_fit_predict(checkpoint_factory, tmp_path):
 
 
 def test_memory_estimate_uses_post_reduction_shape_and_prediction_caps():
-    X = pd.DataFrame(np.random.RandomState(7).normal(size=(100, 300)))
+    X = pd.DataFrame(np.random.RandomState(7).normal(size=(300, 300)))
     shapes = []
 
     def record_shape(*, X, **kwargs):
@@ -809,7 +809,7 @@ def test_memory_estimate_uses_post_reduction_shape_and_prediction_caps():
     ):
         MitraModel._estimate_memory_usage_static(
             X=X,
-            problem_type="multiclass",
+            problem_type="regression",
             hyperparameters={
                 "fine_tune_recipe": "2",
                 "max_samples_support": 10,
@@ -820,6 +820,19 @@ def test_memory_estimate_uses_post_reduction_shape_and_prediction_caps():
             },
         )
     assert shapes == [(90, 256)]
+
+
+def test_classification_memory_estimate_does_not_assume_fold_reduction():
+    X = pd.DataFrame(np.random.RandomState(7).normal(size=(100, 300)))
+    assert (
+        MitraModel._estimate_reduced_num_features(
+            X=X,
+            hyperparameters={},
+            problem_type="binary",
+            recipe="2",
+        )
+        == 300
+    )
 
 
 def test_many_class_memory_estimate_accounts_for_every_hierarchy_node():
@@ -861,7 +874,7 @@ def test_bagged_regression_matches_released_projection(checkpoint_factory, tmp_p
     from autogluon.tabular.models.mitra.finetune import MitraFinetuneRegressor
 
     rng = np.random.RandomState(17)
-    X = pd.DataFrame(rng.normal(size=(40, 6)), columns=list("abcdef"))
+    X = pd.DataFrame(rng.normal(size=(40, 6)), columns=range(6))
     # A column can be constant within a fold and still be needed by the
     # projection fitted on the outer table.
     X["rare"] = 0.0
@@ -894,6 +907,10 @@ def test_bagged_regression_matches_released_projection(checkpoint_factory, tmp_p
         bag.fit(X=X, y=y, k_fold=2, num_cpus=1, num_gpus=0)
     assert len(folds_seen) == 2
     assert np.isfinite(bag.predict_proba_oof()).all()
+    persisted_template = bag.load_model_base()
+    assert persisted_template._feature_reducer.projection is not None
+    assert persisted_template._feature_reducer._training_projection is None
+    assert persisted_template._feature_reducer._training_keys is None
     query = X.iloc[:4] + 100
     # Reusing training indices must not reuse cached training values at
     # inference, including after loading a saved child.
@@ -929,6 +946,24 @@ def test_projection_cache_checks_row_values_and_preserves_fit_transform():
     np.testing.assert_array_equal(
         reducer.transform(X.iloc[rows] + 1), reference.transform((X.iloc[rows] + 1).to_numpy())
     )
+
+
+def test_projection_cache_supports_temporal_dtypes_and_normalized_column_names():
+    from autogluon.tabular.models.mitra._internal.data.feature_reduction import FeatureReducer
+
+    X = pd.DataFrame(
+        {
+            0: pd.date_range("2020-01-01", periods=20),
+            1: pd.to_timedelta(np.arange(20), unit="h"),
+            2: np.arange(20, dtype=float),
+        }
+    )
+    reducer = FeatureReducer("regression", max_features=2).fit(X, None, cache_training=True)
+    normalized = X.copy()
+    normalized.columns = normalized.columns.astype(str)
+    transformed = reducer.transform_training(normalized.iloc[[7, 2, 11]])
+    assert transformed.shape == (3, 2)
+    assert np.isfinite(transformed).all().all()
 
 
 def test_shared_regression_projection_accepts_pseudolabeled_rows(checkpoint_factory, tmp_path):
