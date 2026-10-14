@@ -79,7 +79,30 @@ class FeatureReducer:
     @staticmethod
     def _row_keys(X):
         # Include values and index: separate tables may reuse a RangeIndex.
-        return pd.Index(pd.util.hash_pandas_object(X.astype(float), index=True).to_numpy())
+        return pd.Index(pd.util.hash_pandas_object(X, index=True).to_numpy())
+
+    @staticmethod
+    def _select_columns(X, columns):
+        try:
+            return X.loc[:, columns]
+        except KeyError:
+            # AutoGluon normalizes feature names to strings before fitting
+            # fold children. Resolve an upstream reducer fitted on the
+            # original labels without changing its learned column order.
+            by_string = {}
+            for column in X.columns:
+                key = str(column)
+                if key in by_string:
+                    raise KeyError(f"Feature names become ambiguous after string conversion: {key!r}")
+                by_string[key] = column
+            missing = [column for column in columns if str(column) not in by_string]
+            if missing:
+                raise KeyError(f"Missing feature columns: {missing}")
+            return X.loc[:, [by_string[str(column)] for column in columns]]
+
+    def align_input(self, X):
+        columns = self.input_columns if self.input_columns is not None else self.columns
+        return X if columns is None else self._select_columns(X, columns)
 
     def clear_training_cache(self):
         self._training_projection = None
@@ -93,7 +116,7 @@ class FeatureReducer:
         """Reuse fit_transform rows during fitting and fold validation only."""
         if self._training_projection is None:
             return self.transform(X)
-        positions = self._training_keys.get_indexer(self._row_keys(X[self.input_columns]))
+        positions = self._training_keys.get_indexer(self._row_keys(self.align_input(X)))
         if (positions < 0).any():
             # AutoGluon can append pseudolabeled rows and reset the fold's
             # index. Those rows have no cached fit_transform result; apply
@@ -103,9 +126,9 @@ class FeatureReducer:
 
     def transform(self, X: pd.DataFrame) -> pd.DataFrame:
         if self.columns is not None:
-            return X[self.columns]
+            return self.align_input(X)
         if self.projection is not None:
-            values = X[self.input_columns].to_numpy(dtype=float)
+            values = self.align_input(X).to_numpy(dtype=float)
             projected = self.projection.transform(values)
             return self._frame(projected, X)
         return X

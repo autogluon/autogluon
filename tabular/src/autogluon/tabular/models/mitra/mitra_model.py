@@ -1,10 +1,10 @@
 from __future__ import annotations
 
+import copy
 import logging
 import os
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 from typing_extensions import Self
 
@@ -189,19 +189,11 @@ class MitraModel(AbstractTorchModel):
         if method == "svd":
             return min(max_features, n_rows, n_features)
         if problem_type != "regression":
-            required_continuous = n_features * 0.5
-            continuous = 0
-            for index in range(n_features):
-                column = X.iloc[:, index].to_numpy(dtype=float, na_value=np.nan)
-                if np.unique(column[np.isfinite(column)]).size > 2:
-                    continuous += 1
-                    if continuous >= required_continuous:
-                        break
-                remaining = n_features - index - 1
-                if continuous + remaining < required_continuous:
-                    return n_features
-            if continuous < required_continuous:
-                return n_features
+            # Classification selection is supervised and refitted inside
+            # every bag fold. A rare continuous value can disappear from one
+            # fold and make that reducer retain the original table width.
+            # Estimate the safe shape instead of assuming all folds reduce.
+            return n_features
         return min(max_features, n_features)
 
     def _get_model_version(self) -> str:
@@ -271,7 +263,7 @@ class MitraModel(AbstractTorchModel):
         if getattr(self, "_feature_reduction_fitted_upstream", False):
             # A column varying across the outer table can be constant in one
             # fold. It still belongs to the shared projection's input schema.
-            return X[self._feature_reducer.input_columns]
+            return self._feature_reducer.align_input(X)
         return super()._preprocess_align_features(X, **kwargs)
 
     def _preprocess(self, X: pd.DataFrame, is_train: bool = False, **kwargs) -> pd.DataFrame:
@@ -410,6 +402,14 @@ class MitraModel(AbstractTorchModel):
         }
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
+
+    def _get_model_template_for_save(self):
+        model = copy.copy(self)
+        if self._feature_reducer is not None:
+            model._feature_reducer = copy.copy(self._feature_reducer)
+            model._feature_reducer.clear_training_cache()
+            model._use_training_projection = False
+        return model
 
     def _get_default_auxiliary_params(self):
         params = super()._get_default_auxiliary_params()
