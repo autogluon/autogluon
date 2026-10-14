@@ -637,7 +637,7 @@ def test_many_class_fit_is_reusable_and_serializable(checkpoint_factory, tmp_pat
     model = MitraModel(
         path=str(tmp_path / "hierarchy"),
         problem_type="multiclass",
-        hyperparameters={"hf_model": path, "fine_tune_steps": 1},
+        hyperparameters={"hf_model": path, "fine_tune_steps": 1, "ag.max_memory_usage_ratio": None},
     )
     model.fit(X=X.iloc[:44], y=y.iloc[:44], X_val=X.iloc[44:], y_val=y.iloc[44:], num_cpus=1, num_gpus=0)
     model.save()
@@ -685,12 +685,37 @@ def test_many_class_internal_split_retains_every_class(checkpoint_factory):
     probabilities = estimator.predict_proba(X[:3])
     assert probabilities.shape == (3, 11)
     np.testing.assert_allclose(probabilities.sum(axis=1), 1)
+    assert [node.estimator.seed for node in estimator.hierarchy_.nodes] == [0, 1, 2]
+    for node in estimator.hierarchy_.nodes:
+        expected_support = int(node.mask(y).sum())
+        assert len(node.estimator.X) == expected_support
+        assert node.estimator._num_samples_total == expected_support // 2
+        for trainer in node.estimator.trainers:
+            assert trainer.optimizer is None
+            assert trainer.checkpoint is None
+
+
+def test_many_class_float_integer_labels_are_normalized(checkpoint_factory):
+    from autogluon.tabular.models.mitra.finetune import MitraFinetuneClassifier
+
+    X = np.random.RandomState(0).normal(size=(22, 3))
+    y = np.repeat(np.arange(11), 2).astype(float)
+    estimator = MitraFinetuneClassifier(
+        hf_model=checkpoint_factory(version="2"),
+        model_version="2",
+        device="cpu",
+        fine_tune=False,
+        verbose=False,
+    )
+    estimator.fit(X, y)
+    assert estimator.predict_proba(X[:3]).shape == (3, 11)
 
 
 def test_class_hierarchy_validates_node_probability_shape():
-    from autogluon.tabular.models.mitra._internal.data.class_hierarchy import ClassHierarchy
+    from autogluon.tabular.models.mitra._internal.data.class_hierarchy import ClassHierarchy, hierarchy_node_count
 
     hierarchy = ClassHierarchy(n_classes=11, max_classes=10)
+    assert hierarchy_node_count(11, max_classes=10) == len(hierarchy.nodes) == 3
 
     class BadEstimator:
         @staticmethod
@@ -795,6 +820,23 @@ def test_memory_estimate_uses_post_reduction_shape_and_prediction_caps():
             },
         )
     assert shapes == [(90, 256)]
+
+
+def test_many_class_memory_estimate_accounts_for_every_hierarchy_node():
+    X = pd.DataFrame(np.random.RandomState(7).normal(size=(100, 3)))
+    with (
+        mock.patch.object(MitraModel, "_estimate_memory_usage_static_cpu_icl", return_value=100),
+        mock.patch.object(MitraModel, "_estimate_memory_usage_static_cpu_ft_icl", return_value=0),
+        mock.patch.object(MitraModel, "_estimate_memory_usage_static_gpu_cpu", return_value=0),
+        mock.patch.object(MitraModel, "_estimate_memory_usage_static_gpu_gpu", return_value=0),
+    ):
+        estimate = MitraModel._estimate_memory_usage_static(
+            X=X,
+            problem_type="multiclass",
+            num_classes=11,
+            hyperparameters={"fine_tune_recipe": "2"},
+        )
+    assert estimate == 700_000_090
 
 
 def test_memory_feature_gate_ignores_nonfinite_values():

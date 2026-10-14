@@ -578,8 +578,8 @@ class MitraModel(AbstractTorchModel):
             # Estimate the tensor shape seen by the network after feature
             # reduction, rather than rejecting reducible wide tables first.
             X = X.iloc[:row_cap, :feature_cap]
-        # Multiply by 0.9 as currently this is overly safe
-        return int(
+        # Multiply by 0.9 as currently this is overly safe.
+        estimate = int(
             0.9
             * max(
                 cls._estimate_memory_usage_static_cpu_icl(X=X, **kwargs),
@@ -588,6 +588,18 @@ class MitraModel(AbstractTorchModel):
                 cls._estimate_memory_usage_static_gpu_gpu(X=X, **kwargs),
             )
         )
+        num_classes = kwargs.get("num_classes")
+        if num_classes is not None and num_classes > 10:
+            from ._internal.data.class_hierarchy import hierarchy_node_count
+
+            additional_nodes = hierarchy_node_count(num_classes, max_classes=10) - 1
+            n_estimators = hyperparameters.get("n_estimators", 1)
+            # Each additional node retains its fitted network while later
+            # nodes train. Current classifier checkpoints occupy about 303 MB;
+            # keep headroom for tensor/object overhead without multiplying the
+            # one-node training workspace for every node.
+            estimate += additional_nodes * n_estimators * 350_000_000
+        return estimate
 
     @classmethod
     def _estimate_memory_usage_static_cpu_icl(
