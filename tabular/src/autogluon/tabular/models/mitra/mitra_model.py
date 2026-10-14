@@ -35,6 +35,8 @@ class MitraModel(AbstractTorchModel):
     by default. Set ``model_version="1", fine_tune_recipe="1"`` to reproduce
     the legacy settings. Both checkpoint versions use the same fine-tuning
     implementation. Versions are never inferred from the shared architecture.
+    Custom checkpoints used through ``MitraModel`` must declare
+    ``"mitra_version": "1"`` or ``"2"`` in ``config.json``.
 
     A Mitra fit defaults to a 3,600-second budget, shared across bag folds.
     AutoGluon's global ``time_limit`` can impose a shorter limit. Override
@@ -90,6 +92,26 @@ class MitraModel(AbstractTorchModel):
         self._use_training_projection = False
         self._pending_fold_support = None
         self._category_maps = {}
+
+    def __setstate__(self, state: dict) -> None:
+        super().__setstate__(state)
+        self._migrate_legacy_configuration()
+
+    def _migrate_legacy_configuration(self):
+        params = getattr(self, "params", {})
+        params_trained = getattr(self, "params_trained", {})
+        user_params = getattr(self, "_user_params", {})
+        fitted_model = getattr(self, "model", None)
+
+        if "model_version" not in params and "model_version" not in user_params:
+            version = params_trained.get("model_version", getattr(fitted_model, "model_version", "1"))
+            user_params["model_version"] = version
+            params_trained.setdefault("model_version", version)
+
+        if params.get("fine_tune_recipe") is None and user_params.get("fine_tune_recipe") is None:
+            recipe = params_trained.get("fine_tune_recipe", getattr(fitted_model, "fine_tune_recipe", "1"))
+            user_params["fine_tune_recipe"] = recipe
+            params_trained.setdefault("fine_tune_recipe", recipe)
 
     def validate_fit_args(self, X: pd.DataFrame, **kwargs):
         super().validate_fit_args(X=X, **kwargs)
@@ -501,15 +523,7 @@ class MitraModel(AbstractTorchModel):
     @classmethod
     def load(cls, path: str, reset_paths=True, verbose=True) -> Self:
         model: MitraModel = super().load(path=path, reset_paths=reset_paths, verbose=verbose)
-
-        if "model_version" not in model.params and model.model is not None:
-            # Persist the fitted recipe for refit_full of predictors saved
-            # before model_version existed, as well as for ordinary inference.
-            model.params_trained.setdefault("model_version", getattr(model.model, "model_version", "1"))
-        if model.params.get("fine_tune_recipe") is None and model.model is not None:
-            # Keep the stored choice when an earlier predictor used an
-            # implicit recipe, including a version-dependent None default.
-            model.params_trained.setdefault("fine_tune_recipe", getattr(model.model, "fine_tune_recipe", "1"))
+        model._migrate_legacy_configuration()
         if model._weights_saved:
             model._load_model_artifact()
             model._weights_saved = False
