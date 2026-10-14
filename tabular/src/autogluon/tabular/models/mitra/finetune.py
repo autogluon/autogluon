@@ -214,6 +214,8 @@ class MitraFinetuneClassifier(MitraFinetuneMixin, MitraClassifier):
         X, y = np.asarray(X), np.asarray(y)
         if not np.array_equal(classes, np.arange(classes.size)):
             raise ValueError("Mitra hierarchy labels must be contiguous integers starting at zero.")
+        y = y.astype(np.int64, copy=False)
+        internal_validation = X_val is None
         if X_val is None:
             _, counts = np.unique(y, return_counts=True)
             if counts.min() < 2:
@@ -223,7 +225,12 @@ class MitraFinetuneClassifier(MitraFinetuneMixin, MitraClassifier):
                 )
             X_train, X_valid, y_train, y_valid = self._split_data(X, y)
         else:
-            X_train, y_train, X_valid, y_valid = X, y, np.asarray(X_val), np.asarray(y_val)
+            X_train, y_train, X_valid, y_valid = (
+                X,
+                y,
+                np.asarray(X_val),
+                np.asarray(y_val).astype(np.int64, copy=False),
+            )
             if len(X_valid) != len(y_valid):
                 raise ValueError(f"X_val and y_val have different lengths: {len(X_valid)} != {len(y_valid)}")
             validation_classes = np.unique(y_valid)
@@ -256,8 +263,10 @@ class MitraFinetuneClassifier(MitraFinetuneMixin, MitraClassifier):
                 raise ValueError("A hierarchy training node lost an output class.")
             if not np.array_equal(np.unique(val_labels), expected_outputs):
                 raise ValueError("A hierarchy validation node lost an output class.")
-            estimator = MitraFinetuneClassifier(**self.get_params())
-            estimator._num_samples_total = getattr(self, "_num_samples_total", len(y))
+            params = self.get_params()
+            params["seed"] = self.seed + i
+            estimator = MitraFinetuneClassifier(**params)
+            estimator._num_samples_total = len(train_labels)
             estimator.fit(
                 X_train[train_mask],
                 train_labels,
@@ -265,6 +274,10 @@ class MitraFinetuneClassifier(MitraFinetuneMixin, MitraClassifier):
                 y_val=val_labels,
                 time_limit=None if remaining is None else remaining / (len(self.hierarchy_.nodes) - i),
             )
+            if internal_validation:
+                estimator.extend_support(X_valid[val_mask], val_labels)
+            for trainer in estimator.trainers:
+                trainer.post_fit_optimize()
             node.estimator = estimator
         self.trainers = [trainer for node in self.hierarchy_.nodes for trainer in node.estimator.trainers]
         self.train_time = time.monotonic() - started

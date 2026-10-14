@@ -5,6 +5,20 @@ from __future__ import annotations
 import numpy as np
 
 
+def hierarchy_node_count(n_classes, max_classes=10):
+    """Return the number of classifier nodes required by the hierarchy."""
+    if n_classes < 1:
+        raise ValueError("n_classes must be positive.")
+    if max_classes < 2:
+        raise ValueError("max_classes must be at least 2.")
+    if n_classes <= max_classes:
+        return 1
+    n_groups = min(int(np.ceil(n_classes / max_classes)), max_classes)
+    quotient, remainder = divmod(n_classes, n_groups)
+    group_sizes = [quotient + (index < remainder) for index in range(n_groups)]
+    return 1 + sum(hierarchy_node_count(size, max_classes=max_classes) for size in group_sizes if size > 1)
+
+
 def _normalized_probabilities(probabilities, *, n_rows, n_classes):
     probabilities = np.asarray(probabilities, dtype=np.float64)
     expected_shape = (n_rows, n_classes)
