@@ -42,10 +42,19 @@ def checkpoint_version(path_or_repo_id: str, metadata_version: str | None = None
 
 
 def validate_checkpoint_version(
-    path_or_repo_id: str, model_version: str, metadata_version: str | None = None
+    path_or_repo_id: str,
+    model_version: str,
+    metadata_version: str | None = None,
+    *,
+    require_identity: bool = False,
 ) -> str | None:
     validate_model_version(model_version)
     version = checkpoint_version(path_or_repo_id, metadata_version)
+    if version is None and require_identity:
+        raise ValueError(
+            f"Cannot determine the Mitra version of checkpoint {str(path_or_repo_id)!r}. "
+            "Add a 'mitra_version' field with value '1' or '2' to its config.json."
+        )
     if version is not None and version != model_version:
         raise ValueError(
             f"Checkpoint {str(path_or_repo_id)!r} is Mitra v{version}, but model_version={model_version!r} "

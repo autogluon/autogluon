@@ -255,7 +255,12 @@ class Tab2D(BaseModel):
         if model_version is None:
             version = checkpoint_version(path_or_repo_id, config.get("mitra_version"))
         else:
-            version = validate_checkpoint_version(path_or_repo_id, model_version, config.get("mitra_version"))
+            version = validate_checkpoint_version(
+                path_or_repo_id,
+                model_version,
+                config.get("mitra_version"),
+                require_identity=True,
+            )
 
         with torch.device("meta"):
             model = cls(

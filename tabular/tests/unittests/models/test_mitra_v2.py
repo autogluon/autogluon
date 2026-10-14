@@ -123,12 +123,13 @@ def test_checkpoint_version_is_not_inferred_from_architecture(checkpoint_factory
 
 
 @pytest.mark.parametrize("version", ["1", "2"])
-def test_unlabelled_local_checkpoint_obeys_explicit_selection(checkpoint_factory, version):
+def test_unlabelled_local_checkpoint_requires_version_metadata(checkpoint_factory, version):
     from autogluon.tabular.models.mitra._internal.models.tab2d import Tab2D
 
     path = checkpoint_factory()
-    loaded = Tab2D.from_pretrained(path, device="cpu", model_version=version)
-    assert loaded.mitra_version is None  # Selecting a version does not invent weight provenance.
+    with pytest.raises(ValueError, match="Cannot determine the Mitra version"):
+        Tab2D.from_pretrained(path, device="cpu", model_version=version)
+    assert Tab2D.from_pretrained(path, device="cpu").mitra_version is None
 
 
 @pytest.mark.parametrize("task", ["classification", "regression"])
@@ -534,6 +535,34 @@ def test_loading_legacy_predictor_does_not_change_recipe(checkpoint_factory, tmp
     assert loaded.convert_to_refit_full_template()._get_model_version() == "1"
     assert loaded.convert_to_refit_full_template()._get_fine_tune_recipe() == "1"
     np.testing.assert_allclose(loaded.predict_proba(X.iloc[16:]), prediction, atol=1e-5)
+
+
+def test_legacy_bagged_template_migrates_before_refit_full(tmp_path):
+    legacy = MitraModel(
+        problem_type="binary",
+        hyperparameters={"model_version": "1", "fine_tune_recipe": "1"},
+    )
+    legacy._set_default_params()
+    del legacy.params["model_version"]
+    del legacy.params["fine_tune_recipe"]
+    del legacy._user_params["model_version"]
+    del legacy._user_params["fine_tune_recipe"]
+
+    bag = BaggedEnsembleModel(
+        model_base=legacy,
+        path=str(tmp_path / "legacy_bag"),
+        hyperparameters={"fold_fitting_strategy": "sequential_local"},
+    )
+    bag._params_trained_children = {}
+    bag.save_model_base(legacy)
+    bag.model_base = None
+
+    restored = bag.load_model_base()
+    assert restored._get_model_version() == "1"
+    assert restored._get_fine_tune_recipe() == "1"
+    refit = bag.convert_to_refit_full_template_child()
+    assert refit._get_model_version() == "1"
+    assert refit._get_fine_tune_recipe() == "1"
 
 
 @pytest.mark.parametrize("heldout_in_support", [True, False])
