@@ -525,6 +525,7 @@ def test_loading_legacy_predictor_does_not_change_recipe(checkpoint_factory, tmp
         # An earlier native predictor resolved None to the checkpoint's recipe.
         model.params["fine_tune_recipe"] = None
         model._user_params["fine_tune_recipe"] = None
+    del model._mitra_config_schema_version
     del model._feature_reducer
     model.save()
     prediction = model.predict_proba(X.iloc[16:])
@@ -547,6 +548,7 @@ def test_legacy_bagged_template_migrates_before_refit_full(tmp_path):
     del legacy.params["fine_tune_recipe"]
     del legacy._user_params["model_version"]
     del legacy._user_params["fine_tune_recipe"]
+    del legacy._mitra_config_schema_version
 
     bag = BaggedEnsembleModel(
         model_base=legacy,
