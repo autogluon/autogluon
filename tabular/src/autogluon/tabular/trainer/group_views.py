@@ -443,6 +443,24 @@ class GroupPooledWeightedEnsembleModel(WeightedEnsembleModel):
         self._set_default_param_value("group_pooling", None)
         super()._set_default_params()
 
+    def _update_feature_metadata(self, X: pd.DataFrame, feature_metadata: FeatureMetadata) -> FeatureMetadata:
+        types_inner = self._base_model_types_inner_dict
+        if types_inner is not None:
+            # `max_base_models_per_type` counts a collapsed model under the type it collapses, as a type of its
+            # own, rather than every collapsed model as one type.
+            self._base_model_types_inner_dict = {
+                model: (
+                    (GroupCollapsedModel, types_inner.get(model.replace(GROUP_COLLAPSED_SUFFIX, "", 1), model))
+                    if model_type is GroupCollapsedModel
+                    else model_type
+                )
+                for model, model_type in types_inner.items()
+            }
+        try:
+            return super()._update_feature_metadata(X=X, feature_metadata=feature_metadata)
+        finally:
+            self._base_model_types_inner_dict = types_inner
+
     def preprocess(self, X, preprocess_nonadaptive: bool = True, model=None, **kwargs):
         if GROUP_KEY_COLUMN not in X.columns:
             raise KeyError(f"{self.name} pools predictions within groups, so its input needs `{GROUP_KEY_COLUMN}`.")

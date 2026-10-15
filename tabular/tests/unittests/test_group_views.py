@@ -257,6 +257,27 @@ def test_the_ensemble_pools_by_the_chosen_strategy(problem_type, pooling, tmp_pa
     pd.testing.assert_frame_equal(_predict(loaded, test), pred)
 
 
+def test_each_collapsed_model_counts_as_a_type_of_its_own(tmp_path):
+    """Below 1000 rows the ensemble keeps one base model per model type (`max_base_models_per_type="auto"`): a
+    collapsed model counts under the type it collapses, as a type of its own, so every model's collapsed view is
+    kept, not only the best one."""
+    train = _label_per_group_frame("binary", n_groups=40, rows=5, seed=0)
+    predictor = _fit(
+        train,
+        tmp_path,
+        hyperparameters={"GBM": {"num_boost_round": 20}, "LR": {}, "KNN": {}},
+        validation_structure={"group_on": "patient"},
+        group_views=True,
+        ensemble_hyperparameters={_UniformMeanEnsemble: {}},
+    )
+    ensemble = predictor._trainer.load_model(predictor.model_best)
+    assert sorted(ensemble.base_model_names) == sorted(
+        f"{base}{suffix}_BAG_L1"
+        for base in ("KNeighbors", "LightGBM", "LinearModel")
+        for suffix in ("", GROUP_COLLAPSED_SUFFIX)
+    )
+
+
 def test_group_views_help_on_label_per_group_data(tmp_path):
     """A sanity check on a clear case, not a benchmark: groups of noisy rows, one label per group."""
     train = _label_per_group_frame("binary", n_groups=60, rows=8, seed=0)
