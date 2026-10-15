@@ -125,6 +125,10 @@ class BaggedEnsembleModel(AbstractModel):
         # counts, and `_params_trained_children` what the refit template reads from them.
         self._refit_folds_pending = False
         self._params_trained_children: dict | None = None
+        # The bag fit only the first `_k_fold_end` folds of its set (`k_fold_end < k_fold`, e.g. the trainer's
+        # `validation_folds`): it predicts from those folds and has no out-of-fold prediction for the rows of the
+        # others, and a later fit with `k_fold_start=_k_fold_end` fits the rest.
+        self._folds_pending = False
 
         self._predict_n_size_lst = None  # A list of the predict row count for each child, useful to calculate the expected inference throughput of the bag.
 
@@ -153,7 +157,7 @@ class BaggedEnsembleModel(AbstractModel):
         super()._set_default_params()
 
     def is_valid(self) -> bool:
-        return self.is_fit() and (self._n_repeats == self._n_repeats_finished)
+        return self.is_fit() and (self._n_repeats == self._n_repeats_finished or self._folds_pending)
 
     @property
     def save_bag_folds(self) -> bool:
@@ -477,10 +481,8 @@ class BaggedEnsembleModel(AbstractModel):
                     raise AssertionError(
                         f"n_repeat_start and k_fold_start must be 0 with refit_folds=True, values: ({n_repeat_start}, {k_fold_start})"
                     )
-                if k_fold_end != k_fold:
-                    raise AssertionError(
-                        f"k_fold_end and k_fold must be equal with refit_folds=True, values: ({k_fold_end}, {k_fold})"
-                    )
+                # A first set fit only up to `k_fold_end` (the trainer's `validation_folds`) refits from the folds
+                # it has: they provide the out-of-fold predictions of their rows, the refit the predictions.
                 save_bag_folds = False
                 if kwargs.get("time_limit", None) is not None:
                     fold_start = n_repeat_start * k_fold + k_fold_start
@@ -558,6 +560,10 @@ class BaggedEnsembleModel(AbstractModel):
         for n_repeat, k in enumerate(self._k_per_n_repeat):
             kfolds = self._cv_splitters[n_repeat].split(X=X, y=y)
             all_kfolds += kfolds[n_repeat * k : (n_repeat + 1) * k]
+        if self._k_fold_end:  # the fitted first folds of a set that is not complete
+            n_repeat = len(self._k_per_n_repeat)
+            kfolds = self._cv_splitters[n_repeat].split(X=X, y=y)
+            all_kfolds += kfolds[n_repeat * self._k : n_repeat * self._k + self._k_fold_end]
         return [val_idx for _train_idx, val_idx in all_kfolds]
 
     def validate_fit_args(self, X: pd.DataFrame, **kwargs):
@@ -1164,6 +1170,7 @@ class BaggedEnsembleModel(AbstractModel):
             self._k = k_fold
             self._k_fold_end = k_fold_end
             self._n_repeats_finished = self._n_repeats - 1
+        self._folds_pending = k_fold != k_fold_end
 
     @staticmethod
     def _generate_fold_configs(

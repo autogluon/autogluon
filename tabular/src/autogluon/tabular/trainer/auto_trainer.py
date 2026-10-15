@@ -62,6 +62,7 @@ class AutoTrainer(AbstractTabularTrainer):
         ensemble_weights: dict | None = None,
         ensemble_weights_missing: str = "error",
         ensemble_hyperparameters: dict | None = None,
+        validation_folds: int | None = None,
         callbacks: list[callable] = None,
         label_cleaner=None,
         **kwargs,
@@ -185,6 +186,14 @@ class AutoTrainer(AbstractTabularTrainer):
         if ensemble_hyperparameters is not None:
             aux_kwargs = dict(aux_kwargs or {})
             aux_kwargs["ensemble_hyperparameters"] = ensemble_hyperparameters
+        partial = validation_folds is not None and self.bagged_mode and validation_folds < self.k_fold
+        self._validation_folds = validation_folds if partial else None
+        if self._validation_folds is not None:
+            logger.log(
+                20,
+                f"validation_folds={self._validation_folds}: every bagged model fits {self._validation_folds} of its "
+                f"{self.k_fold} folds before the weighted ensemble, and the models the best model uses then fit the rest.",
+            )
 
         self._train_multi_and_ensemble(
             X=X,
