@@ -165,6 +165,9 @@ class GroupCollapsedModel(AbstractModel):
         self.model_base = model_base
         self.group_columns = list(group_columns or [])
         self._inner_type: type[AbstractModel] | None = None
+        # Whether the last save wrote the inner model: a bag that keeps no fold models (`save_bag_folds=False`,
+        # `refit_folds=True`) saves its fold children with the inner model dropped.
+        self._inner_saved = False
         self._mean_features: list[str] | None = None
         self._mode_features: list[str] | None = None
 
@@ -278,6 +281,7 @@ class GroupCollapsedModel(AbstractModel):
         inner = self.model
         if inner is not None:
             inner.save(path=os.path.join(path, self._INNER_NAME), verbose=verbose)
+        self._inner_saved = inner is not None
         self.model = None
         try:
             path = super().save(path=path, verbose=verbose)
@@ -288,7 +292,7 @@ class GroupCollapsedModel(AbstractModel):
     @classmethod
     def load(cls, path: str, reset_paths: bool = True, verbose: bool = True):
         model = super().load(path=path, reset_paths=reset_paths, verbose=verbose)
-        if model._inner_type is not None:
+        if model._inner_saved:
             model.model = model._inner_type.load(
                 path=os.path.join(path, cls._INNER_NAME), reset_paths=reset_paths, verbose=verbose
             )

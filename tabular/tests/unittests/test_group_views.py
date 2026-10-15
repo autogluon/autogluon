@@ -41,8 +41,9 @@ def _label_per_group_frame(problem_type: str, n_groups: int, rows: int, seed: in
 
 def _fit(train: pd.DataFrame, tmp_path, **kwargs) -> TabularPredictor:
     kwargs.setdefault("num_bag_folds", 3)
+    kwargs.setdefault("hyperparameters", HYPERPARAMETERS)
     return TabularPredictor(label="label", path=str(tmp_path / "predictor"), verbosity=0).fit(
-        train, hyperparameters=HYPERPARAMETERS, num_gpus=0, dynamic_stacking=False, **kwargs
+        train, num_gpus=0, dynamic_stacking=False, **kwargs
     )
 
 
@@ -208,6 +209,27 @@ def test_refit_full_keeps_both_views(tmp_path):
     assert any(name.endswith(f"{GROUP_COLLAPSED_SUFFIX}_BAG_L1_FULL") for name in predictor.model_names())
     pred = predictor.predict_proba(test)
     assert pred.groupby(test["patient"].to_numpy()).nunique().max().max() == 1
+
+
+def test_a_bag_that_refits_its_folds_gets_a_collapsed_view(tmp_path):
+    """A bag fit with `refit_folds` keeps no fold models: the collapsed view's fold children are saved without
+    their inner model, and the bag reloads them for their trained parameters before refitting."""
+    train = _label_per_group_frame("binary", n_groups=30, rows=4, seed=0)
+    test = _label_per_group_frame("binary", n_groups=10, rows=4, seed=1)
+    hyperparameters = {"GBM": {"num_boost_round": 20, "ag_args_ensemble": {"refit_folds": True}}}
+    predictor = _fit(
+        train,
+        tmp_path,
+        hyperparameters=hyperparameters,
+        validation_structure={"group_on": "patient"},
+        group_views=True,
+        raise_on_model_failure=True,
+    )
+    assert f"LightGBM{GROUP_COLLAPSED_SUFFIX}_BAG_L1" in predictor.model_names()
+    pred = predictor.predict_proba(test)
+    assert pred.groupby(test["patient"].to_numpy()).nunique().max().max() == 1
+    loaded = TabularPredictor.load(predictor.path)
+    pd.testing.assert_frame_equal(loaded.predict_proba(test), pred)
 
 
 def test_errors(tmp_path):
