@@ -3,7 +3,6 @@ from __future__ import annotations
 import copy
 import logging
 import os
-import uuid
 from pathlib import Path
 
 import pandas as pd
@@ -14,6 +13,7 @@ from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.tabular import __version__
 from autogluon.tabular.models.abstract.abstract_torch_model import AbstractTorchModel
 
+from ._internal.core.fit_context import FitContextMemo
 from .checkpoint import CHECKPOINTS, DEFAULT_MODEL_VERSION, validate_checkpoint_version, validate_model_version
 from .recipes import DEFAULT_FINE_TUNE_RECIPE, get_finetune_recipe
 
@@ -94,12 +94,14 @@ class MitraModel(AbstractTorchModel):
         self._use_training_projection = False
         self._pending_fold_support = None
         self._category_maps = {}
-        self._fit_context_id = None
+        self._fit_context_memo = None
         self._mitra_config_schema_version = 1
 
     def __setstate__(self, state: dict) -> None:
         is_legacy = "_mitra_config_schema_version" not in state
         super().__setstate__(state)
+        if not hasattr(self, "_fit_context_memo"):
+            self._fit_context_memo = None
         if is_legacy:
             self._migrate_legacy_configuration()
 
@@ -108,9 +110,6 @@ class MitraModel(AbstractTorchModel):
         params_trained = getattr(self, "params_trained", {})
         user_params = getattr(self, "_user_params", {})
         fitted_model = getattr(self, "model", None)
-        if not hasattr(self, "_fit_context_id"):
-            self._fit_context_id = None
-
         if "model_version" not in params and "model_version" not in user_params:
             version = params_trained.get("model_version", getattr(fitted_model, "model_version", "1"))
             user_params["model_version"] = version
@@ -129,7 +128,7 @@ class MitraModel(AbstractTorchModel):
         # own validation is skipped by the existing upstream-validation flag.
         if not self._fit_constraints_validated_upstream:
             self._num_samples_total = len(X)
-            self._fit_context_id = uuid.uuid4().hex
+            self._fit_context_memo = FitContextMemo()
             # The released regression recipe fits its unsupervised projection
             # before bagging. The existing template-validation hook supplies
             # the outer training table without changing AutoGluon's fold code.
@@ -245,6 +244,30 @@ class MitraModel(AbstractTorchModel):
         get_finetune_recipe(recipe)
         return recipe
 
+    def _set_fine_tune_metric(self, hyperparameters: dict) -> None:
+        """Use a compatible AutoGluon metric unless the user selected one explicitly."""
+        if hyperparameters.get("metric") is not None:
+            return
+        classification_metrics = {
+            "accuracy": "accuracy",
+            "f1": "f1",
+            "f1_weighted": "f1",
+            "log_loss": "log_loss",
+            "roc_auc": "auc",
+            "roc_auc_ovo": "auc",
+            "roc_auc_ovo_macro": "auc",
+        }
+        regression_metrics = {
+            "mean_absolute_error": "mae",
+            "mean_squared_error": "mse",
+            "r2": "r2",
+            "root_mean_squared_error": "rmse",
+        }
+        metrics = regression_metrics if self.problem_type == "regression" else classification_metrics
+        metric = metrics.get(self.eval_metric.name)
+        if metric is not None:
+            hyperparameters["metric"] = metric
+
     @staticmethod
     def _get_default_device():
         """Get the best available device for the current system."""
@@ -348,6 +371,7 @@ class MitraModel(AbstractTorchModel):
         model_version = self._get_model_version()
         hyp["model_version"] = model_version
         hyp["fine_tune_recipe"] = self._get_fine_tune_recipe()
+        self._set_fine_tune_metric(hyp)
         hyp.pop("max_features", None)
         hyp.pop("feature_reduction", None)
 
@@ -387,7 +411,7 @@ class MitraModel(AbstractTorchModel):
             hyp["verbose"] = verbosity >= 3
 
         self.model = model_cls(**hyp)
-        self.model._fit_context_id = self._fit_context_id
+        self.model._fit_context_memo = self._fit_context_memo
         self.model._num_samples_total = getattr(self, "_num_samples_total", len(X))
 
         X = self.preprocess(X, y=y, is_train=True)
@@ -580,6 +604,7 @@ class MitraModel(AbstractTorchModel):
             cls.download_weights(repo_id=repo_id)
 
     def _estimate_memory_usage(self, X: pd.DataFrame, **kwargs) -> int:
+        kwargs["hyperparameters"] = self._get_model_params(convert_search_spaces_to_default=True)
         return self.estimate_memory_usage_static(
             X=X, problem_type=self.problem_type, num_classes=self.num_classes, **kwargs
         )

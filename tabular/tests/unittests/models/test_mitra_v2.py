@@ -1,3 +1,4 @@
+import copy
 import json
 import os
 import subprocess
@@ -249,6 +250,42 @@ def test_explicit_recipe_overrides_and_time_budget():
     assert cfg.hyperparams["budget"] == 100
     cfg, _ = estimator._create_config("classification", 10, time_limit=1000)
     assert cfg.hyperparams["budget"] == 250
+
+
+@pytest.mark.parametrize(
+    "problem_type,eval_metric,expected",
+    [
+        ("binary", "accuracy", "accuracy"),
+        ("binary", "f1", "f1"),
+        ("multiclass", "f1_weighted", "f1"),
+        ("multiclass", "roc_auc_ovo_macro", "auc"),
+        ("regression", "root_mean_squared_error", "rmse"),
+        ("regression", "mean_squared_error", "mse"),
+        ("regression", "mean_absolute_error", "mae"),
+        ("regression", "r2", "r2"),
+    ],
+)
+def test_eval_metric_controls_fine_tuning_metric(problem_type, eval_metric, expected):
+    model = MitraModel(problem_type=problem_type, eval_metric=eval_metric)
+    hyperparameters = {}
+    model._set_fine_tune_metric(hyperparameters)
+    assert hyperparameters["metric"] == expected
+
+
+def test_explicit_fine_tuning_metric_takes_precedence():
+    model = MitraModel(problem_type="binary", eval_metric="f1")
+    hyperparameters = {"metric": "log_loss"}
+    model._set_fine_tune_metric(hyperparameters)
+    assert hyperparameters["metric"] == "log_loss"
+
+
+def test_f1_early_stopping_maximizes_score():
+    from autogluon.tabular.models.mitra._internal.core.callbacks import EarlyStopping
+
+    callback = EarlyStopping(patience=1, metric="f1")
+    callback(0.8)
+    callback(0.7)
+    assert callback.we_should_stop()
 
 
 @pytest.mark.parametrize("bagged", [False, True])
@@ -700,6 +737,18 @@ def test_many_class_external_validation_requires_every_class():
         estimator.fit(X, y, X_val=X[:10], y_val=np.arange(10))
 
 
+def test_many_class_external_validation_rejects_non_integer_labels_before_casting():
+    from autogluon.tabular.models.mitra.finetune import MitraFinetuneClassifier
+
+    X = np.random.RandomState(0).normal(size=(44, 3))
+    y = np.tile(np.arange(11), 4)
+    y_val = np.arange(11, dtype=float)
+    y_val[0] = 0.5
+    estimator = MitraFinetuneClassifier(hf_model="unused", device="cpu", fine_tune=False)
+    with pytest.raises(ValueError, match="must contain exactly the training classes"):
+        estimator.fit(X, y, X_val=X[:11], y_val=y_val)
+
+
 def test_many_class_internal_split_retains_every_class(checkpoint_factory):
     from autogluon.tabular.models.mitra.finetune import MitraFinetuneClassifier
 
@@ -851,6 +900,27 @@ def test_memory_estimate_uses_post_reduction_shape_and_prediction_caps():
             },
         )
     assert shapes == [(90, 256)]
+
+
+def test_instance_memory_estimate_uses_resolved_hyperparameters():
+    X = pd.DataFrame(np.random.RandomState(7).normal(size=(100, 300)))
+    model = MitraModel(
+        problem_type="regression",
+        hyperparameters={
+            "fine_tune_recipe": "2",
+            "max_features": 64,
+            "max_samples_support": 32,
+            "n_estimators": 3,
+        },
+    )
+    model.initialize(X=X, y=pd.Series(np.arange(len(X), dtype=float)))
+    with mock.patch.object(MitraModel, "estimate_memory_usage_static", return_value=123) as estimate:
+        assert model._estimate_memory_usage(X) == 123
+    hyperparameters = estimate.call_args.kwargs["hyperparameters"]
+    assert hyperparameters["fine_tune_recipe"] == "2"
+    assert hyperparameters["max_features"] == 64
+    assert hyperparameters["max_samples_support"] == 32
+    assert hyperparameters["n_estimators"] == 3
 
 
 def test_classification_memory_estimate_does_not_assume_fold_reduction():
@@ -1281,9 +1351,11 @@ def test_fitted_context_is_reused_and_can_shrink_again():
     import torch
 
     from autogluon.tabular.models.mitra import finetune
+    from autogluon.tabular.models.mitra._internal.core.fit_context import FitContextMemo
 
     attempts = []
     supported = [2048]
+    fit_context = FitContextMemo()
 
     class Trainer:
         def __init__(self, cfg, *args, **kwargs):
@@ -1297,12 +1369,11 @@ def test_fitted_context_is_reused_and_can_shrink_again():
 
     def fit(rows):
         estimator = finetune.MitraFinetuneClassifier(device="cpu")
-        estimator._fit_context_id = "shared-fit"
+        estimator._fit_context_memo = fit_context
         estimator.fit(np.zeros((rows, 4)), np.arange(rows) % 2, X_val=np.zeros((2, 4)), y_val=np.array([0, 1]))
         assert "_fitted_context_key" not in estimator.__dict__
 
     with (
-        mock.patch.dict(finetune._FITTED_CONTEXT_MEMO, clear=True),
         mock.patch(
             "autogluon.tabular.models.mitra.sklearn_interface.Tab2D.from_pretrained",
             return_value=SimpleNamespace(task="classification", dim_output=10),
@@ -1330,9 +1401,11 @@ def test_fitted_context_is_reused_and_can_shrink_again():
 )
 def test_fitted_context_does_not_cross_fit_settings(change):
     from autogluon.tabular.models.mitra import finetune
+    from autogluon.tabular.models.mitra._internal.core.fit_context import FitContextMemo
     from autogluon.tabular.models.mitra.sklearn_interface import MitraBase
 
     starts = []
+    fit_context = FitContextMemo()
 
     def train(estimator, X_train, y_train, X_valid, y_valid, task, dim_output, **kwargs):
         cfg, _ = estimator._create_config(task, dim_output)
@@ -1341,12 +1414,9 @@ def test_fitted_context_does_not_cross_fit_settings(change):
         estimator.trainers = [SimpleNamespace(cfg=cfg)]
         return estimator
 
-    with (
-        mock.patch.dict(finetune._FITTED_CONTEXT_MEMO, clear=True),
-        mock.patch.object(MitraBase, "_train_ensemble", train),
-    ):
+    with mock.patch.object(MitraBase, "_train_ensemble", train):
         first = finetune.MitraFinetuneClassifier(device="cpu")
-        first._fit_context_id = "shared-fit"
+        first._fit_context_memo = fit_context
         first.fit(np.zeros((4096, 4)), np.arange(4096) % 2, X_val=np.zeros((2, 4)), y_val=np.array([0, 1]))
         rows, features, kwargs = 4096, 4, {"device": "cpu"}
         if change == "features":
@@ -1364,7 +1434,7 @@ def test_fitted_context_does_not_cross_fit_settings(change):
         elif change == "legacy_recipe":
             kwargs["fine_tune_recipe"] = "1"
         second = finetune.MitraFinetuneClassifier(**kwargs)
-        second._fit_context_id = "shared-fit"
+        second._fit_context_memo = fit_context
         second.fit(
             np.zeros((rows, features)),
             np.arange(rows) % 2,
@@ -1391,10 +1461,7 @@ def test_fitted_context_does_not_cross_unrelated_fits():
         estimator.trainers = [SimpleNamespace(cfg=cfg)]
         return estimator
 
-    with (
-        mock.patch.dict(finetune._FITTED_CONTEXT_MEMO, clear=True),
-        mock.patch.object(MitraBase, "_train_ensemble", train),
-    ):
+    with mock.patch.object(MitraBase, "_train_ensemble", train):
         for _ in range(2):
             estimator = finetune.MitraFinetuneClassifier(device="cpu")
             estimator.fit(
@@ -1404,6 +1471,16 @@ def test_fitted_context_does_not_cross_unrelated_fits():
                 y_val=np.array([0, 1]),
             )
     assert starts == [16384, 16384]
+
+
+def test_fitted_context_is_shared_by_deep_copies_without_global_state():
+    from autogluon.tabular.models.mitra._internal.core.fit_context import FitContextMemo
+
+    fit_context = FitContextMemo()
+    fit_context.values[("shape",)] = (2048, 512)
+    copied = copy.deepcopy(fit_context)
+    assert copied is fit_context
+    assert copied.values == {("shape",): (2048, 512)}
 
 
 @pytest.mark.parametrize(
@@ -1433,13 +1510,10 @@ def test_failed_fit_does_not_record_a_fitted_context():
         estimator._create_config("classification", 10)
         raise RuntimeError("failed fit")
 
-    with (
-        mock.patch.dict(finetune._FITTED_CONTEXT_MEMO, clear=True),
-        mock.patch.object(MitraBase, "_train_ensemble", fail),
-    ):
+    with mock.patch.object(MitraBase, "_train_ensemble", fail):
         with pytest.raises(RuntimeError, match="failed fit"):
             estimator.fit(np.zeros((16, 4)), np.arange(16) % 2)
-        assert not finetune._FITTED_CONTEXT_MEMO
+        assert not estimator._fit_context_memo.values
         assert "_fitted_context_key" not in estimator.__dict__
 
 
