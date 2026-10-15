@@ -1084,6 +1084,12 @@ class TabularPredictor:
                   and renormalized. The collapsed views' predictions, constant within a group, are
                   pooled too, so it should map a group of identical rows to that row. It is saved with
                   the predictor, so it must be picklable (e.g. a function defined at module level).
+                - a list of these, e.g. `["geometric_mean", "median"]`: every model gets one pooled
+                  view per strategy, each a separate input of the weighted ensemble named
+                  `<model>@<strategy>` (a callable's `__name__`), so the ensemble weighs the
+                  strategies per model as it weighs the models. A collapsed view is a single input,
+                  pooled by the first strategy. A model's ensemble weight is the sum of its inputs'
+                  weights; the weight of each input is logged.
 
                 Supported for the first stack layer only.
             validation_size_curves : dict | ValidationSizeCurves, default = None

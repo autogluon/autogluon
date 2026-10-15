@@ -6,7 +6,7 @@ of each base model use that:
 
 - the model's row predictions pooled within each group, so every row of a group gets the group's prediction
   (`GroupViews.pooling`: by default the geometric mean of the class probabilities, renormalised, and the mean
-  for regression);
+  for regression; several strategies give one pooled view each);
 - the same model fit on the collapsed table, one row per group (numeric features averaged, the others
   set to their most frequent value in the group, plus the log of the group's row count), its prediction
   for a group copied to the group's rows.
@@ -25,6 +25,7 @@ import copy
 import logging
 import os
 import pickle
+from collections.abc import Sequence
 from dataclasses import dataclass, fields
 from typing import Callable
 
@@ -32,7 +33,7 @@ import numpy as np
 import pandas as pd
 
 from autogluon.common.features.feature_metadata import FeatureMetadata
-from autogluon.common.features.types import R_FLOAT, R_INT, S_BOOL, S_GROUP_KEY
+from autogluon.common.features.types import R_FLOAT, R_INT, S_BOOL, S_GROUP_KEY, S_STACK
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
 from autogluon.core.models import AbstractModel
 from autogluon.core.models.ensemble.weighted_ensemble_model import WeightedEnsembleModel
@@ -54,6 +55,10 @@ _LOG_CLIP = 1e-15
 
 GroupPooling = Callable[[np.ndarray, np.ndarray], np.ndarray]
 """A custom pooling strategy, `pooling(pred, groups) -> pooled` (see `GroupViews.pooling`)."""
+
+GROUP_POOLED_SEPARATOR = "@"
+"""Joins a model's name and a pooling strategy's into the name of the model's view pooled by that strategy, when
+`GroupViews.pooling` lists several (e.g. `LightGBM_BAG_L1@median`)."""
 
 
 def group_key_feature_metadata() -> FeatureMetadata:
@@ -166,6 +171,20 @@ def group_pooling_function(pooling: str | GroupPooling | None, problem_type: str
     return GROUP_POOLING[pooling]
 
 
+def group_pooling_strategies(pooling: str | GroupPooling | Sequence[str | GroupPooling] | None) -> list:
+    """`GroupViews.pooling` as a list of strategies (`[None]` for the problem type's default)."""
+    if isinstance(pooling, (list, tuple)):
+        return list(pooling)
+    return [pooling]
+
+
+def group_pooling_name(pooling: str | GroupPooling) -> str:
+    """The name of a pooling strategy: a built-in's own, or the callable's `__name__`."""
+    if isinstance(pooling, str):
+        return pooling
+    return getattr(pooling, "__name__", type(pooling).__name__)
+
+
 def pool_within_groups(
     pred: np.ndarray, codes: np.ndarray, problem_type: str, pooling: str | GroupPooling | None = None
 ) -> np.ndarray:
@@ -205,22 +224,39 @@ class GroupViews:
     ----------
     enabled : bool | str, default True
         True: on, raising if the fit does not allow it. "auto": on when the data and fit allow it. False: off.
-    pooling : str | callable, default None
+    pooling : str | callable | list, default None
         How the weighted ensemble pools each model's row predictions within a group: "geometric_mean",
         "mean", "median" or a callable `pooling(pred, groups)`. None: "geometric_mean" for classification and
-        "mean" for regression.
+        "mean" for regression. A list of these gives every model one pooled view per strategy, each a separate
+        input to the weighted ensemble, named `<model>@<strategy>` (a callable's `__name__`).
     """
 
     enabled: bool | str = True
-    pooling: str | GroupPooling | None = None
+    pooling: str | GroupPooling | Sequence[str | GroupPooling] | None = None
 
     def __post_init__(self):
         if self.enabled not in (True, False, "auto"):
             raise ValueError(f"group_views must be True, False or 'auto', got {self.enabled!r}.")
-        if self.pooling is not None and not callable(self.pooling) and self.pooling not in GROUP_POOLING:
+        if self.pooling is None:
+            return
+        strategies = group_pooling_strategies(self.pooling)
+        if not strategies:
+            raise ValueError("`group_views` pooling must list at least one strategy.")
+        for pooling in strategies:
+            if not callable(pooling) and pooling not in GROUP_POOLING:
+                raise ValueError(
+                    f"`group_views` pooling must be one of {sorted(GROUP_POOLING)}, a callable or a list of these, "
+                    f"got {pooling!r}."
+                )
+        names = [group_pooling_name(pooling) for pooling in strategies]
+        if len(set(names)) < len(names):
             raise ValueError(
-                f"`group_views` pooling must be one of {sorted(GROUP_POOLING)} or a callable, got {self.pooling!r}."
+                f"`group_views` pooling strategies name the weighted ensemble's inputs, so their names must be "
+                f"distinct, got {names}."
             )
+        if isinstance(self.pooling, list):
+            # A frozen dataclass is hashable only with hashable fields.
+            object.__setattr__(self, "pooling", tuple(self.pooling))
 
     @classmethod
     def from_input(cls, value: bool | str | dict | GroupViews | None) -> GroupViews | None:
@@ -240,23 +276,28 @@ class GroupViews:
             raise ValueError(f"group_views must be True, False, 'auto', a dict or a GroupViews, got {value!r}.")
         return None if value.enabled is False else value
 
-    def resolve_pooling(self, problem_type: str, check_picklable: bool = True) -> str | GroupPooling:
-        """The pooling strategy for `problem_type`: a built-in's name, or the callable.
+    def resolve_pooling(
+        self, problem_type: str, check_picklable: bool = True
+    ) -> str | GroupPooling | tuple[str | GroupPooling, ...]:
+        """The pooling strategy for `problem_type` (a built-in's name, or the callable), or a tuple of several.
 
         A callable is saved with the predictor, so `check_picklable` checks that up front rather than once
-        every model is fit.
+        every model is fit. A list of one strategy is that strategy.
         """
-        pooling = default_group_pooling(problem_type) if self.pooling is None else self.pooling
-        group_pooling_function(pooling, problem_type)
-        if callable(pooling) and check_picklable:
-            try:
-                pickle.dumps(pooling)
-            except (pickle.PicklingError, AttributeError, TypeError) as err:
-                raise ValueError(
-                    "A custom `group_views` pooling is saved with the predictor, so it must be picklable: a function "
-                    f"defined at module level, not a lambda or a nested function. Got {pooling!r}."
-                ) from err
-        return pooling
+        if self.pooling is None:
+            return default_group_pooling(problem_type)
+        strategies = group_pooling_strategies(self.pooling)
+        for pooling in strategies:
+            group_pooling_function(pooling, problem_type)
+            if callable(pooling) and check_picklable:
+                try:
+                    pickle.dumps(pooling)
+                except (pickle.PicklingError, AttributeError, TypeError) as err:
+                    raise ValueError(
+                        "A custom `group_views` pooling is saved with the predictor, so it must be picklable: a "
+                        f"function defined at module level, not a lambda or a nested function. Got {pooling!r}."
+                    ) from err
+        return strategies[0] if len(strategies) == 1 else tuple(strategies)
 
 
 class GroupCollapsedModel(AbstractModel):
@@ -437,11 +478,60 @@ class GroupPooledWeightedEnsembleModel(WeightedEnsembleModel):
     selects among each model's pooled row predictions and its collapsed predictions (the built-in pooling
     strategies leave the latter unchanged, being constant within a group already). The data passed in carries
     `GROUP_KEY_COLUMN`. The `group_pooling` hyperparameter is the pooling strategy (see `GroupViews.pooling`).
+
+    With several strategies, each of a model's pooled views is an input of its own: a copy of the model's stack
+    columns under the prefix `<model>@<strategy>`, pooled by that strategy. A collapsed model is one input, under
+    its own name and pooled by the first strategy. `_get_model_weights` sums a model's inputs' weights; the
+    children's `model_weights` keep them apart.
     """
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        #: The base model and pooling strategy of each input, by stack column prefix, as fit (refit_full later points
+        #: the prefixes at the refit base models).
+        self._group_inputs: dict[str, tuple[str, str | GroupPooling | None]] = {}
 
     def _set_default_params(self):
         self._set_default_param_value("group_pooling", None)
         super()._set_default_params()
+
+    def _is_collapsed(self, model: str) -> bool:
+        return (self._base_model_types_inner_dict or {}).get(model) is GroupCollapsedModel
+
+    def _inputs(self, base_model_names: list[str]) -> list[tuple[str, str, str | GroupPooling | None]]:
+        """The `(stack column prefix, base model, pooling strategy)` of every input of the ensemble."""
+        strategies = group_pooling_strategies(self.params["group_pooling"])
+        inputs = []
+        for model in base_model_names:
+            if len(strategies) == 1 or self._is_collapsed(model):
+                inputs.append((model, model, strategies[0]))
+            else:
+                inputs += [
+                    (f"{model}{GROUP_POOLED_SEPARATOR}{group_pooling_name(pooling)}", model, pooling)
+                    for pooling in strategies
+                ]
+        return inputs
+
+    def _with_input_columns(self, X: pd.DataFrame, inputs: list[tuple[str, str]]) -> pd.DataFrame:
+        """`X` plus the stack columns of each `(prefix, base model)` input, copied from the base model's columns,
+        where `X` has those but not the input's."""
+        copies = {}
+        for prefix, model in inputs:
+            if prefix == model:
+                continue
+            columns, _ = self.set_stack_columns(stack_column_prefix_lst=[prefix])
+            model_columns, _ = self.set_stack_columns(stack_column_prefix_lst=[model])
+            if columns[0] not in X.columns and all(column in X.columns for column in model_columns):
+                copies.update({column: X[model_column] for column, model_column in zip(columns, model_columns)})
+        if not copies:
+            return X
+        return pd.concat([X, pd.DataFrame(copies, index=X.index)], axis=1)
+
+    def _preprocess_set_features(self, X: pd.DataFrame, feature_metadata: FeatureMetadata = None):
+        # The inputs are features of the ensemble. They are set before the limits on base models apply, so
+        # every base model's are added here, and `_update_feature_metadata` keeps those of the models it keeps.
+        inputs = [(prefix, model) for prefix, model, _ in self._inputs(self.base_model_names)]
+        super()._preprocess_set_features(X=self._with_input_columns(X, inputs), feature_metadata=feature_metadata)
 
     def _update_feature_metadata(self, X: pd.DataFrame, feature_metadata: FeatureMetadata) -> FeatureMetadata:
         types_inner = self._base_model_types_inner_dict
@@ -457,14 +547,49 @@ class GroupPooledWeightedEnsembleModel(WeightedEnsembleModel):
                 for model, model_type in types_inner.items()
             }
         try:
-            return super()._update_feature_metadata(X=X, feature_metadata=feature_metadata)
+            feature_metadata = super()._update_feature_metadata(X=X, feature_metadata=feature_metadata)
         finally:
             self._base_model_types_inner_dict = types_inner
+        inputs = self._inputs(self.base_model_names)
+        self._group_inputs = {prefix: (model, pooling) for prefix, model, pooling in inputs}
+        prefixes = [prefix for prefix, _, _ in inputs]
+        if prefixes == self.stack_column_prefix_lst:
+            return feature_metadata
+        model_columns = self.stack_columns
+        self.stack_column_prefix_lst = prefixes
+        self.stack_column_prefix_to_model_map = {prefix: model for prefix, model, _ in inputs}
+        self.stack_columns, self.num_pred_cols_per_model = self.set_stack_columns(stack_column_prefix_lst=prefixes)
+        feature_metadata = feature_metadata.remove_features(
+            features=[column for column in model_columns if column not in self.stack_columns]
+        )
+        new_columns = [column for column in self.stack_columns if column not in model_columns]
+        return feature_metadata.join_metadata(
+            FeatureMetadata(
+                type_map_raw={column: R_FLOAT for column in new_columns},
+                type_group_map_special={S_STACK: new_columns},
+            )
+        )
+
+    def _fit(self, X, y, **kwargs):
+        super()._fit(X, y, **kwargs)
+        if self._child_has_weights() and len(group_pooling_strategies(self.params["group_pooling"])) > 1:
+            weights = sorted(super()._get_model_weights().items(), key=lambda item: item[1], reverse=True)
+            logger.log(20, f"\tGroup view weights: {{{', '.join(f'{k!r}: {round(v, 3)}' for k, v in weights)}}}")
+        return self
+
+    def _get_model_weights(self) -> dict:
+        """The base models' weights, each the sum of the weights of the model's inputs."""
+        weights = {}
+        for prefix, weight in super()._get_model_weights().items():
+            model = self._group_inputs[prefix][0] if prefix in self._group_inputs else prefix
+            weights[model] = weights.get(model, 0) + weight
+        return weights
 
     def preprocess(self, X, preprocess_nonadaptive: bool = True, model=None, **kwargs):
         if GROUP_KEY_COLUMN not in X.columns:
             raise KeyError(f"{self.name} pools predictions within groups, so its input needs `{GROUP_KEY_COLUMN}`.")
         codes = X[GROUP_KEY_COLUMN].to_numpy()
+        X = self._with_input_columns(X, list(self.stack_column_prefix_to_model_map.items()))
         X = super().preprocess(X, preprocess_nonadaptive=False, **kwargs)
         X = self._pool(X, codes)
         if preprocess_nonadaptive:
@@ -474,11 +599,11 @@ class GroupPooledWeightedEnsembleModel(WeightedEnsembleModel):
     def _pool(self, X: pd.DataFrame, codes: np.ndarray) -> pd.DataFrame:
         X = X.copy()
         k = self.num_pred_cols_per_model
-        for i in range(len(self.stack_column_prefix_lst)):
+        for i, prefix in enumerate(self.stack_column_prefix_lst):
             columns = self.stack_columns[i * k : (i + 1) * k]
             values = X[columns].to_numpy()
             if k == 1:
                 values = values[:, 0]
-            pooled = pool_within_groups(values, codes, self.problem_type, self.params["group_pooling"])
+            pooled = pool_within_groups(values, codes, self.problem_type, self._group_inputs[prefix][1])
             X[columns] = pooled.reshape(len(X), k)
         return X

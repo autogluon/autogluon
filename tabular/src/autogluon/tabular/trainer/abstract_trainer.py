@@ -172,7 +172,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         raise_on_model_failure: bool = False,
         save_to_disk: bool = True,
         group_views: list[str] | None = None,
-        group_pooling: str | GroupPooling | None = None,
+        group_pooling: str | GroupPooling | tuple[str | GroupPooling, ...] | None = None,
     ):
         super().__init__(
             path=path,
@@ -184,7 +184,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         #: The data then carries the `GROUP_KEY_COLUMN` feature.
         self.group_views: list[str] | None = group_views
         #: How the weighted ensemble pools predictions within groups under group views (see `GroupViews.pooling`).
-        self.group_pooling: str | GroupPooling | None = group_pooling
+        self.group_pooling: str | GroupPooling | tuple[str | GroupPooling, ...] | None = group_pooling
         #: When False, nothing is written to ``path`` during fit: the trainer keeps every model in memory (as
         #: ``low_memory=False`` does) and skips its own pickle, so the fitted trainer lives only in this process.
         self.save_to_disk: bool = save_to_disk
@@ -2160,7 +2160,9 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
 
                     model_loaded.base_model_paths_dict[new_base_model] = new_base_model_path
                     model_loaded.base_model_types_dict[new_base_model] = new_base_model_type
-                    model_loaded.base_model_names.append(new_base_model)
+                    # Several prefixes can read one base model (e.g. the pooled views of `group_views`).
+                    if new_base_model not in model_loaded.base_model_names:
+                        model_loaded.base_model_names.append(new_base_model)
                     model_loaded.stack_column_prefix_to_model_map[stack_column_prefix] = new_base_model
 
             model_loaded.save()  # TODO: Avoid this!

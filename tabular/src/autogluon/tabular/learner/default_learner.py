@@ -63,7 +63,7 @@ class DefaultLearner(AbstractTabularLearner):
         ensemble_weights_missing: str = "error",
         ensemble_hyperparameters: dict | None = None,
         group_views: list[str] | None = None,
-        group_pooling: str | GroupPooling | None = None,
+        group_pooling: str | GroupPooling | tuple[str | GroupPooling, ...] | None = None,
         **trainer_fit_kwargs,
     ):
         """Arguments:

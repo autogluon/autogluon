@@ -11,9 +11,12 @@ from autogluon.core.models import AbstractModel
 from autogluon.tabular import TabularPredictor
 from autogluon.tabular.trainer.group_views import (
     GROUP_COLLAPSED_SUFFIX,
+    GROUP_POOLED_SEPARATOR,
     GroupViews,
     _group_mode,
     group_codes,
+    group_pooling_name,
+    group_pooling_strategies,
     label_constant_within_groups,
     pool_within_groups,
 )
@@ -120,6 +123,22 @@ def test_group_views_input_forms():
     # an in-memory predictor saves nothing, so it takes any callable
     assert callable(GroupViews(pooling=lambda pred, groups: pred).resolve_pooling("binary", check_picklable=False))
 
+    listed = GroupViews.from_input({"pooling": ["mean", "median", _max_pool]})
+    assert listed.pooling == ("mean", "median", _max_pool)
+    assert hash(listed) == hash(GroupViews(pooling=("mean", "median", _max_pool)))
+    assert listed.resolve_pooling("regression") == ("mean", "median", _max_pool)
+    assert GroupViews(pooling=["median"]).resolve_pooling("binary") == "median"
+    with pytest.raises(ValueError, match="at least one strategy"):
+        GroupViews(pooling=[])
+    with pytest.raises(ValueError, match="must be distinct"):
+        GroupViews(pooling=["mean", "mean"])
+    with pytest.raises(ValueError, match="must be one of"):
+        GroupViews(pooling=["mean", "mode"])
+    with pytest.raises(ValueError, match="does not apply to regression"):
+        GroupViews(pooling=["mean", "geometric_mean"]).resolve_pooling("regression")
+    with pytest.raises(ValueError, match="must be picklable"):
+        GroupViews(pooling=["mean", lambda pred, groups: pred]).resolve_pooling("binary")
+
 
 def test_group_codes_number_the_groups_of_the_frame():
     df = pd.DataFrame({"a": ["x", "y", "x", "z"], "b": [1, 1, 2, 1]})
@@ -217,14 +236,18 @@ def test_an_ensemble_model_combines_the_pooled_views(problem_type, tmp_path):
 
 
 def _pooled_greedy_prediction(predictor: TabularPredictor, data: pd.DataFrame, pooling) -> pd.DataFrame:
-    """The weighted ensemble's prediction, recomputed: its weights over the base models' pooled predictions."""
+    """The weighted ensemble's prediction, recomputed: its weights over its inputs, each a base model's
+    predictions pooled by one of the strategies of `pooling` (a collapsed model's by the first)."""
     ensemble = predictor._trainer.load_model(predictor.model_best)
+    strategies = {group_pooling_name(strategy): strategy for strategy in group_pooling_strategies(pooling)}
     codes = group_codes(data, ["patient"])
     out = 0
-    for name, weight in ensemble._get_model_weights().items():
-        pred = _predict_model(predictor, data, name)
+    for name, weight in ensemble.load_child(ensemble.models[0])._get_model_weights().items():
+        model, _, strategy = name.partition(GROUP_POOLED_SEPARATOR)
+        strategy = strategies[strategy] if strategy else next(iter(strategies.values()))
+        pred = _predict_model(predictor, data, model)
         values = pred.to_numpy()[:, 1] if predictor.problem_type == "binary" else pred.to_numpy()
-        pooled = pool_within_groups(values, codes, predictor.problem_type, pooling)
+        pooled = pool_within_groups(values, codes, predictor.problem_type, strategy)
         if predictor.problem_type == "binary":
             pooled = np.stack([1 - pooled, pooled], axis=1)
         out = out + weight * pooled.reshape(pred.shape)
@@ -257,25 +280,64 @@ def test_the_ensemble_pools_by_the_chosen_strategy(problem_type, pooling, tmp_pa
     pd.testing.assert_frame_equal(_predict(loaded, test), pred)
 
 
-def test_each_collapsed_model_counts_as_a_type_of_its_own(tmp_path):
+@pytest.mark.parametrize("problem_type", ["multiclass", "regression"], ids=["multiclass", "rmse"])
+def test_a_list_of_strategies_gives_every_model_a_pooled_view_per_strategy(problem_type, tmp_path):
+    train = _label_per_group_frame(problem_type, n_groups=40, rows=5, seed=0)
+    test = _label_per_group_frame(problem_type, n_groups=15, rows=5, seed=1)
+    pooling = ["mean", "median"]
+    predictor = _fit(train, tmp_path, validation_structure={"group_on": "patient"}, group_views={"pooling": pooling})
+    ensemble = predictor._trainer.load_model(predictor.model_best)
+    assert ensemble.params["group_pooling"] == ("mean", "median")
+    input_weights = ensemble.load_child(ensemble.models[0])._get_model_weights()
+    for name in input_weights:
+        model, _, strategy = name.partition(GROUP_POOLED_SEPARATOR)
+        assert strategy == ("" if model.endswith(GROUP_COLLAPSED_SUFFIX + "_BAG_L1") else strategy)
+        assert strategy in ("", "mean", "median")
+    # A model's weight is the sum of its inputs'.
+    model_weights = ensemble._get_model_weights()
+    assert set(model_weights) == {name.partition(GROUP_POOLED_SEPARATOR)[0] for name in input_weights}
+    assert sum(model_weights.values()) == pytest.approx(sum(input_weights.values()))
+
+    pred = _predict(predictor, test)
+    pd.testing.assert_frame_equal(
+        pred, _pooled_greedy_prediction(predictor, test, pooling), atol=1e-5, check_dtype=False
+    )
+    loaded = TabularPredictor.load(predictor.path)
+    pd.testing.assert_frame_equal(_predict(loaded, test), pred)
+
+    refit_map = predictor.refit_full()
+    full = predictor._trainer.load_model(refit_map[ensemble.name])
+    assert sorted(set(full.stack_column_prefix_lst)) == sorted(ensemble.stack_column_prefix_lst)
+    assert len(full.base_model_names) == len(set(full.base_model_names))
+    pred_full = _predict_model(predictor, test, full.name)
+    assert pred_full.groupby(test["patient"].to_numpy()).nunique().max().max() == 1
+
+
+def test_every_input_reaches_the_ensemble_model(tmp_path):
     """Below 1000 rows the ensemble keeps one base model per model type (`max_base_models_per_type="auto"`): a
     collapsed model counts under the type it collapses, as a type of its own, so every model's collapsed view is
-    kept, not only the best one."""
+    kept, not only the best one. With a list of strategies, each pooled view is an input of its own."""
     train = _label_per_group_frame("binary", n_groups=40, rows=5, seed=0)
+    test = _label_per_group_frame("binary", n_groups=15, rows=5, seed=1)
     predictor = _fit(
         train,
         tmp_path,
         hyperparameters={"GBM": {"num_boost_round": 20}, "LR": {}, "KNN": {}},
         validation_structure={"group_on": "patient"},
-        group_views=True,
+        group_views={"pooling": ["geometric_mean", _max_pool]},
         ensemble_hyperparameters={_UniformMeanEnsemble: {}},
     )
     ensemble = predictor._trainer.load_model(predictor.model_best)
+    base_models = ["KNeighbors", "LightGBM", "LinearModel"]
     assert sorted(ensemble.base_model_names) == sorted(
-        f"{base}{suffix}_BAG_L1"
-        for base in ("KNeighbors", "LightGBM", "LinearModel")
-        for suffix in ("", GROUP_COLLAPSED_SUFFIX)
+        f"{base}{suffix}_BAG_L1" for base in base_models for suffix in ("", GROUP_COLLAPSED_SUFFIX)
     )
+    assert sorted(ensemble.stack_column_prefix_lst) == sorted(
+        [f"{base}_BAG_L1@{strategy}" for base in base_models for strategy in ("geometric_mean", "_max_pool")]
+        + [f"{base}{GROUP_COLLAPSED_SUFFIX}_BAG_L1" for base in base_models]
+    )
+    pred = _predict(predictor, test)
+    assert pred.groupby(test["patient"].to_numpy()).nunique().max().max() == 1
 
 
 def test_group_views_help_on_label_per_group_data(tmp_path):
