@@ -19,6 +19,7 @@ import pandas as pd
 from typing_extensions import Self
 
 from autogluon.common.features.feature_metadata import FeatureMetadata
+from autogluon.common.features.types import S_GROUP_KEY
 from autogluon.common.space import Space
 from autogluon.common.utils.distribute_utils import DistributedContext
 from autogluon.common.utils.log_utils import DuplicateFilter
@@ -991,6 +992,10 @@ class AbstractModel(ModelBase, Tunable):
         if get_features_kwargs_extra is not None:
             valid_features_extra = feature_metadata.get_features(**get_features_kwargs_extra)
             valid_features = [feature for feature in valid_features if feature in valid_features_extra]
+        if not self._uses_group_key():
+            group_key_features = set(feature_metadata.get_features(required_special_types=[S_GROUP_KEY]))
+            if group_key_features:
+                valid_features = [feature for feature in valid_features if feature not in group_key_features]
 
         return valid_features
 
@@ -1551,6 +1556,14 @@ class AbstractModel(ModelBase, Tunable):
     #: full split satisfies `ag.min_rows` but whose fold slices do not would otherwise fail every
     #: child and lose the model entirely.
     _fit_constraints_validated_upstream: bool = False
+
+    #: Whether the model reads features of special type `S_GROUP_KEY` (the group a row belongs to). Such a
+    #: feature is row-aligned side information for per-group models, so every other model leaves it out of
+    #: its features (see `_get_valid_features`).
+    uses_group_key: bool = False
+
+    def _uses_group_key(self) -> bool:
+        return self.uses_group_key
 
     # FIXME: Simply log a message that the model is being skipped instead of logging a traceback.
     def validate_fit_args(self, X: pd.DataFrame, feature_metadata: FeatureMetadata | None = None, **kwargs):
