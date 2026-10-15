@@ -1,0 +1,332 @@
+"""Group views: two views of every base model on data whose label is constant within each group.
+
+When the rows of a group share one label (for example several measurements of the same patient, each row
+labelled with the patient's diagnosis), a row is one noisy observation of a group-level target. Two views
+of each base model use that:
+
+- the model's row predictions pooled within each group: the geometric mean of the class probabilities,
+  renormalised (the mean for regression), so every row of a group gets the group's prediction;
+- the same model fit on the collapsed table, one row per group (numeric features averaged, the others
+  set to their most frequent value in the group, plus the log of the group's row count), its prediction
+  for a group copied to the group's rows.
+
+Neither view depends on the order of the rows within a group.
+
+The weighted ensemble chooses among both views of every base model. The group a row belongs to travels as
+`GROUP_KEY_COLUMN`, a feature of special type `S_GROUP_KEY` holding integer codes computed from the raw
+`group_on` columns of the frame being processed (so unseen test groups stay distinct). Models other than the
+ones defined here leave that feature out.
+"""
+
+from __future__ import annotations
+
+import copy
+import logging
+import os
+
+import numpy as np
+import pandas as pd
+
+from autogluon.common.features.feature_metadata import FeatureMetadata
+from autogluon.common.features.types import R_FLOAT, R_INT, S_BOOL, S_GROUP_KEY
+from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
+from autogluon.core.models import AbstractModel
+from autogluon.core.models.ensemble.weighted_ensemble_model import WeightedEnsembleModel
+
+logger = logging.getLogger(__name__)
+
+GROUP_KEY_COLUMN = "__ag_group_key__"
+"""The feature that carries each row's group, as integer codes within the frame."""
+
+GROUP_COLLAPSED_SUFFIX = "_GroupCollapsed"
+"""Appended to a base model's name for its collapsed view (e.g. `LightGBM_GroupCollapsed_BAG_L1`)."""
+
+GROUP_LOG_ROWS_COLUMN = "__ag_group_log_rows__"
+"""The collapsed table's feature holding the log of each group's row count."""
+
+GROUP_VIEWS_PROBLEM_TYPES = (BINARY, MULTICLASS, REGRESSION)
+
+_LOG_CLIP = 1e-15
+
+
+def group_key_feature_metadata() -> FeatureMetadata:
+    """The metadata of `GROUP_KEY_COLUMN`, to join with the training features' metadata."""
+    return FeatureMetadata(
+        type_map_raw={GROUP_KEY_COLUMN: R_INT}, type_group_map_special={S_GROUP_KEY: [GROUP_KEY_COLUMN]}
+    )
+
+
+def group_codes(X: pd.DataFrame, group_on: list[str]) -> np.ndarray:
+    """Integer codes of the groups of the rows of `X` (one code per distinct value of the `group_on` columns).
+
+    Codes are only meaningful within `X`: two frames number their groups independently.
+    """
+    missing = [column for column in group_on if column not in X.columns]
+    if missing:
+        raise KeyError(
+            f"`group_views` pools and collapses predictions within groups, so the data needs the `group_on` "
+            f"column(s) {missing}."
+        )
+    for column in group_on:
+        if X[column].isna().any():
+            raise ValueError(f"`group_on` column {column!r} contains NaN values, so some rows have no group.")
+    if len(group_on) == 1:
+        values = X[group_on[0]]
+    else:
+        values = X[group_on].astype(str).agg("||".join, axis=1)
+    codes, _ = pd.factorize(values, sort=False)
+    return codes.astype(np.int64)
+
+
+def label_constant_within_groups(y: pd.Series, codes: np.ndarray) -> bool:
+    """Whether every group's rows share one label (rows with a missing label are ignored)."""
+    y = pd.Series(np.asarray(y))
+    known = y.notna().to_numpy()
+    if not known.any():
+        return False
+    return bool(y[known].groupby(codes[known]).nunique().max() <= 1)
+
+
+def _group_mean(values: np.ndarray, codes: np.ndarray) -> np.ndarray:
+    """Each row's value replaced by the mean over its group (`values` is 1-d or 2-d over rows)."""
+    groups, inverse = np.unique(codes, return_inverse=True)
+    counts = np.bincount(inverse, minlength=len(groups)).astype(np.float64)
+    if values.ndim == 1:
+        return (np.bincount(inverse, weights=values, minlength=len(groups)) / counts)[inverse]
+    out = np.empty_like(values, dtype=np.float64)
+    for j in range(values.shape[1]):
+        out[:, j] = (np.bincount(inverse, weights=values[:, j], minlength=len(groups)) / counts)[inverse]
+    return out
+
+
+def _group_mode(column: pd.Series, group: np.ndarray, n_groups: int) -> pd.Series:
+    """Each group's most frequent non-missing value of `column` (ties: the smallest value; missing if none)."""
+    if isinstance(column.dtype, pd.CategoricalDtype):
+        codes, uniques = column.cat.codes.to_numpy().astype(np.int64), None
+    else:
+        codes, uniques = pd.factorize(column, sort=True)
+    known = codes >= 0
+    counts = pd.DataFrame({"g": group[known], "c": codes[known]}).value_counts().reset_index(name="n")
+    best = counts.sort_values(["g", "n", "c"], ascending=[True, False, True]).drop_duplicates("g")
+    mode = np.full(n_groups, -1, dtype=np.int64)
+    mode[best["g"].to_numpy()] = best["c"].to_numpy()
+    if uniques is None:
+        return pd.Series(pd.Categorical.from_codes(mode, dtype=column.dtype), name=column.name)
+    values = pd.Series(np.asarray(uniques).take(np.maximum(mode, 0)), name=column.name)
+    if (mode < 0).any():
+        values = values.where(mode >= 0)
+    return values
+
+
+def pool_within_groups(pred: np.ndarray, codes: np.ndarray, problem_type: str) -> np.ndarray:
+    """One model's predictions pooled within each group.
+
+    Class probabilities (binary: the positive class's, as a 1-d array) by their geometric mean over the group,
+    renormalised; regression predictions by their mean.
+    """
+    pred = np.asarray(pred)
+    if problem_type == REGRESSION:
+        return _group_mean(pred.astype(np.float64), codes).astype(pred.dtype)
+    proba = np.stack([1 - pred, pred], axis=1) if problem_type == BINARY else pred
+    log_proba = np.log(np.clip(proba.astype(np.float64), _LOG_CLIP, 1))
+    pooled = np.exp(_group_mean(log_proba, codes))
+    pooled /= pooled.sum(axis=1, keepdims=True)
+    return (pooled[:, 1] if problem_type == BINARY else pooled).astype(pred.dtype)
+
+
+class GroupCollapsedModel(AbstractModel):
+    """`model_base` fit on one row per group, its prediction for a group copied to the group's rows.
+
+    The collapsed table has each numeric feature's group mean, each other feature's most frequent value in
+    the group (ties: the smallest value; boolean features count as the latter), and the log of the group's
+    row count. The `group_columns` features themselves are left out, being constant within a group. A
+    group's label is its rows' most frequent label (classification) or their mean (regression); with the
+    label constant within groups, both are simply the group's label.
+
+    Bagged like any other model: the bagged folds are group-disjoint, so each fold collapses its own training
+    groups and predicts its validation groups.
+
+    Parameters
+    ----------
+    model_base : AbstractModel
+        The unfitted model to fit on the collapsed table.
+    group_columns : list[str]
+        The `group_on` columns, left out of the collapsed table.
+    hyperparameters : dict, default None
+        Overrides of `model_base`'s hyperparameters (refit_full passes the trained values through here).
+    """
+
+    uses_group_key = True
+    _default_auxiliary_params_extra = dict(drop_unique=False)
+    _INNER_NAME = "inner"
+
+    def __init__(self, model_base: AbstractModel, group_columns: list[str] | None = None, **kwargs):
+        super().__init__(**kwargs)
+        self.model_base = model_base
+        self.group_columns = list(group_columns or [])
+        self._inner_type: type[AbstractModel] | None = None
+        self._mean_features: list[str] | None = None
+        self._mode_features: list[str] | None = None
+
+    def get_params(self) -> dict:
+        params = super().get_params()
+        params["model_base"] = self.model_base
+        params["group_columns"] = self.group_columns
+        return params
+
+    def _get_default_resources(self) -> tuple[int, float]:
+        return self.model_base._get_default_resources()
+
+    def get_minimum_resources(self, is_gpu_available: bool = False) -> dict[str, int | float]:
+        return self.model_base.get_minimum_resources(is_gpu_available=is_gpu_available)
+
+    def _get_maximum_resources(self) -> dict[str, int | float]:
+        return self.model_base._get_maximum_resources()
+
+    def declared_refit_hyperparameters(self) -> dict:
+        return self.model_base.declared_refit_hyperparameters()
+
+    def _set_collapse_features(self) -> None:
+        features = [f for f in self._features if f != GROUP_KEY_COLUMN and f not in self.group_columns]
+        numeric = set(
+            self._feature_metadata.get_features(valid_raw_types=[R_INT, R_FLOAT], invalid_special_types=[S_BOOL])
+        )
+        self._mean_features = [f for f in features if f in numeric]
+        self._mode_features = [f for f in features if f not in numeric]
+
+    def _collapse(self, X: pd.DataFrame) -> tuple[pd.DataFrame, np.ndarray]:
+        """The collapsed table of `X` (one row per group, in order of first appearance) and each row's group."""
+        group, _ = pd.factorize(X[GROUP_KEY_COLUMN].to_numpy(), sort=False)
+        parts = []
+        if self._mean_features:
+            parts.append(X[self._mean_features].groupby(group, sort=True).mean())
+        counts = np.bincount(group)
+        if self._mode_features:
+            parts.append(pd.concat([_group_mode(X[f], group, len(counts)) for f in self._mode_features], axis=1))
+        parts.append(pd.DataFrame({GROUP_LOG_ROWS_COLUMN: np.log(counts).astype(np.float64)}))
+        X_collapsed = pd.concat([part.reset_index(drop=True) for part in parts], axis=1)
+        return X_collapsed, group
+
+    def _collapse_labels(self, y: pd.Series, group: np.ndarray) -> pd.Series:
+        y = np.asarray(y)
+        n_groups = group.max() + 1
+        if self.problem_type == REGRESSION:
+            values = np.bincount(group, weights=y.astype(np.float64), minlength=n_groups) / np.bincount(group)
+        else:
+            counts = np.zeros((n_groups, self.num_classes if self.num_classes else int(y.max()) + 1))
+            np.add.at(counts, (group, y.astype(np.int64)), 1)
+            values = counts.argmax(axis=1)
+        return pd.Series(values)
+
+    def _collapsed_metadata(self, X_collapsed: pd.DataFrame) -> FeatureMetadata:
+        type_map_raw = {f: R_FLOAT for f in self._mean_features}
+        type_map_raw.update({f: self._feature_metadata.get_feature_type_raw(f) for f in self._mode_features})
+        type_map_raw[GROUP_LOG_ROWS_COLUMN] = R_FLOAT
+        type_group_map_special = {}
+        for feature in self._mode_features:
+            for special in self._feature_metadata.get_feature_types_special(feature):
+                type_group_map_special.setdefault(special, []).append(feature)
+        return FeatureMetadata(type_map_raw=type_map_raw, type_group_map_special=type_group_map_special)
+
+    def _fit(self, X, y, X_val=None, y_val=None, time_limit=None, sample_weight=None, **kwargs):
+        X = self.preprocess(X)
+        self._set_collapse_features()
+        X_collapsed, group = self._collapse(X)
+        y_collapsed = self._collapse_labels(y, group)
+        if sample_weight is not None:
+            sample_weight = np.bincount(group, weights=np.asarray(sample_weight, dtype=np.float64)) / np.bincount(
+                group
+            )
+        if X_val is not None and y_val is not None:
+            X_val = self.preprocess(X_val)
+            X_val, group_val = self._collapse(X_val)
+            y_val = self._collapse_labels(y_val, group_val)
+        else:
+            X_val, y_val = None, None
+        for key in ("X_test", "y_test", "X_unlabeled", "sample_weight_val"):
+            kwargs.pop(key, None)
+
+        params = self.model_base.get_params()
+        params["hyperparameters"] = {**(params.get("hyperparameters") or {}), **self.get_hyperparameters_init()}
+        params["name"] = self._INNER_NAME
+        params["path"] = self.path
+        inner: AbstractModel = type(self.model_base)(**params)
+        inner.set_contexts(path_context=os.path.join(self.path, self._INNER_NAME))
+        inner.fit(
+            X=X_collapsed,
+            y=y_collapsed,
+            X_val=X_val,
+            y_val=y_val,
+            time_limit=time_limit,
+            sample_weight=sample_weight,
+            feature_metadata=self._collapsed_metadata(X_collapsed),
+            num_classes=self.num_classes,
+            **kwargs,
+        )
+        self.model = inner
+        self._inner_type = type(inner)
+        self.params_trained = copy.deepcopy(inner.params_trained)
+
+    def _predict_proba(self, X, **kwargs) -> np.ndarray:
+        X = self.preprocess(X, **kwargs)
+        X_collapsed, group = self._collapse(X)
+        return self.model.predict_proba(X_collapsed)[group]
+
+    def save(self, path: str | None = None, verbose: bool = True) -> str:
+        if path is None:
+            path = self.path
+        inner = self.model
+        if inner is not None:
+            inner.save(path=os.path.join(path, self._INNER_NAME), verbose=verbose)
+        self.model = None
+        try:
+            path = super().save(path=path, verbose=verbose)
+        finally:
+            self.model = inner
+        return path
+
+    @classmethod
+    def load(cls, path: str, reset_paths: bool = True, verbose: bool = True):
+        model = super().load(path=path, reset_paths=reset_paths, verbose=verbose)
+        if model._inner_type is not None:
+            model.model = model._inner_type.load(
+                path=os.path.join(path, cls._INNER_NAME), reset_paths=reset_paths, verbose=verbose
+            )
+        return model
+
+    def convert_to_refit_full_template(self):
+        template = super().convert_to_refit_full_template()
+        if self.model is not None:
+            template.model_base = self.model.convert_to_refit_full_template()
+        return template
+
+
+class GroupPooledWeightedEnsembleModel(WeightedEnsembleModel):
+    """`WeightedEnsembleModel` over the group views: every base model's predictions are pooled within groups.
+
+    The base models are the bagged models and their `GroupCollapsedModel` counterparts, so the ensemble
+    selects among each model's pooled row predictions and its collapsed predictions (pooling leaves the
+    latter unchanged, being constant within a group already). The data passed in carries `GROUP_KEY_COLUMN`.
+    """
+
+    def preprocess(self, X, preprocess_nonadaptive: bool = True, model=None, **kwargs):
+        if GROUP_KEY_COLUMN not in X.columns:
+            raise KeyError(f"{self.name} pools predictions within groups, so its input needs `{GROUP_KEY_COLUMN}`.")
+        codes = X[GROUP_KEY_COLUMN].to_numpy()
+        X = super().preprocess(X, preprocess_nonadaptive=False, **kwargs)
+        X = self._pool(X, codes)
+        if preprocess_nonadaptive:
+            X = super().preprocess(X, preprocess_nonadaptive=True, model=model, compute_base_preds=False)
+        return X
+
+    def _pool(self, X: pd.DataFrame, codes: np.ndarray) -> pd.DataFrame:
+        X = X.copy()
+        k = self.num_pred_cols_per_model
+        for i in range(len(self.stack_column_prefix_lst)):
+            columns = self.stack_columns[i * k : (i + 1) * k]
+            values = X[columns].to_numpy()
+            if k == 1:
+                values = values[:, 0]
+            pooled = pool_within_groups(values, codes, self.problem_type)
+            X[columns] = pooled.reshape(len(X), k)
+        return X

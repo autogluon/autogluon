@@ -102,6 +102,9 @@ class ValidationSizeCurves:
         {"ensemble_hyperparameters": [[100_000, {MyEnsembleModel: {}}], None]}
 
     It has no default curve; ``None`` means greedy ensemble selection.
+
+    ``group_views`` (``"auto"``, ``True`` or ``False``) has no default curve either; see
+    :func:`resolve_group_views`.
     """
 
     num_bag_folds: SizeCurve = None
@@ -115,6 +118,7 @@ class ValidationSizeCurves:
     ensemble_weights: SizeCurve = None
     ensemble_hyperparameters: SizeCurve = None
     hyperparameters: SizeCurve = None
+    group_views: SizeCurve = None
 
     @classmethod
     def from_input(cls, value: ValidationSizeCurves | dict | None) -> ValidationSizeCurves | None:
@@ -248,6 +252,31 @@ def resolve_hyperparameters_curve(
     if overrides is None or overrides.hyperparameters is None:
         return hyperparameters
     return resolve_size_curve(overrides.hyperparameters, num_train_rows)
+
+
+def resolve_group_views(
+    group_views: bool | str | None,
+    num_train_rows: int,
+    validation_size_curves: ValidationSizeCurves | dict[str, SizeCurve] | None = None,
+    num_group_instances: int | None = None,
+    size_on_groups: bool = False,
+) -> bool | str:
+    """Resolve ``group_views`` (``"auto"``, ``True`` or ``False``) at the effective sample size.
+
+    A caller-supplied value wins over its curve, as everywhere else; with neither, group views are off.
+    """
+    if group_views is not None:
+        return group_views
+    overrides = ValidationSizeCurves.from_input(validation_size_curves)
+    if overrides is None or overrides.group_views is None:
+        return False
+    effective_size = resolve_effective_sample_size(
+        num_train_rows=num_train_rows,
+        num_group_instances=num_group_instances,
+        size_on_groups=size_on_groups,
+    )
+    value = resolve_size_curve(overrides.group_views, effective_size)
+    return False if value is None else value
 
 
 def resolve_validation_mode(

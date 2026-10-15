@@ -63,6 +63,13 @@ from autogluon.core.utils.feature_selection import FeatureSelector
 from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.savers import save_pkl
 
+from .group_views import (
+    GROUP_COLLAPSED_SUFFIX,
+    GROUP_KEY_COLUMN,
+    GroupCollapsedModel,
+    GroupPooledWeightedEnsembleModel,
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -163,12 +170,17 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         verbosity: int = 2,
         raise_on_model_failure: bool = False,
         save_to_disk: bool = True,
+        group_views: list[str] | None = None,
     ):
         super().__init__(
             path=path,
             low_memory=low_memory,
             save_data=save_data,
         )
+        #: The `group_on` columns when group views are on (see `group_views.py`): every bagged level-1 model then
+        #: gets a `GroupCollapsedModel` counterpart, and the weighted ensemble pools predictions within groups.
+        #: The data then carries the `GROUP_KEY_COLUMN` feature.
+        self.group_views: list[str] | None = group_views
         #: When False, nothing is written to ``path`` during fit: the trainer keeps every model in memory (as
         #: ``low_memory=False`` does) and skips its own pickle, so the fitted trainer lives only in this process.
         self.save_to_disk: bool = save_to_disk
@@ -998,6 +1010,8 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                     )
                 )
             models, model_args_fit = get_models_func(hyperparameters=models, **get_models_kwargs)
+            if self.group_views and self.bagged_mode and level == 1:
+                models, model_args_fit = self._with_group_collapsed_models(models, model_args_fit)
             if model_args_fit:
                 hyperparameter_tune_kwargs = {
                     model_name: model_args_fit[model_name]["hyperparameter_tune_kwargs"]
@@ -1048,6 +1062,37 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             fit_strategy=fit_strategy,
             **kwargs,
         )
+
+    def _with_group_collapsed_models(
+        self, models: list[AbstractModel], model_args_fit: dict | None
+    ) -> tuple[list[AbstractModel], dict | None]:
+        """`models` with each bagged model followed by its `GroupCollapsedModel` counterpart.
+
+        The counterpart bags the same configuration fit on the collapsed table, under the base model's name with
+        `GROUP_COLLAPSED_SUFFIX` (e.g. `LightGBM_GroupCollapsed_BAG_L1`), and shares its fit arguments.
+        """
+        out = []
+        model_args_fit = dict(model_args_fit) if model_args_fit else model_args_fit
+        for model in models:
+            out.append(model)
+            if not isinstance(model, BaggedEnsembleModel):
+                continue
+            params = copy.deepcopy(model.get_params())
+            inner = params["model_base"]
+            collapsed = GroupCollapsedModel(
+                path=inner.path_root,
+                name=f"{inner.name}{GROUP_COLLAPSED_SUFFIX}",
+                problem_type=inner.problem_type,
+                eval_metric=inner.eval_metric,
+                model_base=inner,
+                group_columns=self.group_views,
+            )
+            params["model_base"] = collapsed
+            params["name"] = model.name.replace(inner.name, collapsed.name, 1)
+            out.append(type(model)(**params))
+            if model_args_fit and model.name in model_args_fit:
+                model_args_fit[params["name"]] = copy.deepcopy(model_args_fit[model.name])
+        return out, model_args_fit
 
     def _stack_new_level_aux(
         self, X_val, y_val, X, y, core_models, level, infer_limit, infer_limit_batch_size, **kwargs
@@ -1285,6 +1330,10 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             covered_rows = None
         if covered_rows is not None and covered_rows.all():
             covered_rows = None
+        if self.group_views:
+            # The ensemble pools its inputs within groups, so the group of each row travels with them.
+            X_stack_preds[GROUP_KEY_COLUMN] = X[GROUP_KEY_COLUMN].to_numpy()
+            kwargs.setdefault("ensemble_type", GroupPooledWeightedEnsembleModel)
         if self.weight_evaluation:
             X, w = extract_column(
                 X, self.sample_weight

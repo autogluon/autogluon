@@ -55,3 +55,7 @@ S_STACK = "stack"
 
 # Feature that comes from dimensionality reduction
 S_DIMENSIONALITY_REDUCTION = "dimensionality_reduction"
+
+# feature identifies the group a row belongs to, as integer codes within the frame being processed. It carries
+# row-aligned side information for the models that act per group (`group_views`), and every other model ignores it.
+S_GROUP_KEY = "group_key"

@@ -27,6 +27,8 @@ from autogluon.core.utils import (
 )
 from autogluon.features.generators import PipelineFeatureGenerator
 
+from ..trainer.group_views import GROUP_KEY_COLUMN, group_codes
+
 logger = logging.getLogger(__name__)
 
 
@@ -101,6 +103,9 @@ class AbstractTabularLearner(AbstractLearner):
         self.sample_weight = sample_weight
         self.weight_evaluation = weight_evaluation
         self.groups = groups
+        #: The `group_on` columns when the fit uses group views: every frame the models see then carries the
+        #: `GROUP_KEY_COLUMN` feature, computed from these raw columns (see `trainer/group_views.py`).
+        self._group_views: list[str] | None = None
         if sample_weight is not None and not isinstance(sample_weight, str):
             raise ValueError(
                 "sample_weight must be a string indicating the name of the column that contains sample weights. If you have a vector of sample weights, first add these as an extra column to your data."
@@ -588,8 +593,11 @@ class AbstractTabularLearner(AbstractLearner):
         return X
 
     def transform_features(self, X):
+        group_keys = group_codes(X, self._group_views) if self._group_views else None
         for feature_generator in self.feature_generators:
             X = feature_generator.transform(X)
+        if group_keys is not None:
+            X = X.assign(**{GROUP_KEY_COLUMN: group_keys})
         return X
 
     def score(self, X: DataFrame, y=None, model: str = None, metric: Scorer = None, as_error: bool = False) -> float:

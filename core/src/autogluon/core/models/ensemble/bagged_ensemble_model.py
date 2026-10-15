@@ -1580,6 +1580,10 @@ class BaggedEnsembleModel(AbstractModel):
         else:
             return self.model_base
 
+    def _uses_group_key(self) -> bool:
+        # The bag passes its features on to its children, so it keeps the group key exactly when they read it.
+        return self._child_type.uses_group_key
+
     def _add_child_times_to_bag(self, model: AbstractModel):
         self._add_parallel_child_times(
             fit_time=model.fit_time, predict_time=model.predict_time, predict_1_time=model.predict_1_time

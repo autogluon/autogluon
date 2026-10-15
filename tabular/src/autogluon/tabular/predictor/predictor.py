@@ -77,6 +77,7 @@ from ..configs.pipeline_presets import (
     ValidationSizeCurves,
     get_validation_and_stacking_method,
     resolve_ensemble_hyperparameters,
+    resolve_group_views,
     resolve_hyperparameters_curve,
     resolve_validation_mode,
 )
@@ -84,6 +85,7 @@ from ..configs.presets_configs import tabular_presets_alias, tabular_presets_dic
 from ..learner import AbstractTabularLearner, DefaultLearner
 from ..registry import ag_model_registry
 from ..trainer.abstract_trainer import AbstractTabularTrainer
+from ..trainer.group_views import GROUP_VIEWS_PROBLEM_TYPES, group_codes, label_constant_within_groups
 from ..version import __version__
 
 logger = logging.getLogger(__name__)  # return autogluon root logger
@@ -1040,6 +1042,27 @@ class TabularPredictor:
                 leaves rows unvalidated (as `TimeSeriesSplit` does), for the same reason as
                 `temporal_forward_only`; a splitter that validates every row (e.g. `KFold`) stacks
                 normally.
+            group_views : bool | str, default = None
+                [EXPERIMENTAL] Whether to give every bagged model two views of data whose label is
+                constant within each group of `validation_structure`'s `group_on` (each row a noisy
+                observation of its group's label, e.g. repeated measurements of one patient):
+
+                - its row predictions pooled within each group (the geometric mean of the class
+                  probabilities, renormalized; the mean for regression);
+                - the same model configuration fit on the collapsed table, one row per group
+                  (numeric features averaged, other features taken from the group's last row, plus
+                  the log of the group's row count), named with a `_GroupCollapsed` suffix.
+
+                The weighted ensemble then chooses among both views of every model. Predictions for a
+                row depend on the other rows of its group in the data passed to `predict`, which
+                therefore needs the `group_on` column(s); rows of different groups never interact.
+
+                "auto": on when `group_on` is set, models are bagged (`num_bag_folds >= 2`), the
+                problem is binary, multiclass or regression, and every group of `train_data` with a
+                label has a single label value (with at least one group of two or more rows).
+                True: on, raising if `group_on`, bagging or the problem type do not allow it.
+                False or None (default): off, unless `validation_size_curves` sets `group_views`.
+                Supported for the first stack layer only.
             validation_size_curves : dict | ValidationSizeCurves, default = None
                 [EXPERIMENTAL] Overrides for how the automatically selected validation method scales
                 with data size, as a `ValidationSizeCurves` or an equivalent dict. The curve format
@@ -1895,6 +1918,15 @@ class TabularPredictor:
             ensemble_weights=ensemble_weights,
             ensemble_weights_missing=ensemble_weights_missing,
             ensemble_hyperparameters=ensemble_hyperparameters,
+            group_views=self._resolve_group_views(
+                group_views=kwargs["group_views"],
+                train_data=train_data,
+                validation_structure=validation_structure,
+                num_bag_folds=num_bag_folds,
+                problem_type=inferred_problem_type,
+                validation_size_curves=kwargs["validation_size_curves"],
+                num_group_instances=num_group_instances,
+            ),
         )
         ag_post_fit_kwargs = dict(
             keep_only_best=kwargs["keep_only_best"],
@@ -6183,6 +6215,7 @@ class TabularPredictor:
             # experimental
             _experimental_dynamic_hyperparameters=False,
             adapt_num_bag_folds_to_n_classes=False,
+            group_views=None,
         )
         kwargs, ds_valid_keys = self._sanitize_dynamic_stacking_kwargs(kwargs)
         kwargs = self._validate_fit_extra_kwargs(
@@ -6368,6 +6401,66 @@ class TabularPredictor:
             if on_unmatched == "error":
                 raise ValueError(message)
             logger.log(30, f"\tWARNING: {message} They will be excluded from the ensemble.")
+
+    def _resolve_group_views(
+        self,
+        *,
+        group_views: bool | str | None,
+        train_data: pd.DataFrame,
+        validation_structure: ValidationStructure | None,
+        num_bag_folds: int,
+        problem_type: str,
+        validation_size_curves,
+        num_group_instances: int | None,
+    ) -> list[str] | None:
+        """The `group_on` columns when this fit uses group views (see `fit`'s `group_views`), else None."""
+        size_on_groups = validation_structure is not None and validation_structure.size_validation_on_groups
+        group_views = resolve_group_views(
+            group_views=group_views,
+            num_train_rows=len(train_data),
+            validation_size_curves=validation_size_curves,
+            num_group_instances=num_group_instances,
+            size_on_groups=size_on_groups,
+        )
+        if group_views is False:
+            return None
+        if group_views not in (True, "auto"):
+            raise ValueError(f"group_views must be True, False or 'auto', got {group_views!r}.")
+        required = group_views is True
+        group_on = None if validation_structure is None else validation_structure.group_on
+        reason = None
+        if group_on is None:
+            reason = "`validation_structure` declares no `group_on`"
+        elif self._learner.groups is not None:
+            reason = "groups are declared through the deprecated `groups` argument rather than `validation_structure`"
+        elif num_bag_folds < 2:
+            reason = f"models are not bagged (num_bag_folds={num_bag_folds})"
+        elif problem_type not in GROUP_VIEWS_PROBLEM_TYPES:
+            reason = f"problem_type={problem_type!r} is not one of {list(GROUP_VIEWS_PROBLEM_TYPES)}"
+        if reason is not None:
+            if required:
+                raise ValueError(f"group_views=True cannot be used: {reason}.")
+            logger.log(20, f"group_views='auto': off, because {reason}.")
+            return None
+        group_on = [group_on] if isinstance(group_on, str) else list(group_on)
+        codes = group_codes(train_data, group_on)
+        constant = label_constant_within_groups(train_data[self.label], codes)
+        if not required:
+            if not constant:
+                logger.log(20, "group_views='auto': off, because the label varies within some groups.")
+                return None
+            if len(np.unique(codes)) == len(codes):
+                logger.log(20, "group_views='auto': off, because every group has a single row.")
+                return None
+        elif not constant:
+            logger.log(
+                30,
+                "Warning: group_views=True, but the label varies within some groups. Group views assume one label "
+                "per group: the collapsed models are fit on each group's most frequent label (the mean for "
+                "regression).",
+            )
+        logger.log(20, f"Group views on (group_on={group_on}): every bagged model also gets a `_GroupCollapsed` view.")
+        return group_on
 
     def _fit_extra_kwargs_dict(self) -> dict:
         """

@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 from pandas import DataFrame, Series
 
+from autogluon.common.features.feature_metadata import FeatureMetadata
 from autogluon.common.utils.log_utils import convert_time_in_s_to_log_friendly
 from autogluon.core.constants import AUTO_WEIGHT, BALANCE_WEIGHT, BINARY, MULTICLASS, QUANTILE, REGRESSION
 from autogluon.core.data import LabelCleaner
@@ -17,6 +18,7 @@ from autogluon.core.utils.time import sample_df_for_time_func, time_func
 from autogluon.core.utils.utils import augment_rare_classes, extract_column
 
 from ..trainer import AutoTrainer
+from ..trainer.group_views import GROUP_KEY_COLUMN, group_codes, group_key_feature_metadata
 from .abstract_learner import AbstractTabularLearner
 
 logger = logging.getLogger(__name__)
@@ -60,6 +62,7 @@ class DefaultLearner(AbstractTabularLearner):
         ensemble_weights: dict | None = None,
         ensemble_weights_missing: str = "error",
         ensemble_hyperparameters: dict | None = None,
+        group_views: list[str] | None = None,
         **trainer_fit_kwargs,
     ):
         """Arguments:
@@ -85,6 +88,7 @@ class DefaultLearner(AbstractTabularLearner):
         """
         # TODO: if provided, feature_types in X, X_val are ignored right now, need to pass to Learner/trainer and update this documentation.
         self._time_limit = time_limit
+        self._group_views = group_views
         if time_limit:
             logger.log(20, f"Beginning AutoGluon training ... Time limit = {time_limit:.0f}s")
         else:
@@ -202,7 +206,7 @@ class DefaultLearner(AbstractTabularLearner):
             eval_metric=self.eval_metric,
             num_classes=self.label_cleaner.num_classes,
             quantile_levels=self.quantile_levels,
-            feature_metadata=self.feature_generator.feature_metadata,
+            feature_metadata=self._trainer_feature_metadata(),
             low_memory=self.save_to_disk,  # in memory only: keep every model resident, nothing to reload
             k_fold=num_bag_folds,  # TODO: Consider moving to fit call
             n_repeats=num_bag_sets,  # TODO: Consider moving to fit call
@@ -213,6 +217,7 @@ class DefaultLearner(AbstractTabularLearner):
             random_state=self.random_state,
             verbosity=verbosity,
             raise_on_model_failure=raise_on_model_failure,
+            group_views=group_views,
         )
 
         self.trainer_path = trainer.path
@@ -483,6 +488,13 @@ class DefaultLearner(AbstractTabularLearner):
             X_test_super = X_test
             y_test_super = y_test
 
+        # Computed off the raw frames: feature generation may transform or drop the `group_on` columns.
+        group_keys = (
+            [None if data is None else group_codes(data, self._group_views) for data in (X, X_val, X_test)]
+            if self._group_views
+            else None
+        )
+
         datasets = [X, X_val, X_test_super, X_unlabeled]
         X_super = pd.concat(datasets, ignore_index=True)
 
@@ -522,6 +534,12 @@ class DefaultLearner(AbstractTabularLearner):
         if transform_with_test:
             X_test = X_test_super
 
+        if group_keys is not None:
+            X, X_val, X_test = (
+                data if data is None else data.assign(**{GROUP_KEY_COLUMN: keys})
+                for data, keys in zip((X, X_val, X_test), group_keys)
+            )
+
         # TODO: consider not bundling sample-weights inside X, X_val
         X = self.bundle_weights(X, w, "X", is_train=True)
         X_val = self.bundle_weights(X_val, w_val, "X_val", is_train=False)
@@ -540,6 +558,14 @@ class DefaultLearner(AbstractTabularLearner):
             groups,
             structure_splits,
         )
+
+    def _trainer_feature_metadata(self) -> FeatureMetadata:
+        """The metadata of the features the trainer receives: the generated features, plus the group key under
+        group views."""
+        feature_metadata = self.feature_generator.feature_metadata
+        if self._group_views:
+            feature_metadata = feature_metadata.join_metadata(group_key_feature_metadata())
+        return feature_metadata
 
     def bundle_weights(self, X: DataFrame | None, w: Series | None, name: str, is_train=False) -> DataFrame:
         if is_train:
