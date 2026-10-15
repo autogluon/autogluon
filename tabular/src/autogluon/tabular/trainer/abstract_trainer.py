@@ -1172,7 +1172,8 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         """
         Trains auxiliary models (currently a single weighted ensemble) using the provided base models.
         Level must be greater than the level of any of the base models.
-        Auxiliary models never use the original features and only train with the predictions of other models as features.
+        Auxiliary models train on the predictions of the base models. They use the original features only when an
+        `ensemble_model` asks for them via `ag_args_ensemble={"use_orig_features": True}`.
         """
         if self._callback_early_stop:
             return []
@@ -1206,6 +1207,9 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
 
         ensemble_weights = kwargs.pop("ensemble_weights", None)
         ensemble_weights_missing = kwargs.pop("ensemble_weights_missing", "error")
+        ensemble_model = kwargs.pop("ensemble_model", None)
+        if ensemble_weights is not None and ensemble_model is not None:
+            raise ValueError("`ensemble_weights` and `ensemble_model` cannot be combined.")
         if ensemble_weights is not None:
             # Fixed weights are not learned from anything, so the base models' validation or
             # out-of-fold predictions are never needed -- which is what makes this reachable with
@@ -1247,16 +1251,38 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                 **kwargs,
             )
 
+        child_cls = "ENS_WEIGHTED"
+        use_orig_features = False
+        if ensemble_model is not None:
+            ((child_cls, ensemble_model_hyperparameters),) = ensemble_model.items()
+            # The caller's hyperparameters first, then what this call adds (e.g. the name suffix).
+            child_hyperparameters = {
+                **copy.deepcopy(ensemble_model_hyperparameters or {}),
+                **copy.deepcopy(child_hyperparameters or {}),
+            }
+            child_ag_args = dict(child_hyperparameters.get("ag_args", None) or {})
+            # The ensemble keeps the weighted ensemble's name, which callers and the stacked-overfitting
+            # check identify it by, and is never a base model for a later stack level.
+            child_ag_args.setdefault("name_main", GreedyWeightedEnsembleModel.ag_name)
+            child_ag_args.setdefault("valid_base", False)
+            child_hyperparameters["ag_args"] = child_ag_args
+            use_orig_features = self._ensemble_model_uses_orig_features(child_hyperparameters)
+
         X_stack_preds = self.get_inputs_to_stacker(
-            X, base_models=base_model_names, fit=fit, use_orig_features=False, use_val_cache=use_val_cache
+            X, base_models=base_model_names, fit=fit, use_orig_features=use_orig_features, use_val_cache=use_val_cache
         )
         # Rows no base model validated have NaN out-of-fold predictions (see
         # `BaggedEnsembleModel._predict_proba_oof`). The ensemble cannot optimize weights against
         # them, so they are excluded from its fit -- but only from the fit: `generate_weighted
         # _ensemble` restores full-length, row-aligned out-of-fold predictions afterwards, marking
         # those rows uncovered. Anything else would leave the ensemble's OOF a different length
-        # from every other model's and so not addressable by training-frame row.
-        covered_rows = X_stack_preds.notna().all(axis=1) if fit else None
+        # from every other model's and so not addressable by training-frame row. Only the stack
+        # columns decide this: a missing value in an original feature is ordinary data.
+        if fit:
+            stack_column_names, _ = self._get_stack_column_names(models=base_model_names)
+            covered_rows = X_stack_preds[stack_column_names].notna().all(axis=1)
+        else:
+            covered_rows = None
         if covered_rows is not None and covered_rows.all():
             covered_rows = None
         if self.weight_evaluation:
@@ -1286,10 +1312,23 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             name_suffix=name_suffix,
             get_models_func=get_models_func,
             check_if_best=check_if_best,
+            child_cls=child_cls,
             child_hyperparameters=child_hyperparameters,
             total_resources=total_resources,
+            use_orig_features=use_orig_features,
             **kwargs,
         )
+
+    @staticmethod
+    def _ensemble_model_uses_orig_features(child_hyperparameters: dict) -> bool:
+        """Whether an `ensemble_model`'s hyperparameters ask for the original features alongside the stack columns.
+
+        Read from `ag_args_ensemble` or the equivalent `ag.ens.` prefix, the two ways a model's hyperparameters set its
+        ensemble wrapper's parameters.
+        """
+        ag_args_ensemble = child_hyperparameters.get("ag_args_ensemble", None) or {}
+        value = ag_args_ensemble.get("use_orig_features", child_hyperparameters.get("ag.ens.use_orig_features", False))
+        return value is True
 
     def predict(self, X: pd.DataFrame, model: str | None = None) -> np.ndarray:
         if model is None:
@@ -2428,6 +2467,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         get_models_func=None,
         total_resources: dict | None = None,
         compute_score: bool = True,
+        use_orig_features: bool = False,
     ) -> list[str]:
         if get_models_func is None:
             get_models_func = self.construct_model_templates
@@ -2451,7 +2491,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
 
         ag_args_ensemble.setdefault("save_bag_folds", save_bag_folds)
 
-        feature_metadata = self.get_feature_metadata(use_orig_features=False, base_models=base_model_names)
+        feature_metadata = self.get_feature_metadata(use_orig_features=use_orig_features, base_models=base_model_names)
 
         base_model_paths_dict = self.get_models_attribute_dict(attribute="path", models=base_model_names)
         base_model_paths_dict = {key: os.path.join(self.path, val) for key, val in base_model_paths_dict.items()}
