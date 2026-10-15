@@ -103,8 +103,8 @@ class ValidationSizeCurves:
 
     It has no default curve; ``None`` means greedy ensemble selection.
 
-    ``group_views`` (``"auto"``, ``True`` or ``False``) has no default curve either; see
-    :func:`resolve_group_views`.
+    ``group_views`` (any value ``fit`` takes for it, e.g. ``"auto"`` or ``{"pooling": "median"}``)
+    has no default curve either; see :func:`resolve_group_views`.
     """
 
     num_bag_folds: SizeCurve = None
@@ -255,13 +255,13 @@ def resolve_hyperparameters_curve(
 
 
 def resolve_group_views(
-    group_views: bool | str | None,
+    group_views: bool | str | dict | None,
     num_train_rows: int,
     validation_size_curves: ValidationSizeCurves | dict[str, SizeCurve] | None = None,
     num_group_instances: int | None = None,
     size_on_groups: bool = False,
-) -> bool | str:
-    """Resolve ``group_views`` (``"auto"``, ``True`` or ``False``) at the effective sample size.
+) -> bool | str | dict:
+    """Resolve ``group_views`` (a bool, ``"auto"``, or a dict or ``GroupViews``) at the effective sample size.
 
     A caller-supplied value wins over its curve, as everywhere else; with neither, group views are off.
     """

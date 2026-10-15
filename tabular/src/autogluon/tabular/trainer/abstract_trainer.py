@@ -68,6 +68,7 @@ from .group_views import (
     GROUP_KEY_COLUMN,
     GroupCollapsedModel,
     GroupPooledWeightedEnsembleModel,
+    GroupPooling,
 )
 
 logger = logging.getLogger(__name__)
@@ -171,6 +172,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         raise_on_model_failure: bool = False,
         save_to_disk: bool = True,
         group_views: list[str] | None = None,
+        group_pooling: str | GroupPooling | None = None,
     ):
         super().__init__(
             path=path,
@@ -181,6 +183,8 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         #: gets a `GroupCollapsedModel` counterpart, and the weighted ensemble pools predictions within groups.
         #: The data then carries the `GROUP_KEY_COLUMN` feature.
         self.group_views: list[str] | None = group_views
+        #: How the weighted ensemble pools predictions within groups under group views (see `GroupViews.pooling`).
+        self.group_pooling: str | GroupPooling | None = group_pooling
         #: When False, nothing is written to ``path`` during fit: the trainer keeps every model in memory (as
         #: ``low_memory=False`` does) and skips its own pickle, so the fitted trainer lives only in this process.
         self.save_to_disk: bool = save_to_disk
@@ -1334,6 +1338,10 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             # The ensemble pools its inputs within groups, so the group of each row travels with them.
             X_stack_preds[GROUP_KEY_COLUMN] = X[GROUP_KEY_COLUMN].to_numpy()
             kwargs.setdefault("ensemble_type", GroupPooledWeightedEnsembleModel)
+            kwargs["ag_args_ensemble"] = {
+                **(kwargs.get("ag_args_ensemble") or {}),
+                "group_pooling": self.group_pooling,
+            }
         if self.weight_evaluation:
             X, w = extract_column(
                 X, self.sample_weight

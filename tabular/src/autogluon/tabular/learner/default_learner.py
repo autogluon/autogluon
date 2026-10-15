@@ -18,7 +18,7 @@ from autogluon.core.utils.time import sample_df_for_time_func, time_func
 from autogluon.core.utils.utils import augment_rare_classes, extract_column
 
 from ..trainer import AutoTrainer
-from ..trainer.group_views import GROUP_KEY_COLUMN, group_codes, group_key_feature_metadata
+from ..trainer.group_views import GROUP_KEY_COLUMN, GroupPooling, group_codes, group_key_feature_metadata
 from .abstract_learner import AbstractTabularLearner
 
 logger = logging.getLogger(__name__)
@@ -63,6 +63,7 @@ class DefaultLearner(AbstractTabularLearner):
         ensemble_weights_missing: str = "error",
         ensemble_hyperparameters: dict | None = None,
         group_views: list[str] | None = None,
+        group_pooling: str | GroupPooling | None = None,
         **trainer_fit_kwargs,
     ):
         """Arguments:
@@ -218,6 +219,7 @@ class DefaultLearner(AbstractTabularLearner):
             verbosity=verbosity,
             raise_on_model_failure=raise_on_model_failure,
             group_views=group_views,
+            group_pooling=group_pooling,
         )
 
         self.trainer_path = trainer.path

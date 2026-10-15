@@ -85,7 +85,7 @@ from ..configs.presets_configs import tabular_presets_alias, tabular_presets_dic
 from ..learner import AbstractTabularLearner, DefaultLearner
 from ..registry import ag_model_registry
 from ..trainer.abstract_trainer import AbstractTabularTrainer
-from ..trainer.group_views import GROUP_VIEWS_PROBLEM_TYPES, group_codes, label_constant_within_groups
+from ..trainer.group_views import GROUP_VIEWS_PROBLEM_TYPES, GroupViews, group_codes, label_constant_within_groups
 from ..version import __version__
 
 logger = logging.getLogger(__name__)  # return autogluon root logger
@@ -1042,16 +1042,15 @@ class TabularPredictor:
                 leaves rows unvalidated (as `TimeSeriesSplit` does), for the same reason as
                 `temporal_forward_only`; a splitter that validates every row (e.g. `KFold`) stacks
                 normally.
-            group_views : bool | str, default = None
+            group_views : bool | str | dict | GroupViews, default = None
                 [EXPERIMENTAL] Whether to give every bagged model two views of data whose label is
                 constant within each group of `validation_structure`'s `group_on` (each row a noisy
                 observation of its group's label, e.g. repeated measurements of one patient):
 
-                - its row predictions pooled within each group (the geometric mean of the class
-                  probabilities, renormalized; the mean for regression);
+                - its row predictions pooled within each group (see `pooling` below);
                 - the same model configuration fit on the collapsed table, one row per group
-                  (numeric features averaged, other features taken from the group's last row, plus
-                  the log of the group's row count), named with a `_GroupCollapsed` suffix.
+                  (numeric features averaged, other features at their most frequent value in the
+                  group, plus the log of the group's row count), named with a `_GroupCollapsed` suffix.
 
                 The weighted ensemble then chooses among both views of every model. Predictions for a
                 row depend on the other rows of its group in the data passed to `predict`, which
@@ -1062,6 +1061,30 @@ class TabularPredictor:
                 label has a single label value (with at least one group of two or more rows).
                 True: on, raising if `group_on`, bagging or the problem type do not allow it.
                 False or None (default): off, unless `validation_size_curves` sets `group_views`.
+
+                A dict, or the equivalent `autogluon.tabular.trainer.group_views.GroupViews`, also
+                sets the pooling, e.g. `{"enabled": "auto", "pooling": "median"}`: `enabled` takes
+                the values above (default True), and `pooling` is one of
+
+                - "geometric_mean" (default for classification; classification only): the geometric
+                  mean of the class probabilities, renormalized, i.e. the mean of the rows'
+                  log-probabilities. The rows of a group are separate observations of one label, so
+                  their evidence combines by multiplying the rows' probabilities; the geometric mean
+                  is that product brought back to the confidence of a single row, so correlated rows
+                  do not add up to overconfidence. A row that confidently rules a class out pulls the
+                  group's probability of that class down strongly.
+                - "mean" (default for regression): the arithmetic mean. A single confidently wrong row
+                  moves the group's prediction less than under the geometric mean.
+                - "median": the median of each class's probability (renormalized) or of the
+                  regression predictions, robust to a minority of outlying rows.
+                - a callable `pooling(pred, groups)`, which takes one model's predictions as a 2-d
+                  float array (a column per class, or one column for regression) and each row's group
+                  as an integer array, and returns an array of `pred`'s shape in which every row holds
+                  its group's pooled prediction. Pooled class probabilities are then floored at 1e-15
+                  and renormalized. The collapsed views' predictions, constant within a group, are
+                  pooled too, so it should map a group of identical rows to that row. It is saved with
+                  the predictor, so it must be picklable (e.g. a function defined at module level).
+
                 Supported for the first stack layer only.
             validation_size_curves : dict | ValidationSizeCurves, default = None
                 [EXPERIMENTAL] Overrides for how the automatically selected validation method scales
@@ -1918,7 +1941,7 @@ class TabularPredictor:
             ensemble_weights=ensemble_weights,
             ensemble_weights_missing=ensemble_weights_missing,
             ensemble_hyperparameters=ensemble_hyperparameters,
-            group_views=self._resolve_group_views(
+            **self._resolve_group_views(
                 group_views=kwargs["group_views"],
                 train_data=train_data,
                 validation_structure=validation_structure,
@@ -6405,28 +6428,35 @@ class TabularPredictor:
     def _resolve_group_views(
         self,
         *,
-        group_views: bool | str | None,
+        group_views: bool | str | dict | GroupViews | None,
         train_data: pd.DataFrame,
         validation_structure: ValidationStructure | None,
         num_bag_folds: int,
         problem_type: str,
         validation_size_curves,
         num_group_instances: int | None,
-    ) -> list[str] | None:
-        """The `group_on` columns when this fit uses group views (see `fit`'s `group_views`), else None."""
+    ) -> dict:
+        """The learner's `group_views` and `group_pooling` for this fit (see `fit`'s `group_views`).
+
+        `group_views` is the `group_on` columns when the fit uses group views, `group_pooling` the pooling strategy;
+        both are None when it does not.
+        """
+        off = dict(group_views=None, group_pooling=None)
         size_on_groups = validation_structure is not None and validation_structure.size_validation_on_groups
-        group_views = resolve_group_views(
-            group_views=group_views,
-            num_train_rows=len(train_data),
-            validation_size_curves=validation_size_curves,
-            num_group_instances=num_group_instances,
-            size_on_groups=size_on_groups,
+        group_views = GroupViews.from_input(
+            resolve_group_views(
+                group_views=group_views,
+                num_train_rows=len(train_data),
+                validation_size_curves=validation_size_curves,
+                num_group_instances=num_group_instances,
+                size_on_groups=size_on_groups,
+            )
         )
-        if group_views is False:
-            return None
-        if group_views not in (True, "auto"):
-            raise ValueError(f"group_views must be True, False or 'auto', got {group_views!r}.")
-        required = group_views is True
+        if group_views is None:
+            return off
+        # Checked whether or not "auto" turns the views on, so a strategy that cannot apply is never silently kept.
+        pooling = group_views.resolve_pooling(problem_type, check_picklable=self._learner.save_to_disk)
+        required = group_views.enabled is True
         group_on = None if validation_structure is None else validation_structure.group_on
         reason = None
         if group_on is None:
@@ -6441,17 +6471,17 @@ class TabularPredictor:
             if required:
                 raise ValueError(f"group_views=True cannot be used: {reason}.")
             logger.log(20, f"group_views='auto': off, because {reason}.")
-            return None
+            return off
         group_on = [group_on] if isinstance(group_on, str) else list(group_on)
         codes = group_codes(train_data, group_on)
         constant = label_constant_within_groups(train_data[self.label], codes)
         if not required:
             if not constant:
                 logger.log(20, "group_views='auto': off, because the label varies within some groups.")
-                return None
+                return off
             if len(np.unique(codes)) == len(codes):
                 logger.log(20, "group_views='auto': off, because every group has a single row.")
-                return None
+                return off
         elif not constant:
             logger.log(
                 30,
@@ -6459,8 +6489,12 @@ class TabularPredictor:
                 "per group: the collapsed models are fit on each group's most frequent label (the mean for "
                 "regression).",
             )
-        logger.log(20, f"Group views on (group_on={group_on}): every bagged model also gets a `_GroupCollapsed` view.")
-        return group_on
+        logger.log(
+            20,
+            f"Group views on (group_on={group_on}, pooling={pooling!r}): every bagged model also gets a "
+            "`_GroupCollapsed` view.",
+        )
+        return dict(group_views=group_on, group_pooling=pooling)
 
     def _fit_extra_kwargs_dict(self) -> dict:
         """

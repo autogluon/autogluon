@@ -11,6 +11,7 @@ from autogluon.core.models import AbstractModel
 from autogluon.tabular import TabularPredictor
 from autogluon.tabular.trainer.group_views import (
     GROUP_COLLAPSED_SUFFIX,
+    GroupViews,
     _group_mode,
     group_codes,
     label_constant_within_groups,
@@ -69,6 +70,57 @@ def test_pool_within_groups_takes_the_geometric_mean_of_probabilities():
     )
 
 
+def _max_pool(pred: np.ndarray, groups: np.ndarray) -> np.ndarray:
+    """A custom pooling strategy: each group's largest prediction, per column."""
+    return pd.DataFrame(pred).groupby(groups).transform("max").to_numpy()
+
+
+def test_pool_within_groups_by_mean_median_or_a_custom_strategy():
+    codes = np.array([0, 0, 0, 1, 1])
+    proba = np.array([[0.2, 0.8], [0.5, 0.5], [0.4, 0.6], [0.9, 0.1], [0.6, 0.4]])
+    mean = np.repeat([[11 / 30, 19 / 30], [0.75, 0.25]], [3, 2], axis=0)
+    np.testing.assert_allclose(pool_within_groups(proba, codes, "multiclass", "mean"), mean, rtol=1e-6)
+    median = np.repeat([[0.4, 0.6], [0.75, 0.25]], [3, 2], axis=0)
+    np.testing.assert_allclose(pool_within_groups(proba, codes, "multiclass", "median"), median, rtol=1e-6)
+    np.testing.assert_allclose(pool_within_groups(proba[:, 1], codes, "binary", "median"), median[:, 1], rtol=1e-6)
+    # a custom strategy's class probabilities are renormalized
+    custom = np.repeat([[0.5 / 1.3, 0.8 / 1.3], [0.9 / 1.3, 0.4 / 1.3]], [3, 2], axis=0)
+    np.testing.assert_allclose(pool_within_groups(proba, codes, "multiclass", _max_pool), custom, rtol=1e-6)
+
+    y = np.array([1.0, 2.0, 6.0, 4.0, 8.0])
+    np.testing.assert_allclose(pool_within_groups(y, codes, "regression"), [3, 3, 3, 6, 6])
+    np.testing.assert_allclose(pool_within_groups(y, codes, "regression", "median"), [2, 2, 2, 6, 6])
+    np.testing.assert_allclose(pool_within_groups(y, codes, "regression", _max_pool), [6, 6, 6, 8, 8])
+
+    with pytest.raises(ValueError, match="does not apply to regression"):
+        pool_within_groups(y, codes, "regression", "geometric_mean")
+    with pytest.raises(ValueError, match="must be one of"):
+        pool_within_groups(y, codes, "regression", "mode")
+    with pytest.raises(ValueError, match="shape of its input"):
+        pool_within_groups(proba, codes, "multiclass", lambda pred, groups: pred[:, :1])
+
+
+def test_group_views_input_forms():
+    assert GroupViews.from_input(True) == GroupViews()
+    assert GroupViews.from_input("auto") == GroupViews(enabled="auto")
+    assert GroupViews.from_input({"enabled": "auto", "pooling": "median"}) == GroupViews("auto", "median")
+    assert GroupViews.from_input(GroupViews(pooling=_max_pool)).pooling is _max_pool
+    for off in (None, False, {"enabled": False}):
+        assert GroupViews.from_input(off) is None
+    assert GroupViews().resolve_pooling("binary") == "geometric_mean"
+    assert GroupViews().resolve_pooling("regression") == "mean"
+    with pytest.raises(ValueError, match="Invalid `group_views` keys"):
+        GroupViews.from_input({"pool": "mean"})
+    with pytest.raises(ValueError, match="must be True, False or 'auto'"):
+        GroupViews.from_input("yes")
+    with pytest.raises(ValueError, match="must be one of"):
+        GroupViews(pooling="mode")
+    with pytest.raises(ValueError, match="must be picklable"):
+        GroupViews(pooling=lambda pred, groups: pred).resolve_pooling("binary")
+    # an in-memory predictor saves nothing, so it takes any callable
+    assert callable(GroupViews(pooling=lambda pred, groups: pred).resolve_pooling("binary", check_picklable=False))
+
+
 def test_group_codes_number_the_groups_of_the_frame():
     df = pd.DataFrame({"a": ["x", "y", "x", "z"], "b": [1, 1, 2, 1]})
     np.testing.assert_array_equal(group_codes(df, ["a"]), [0, 1, 0, 2])
@@ -107,6 +159,9 @@ def test_group_views_fit_two_views_and_predict_per_group(problem_type, tmp_path)
     names = predictor.model_names()
     for base in ("LightGBM", "LinearModel"):
         assert f"{base}_BAG_L1" in names and f"{base}{GROUP_COLLAPSED_SUFFIX}_BAG_L1" in names
+
+    ensemble = predictor._trainer.load_model(predictor.model_best)
+    assert ensemble.params["group_pooling"] == ("mean" if problem_type == "regression" else "geometric_mean")
 
     pred = _predict(predictor, test)
     # Every view is constant within a group, so the ensemble is too.
@@ -161,6 +216,47 @@ def test_an_ensemble_model_combines_the_pooled_views(problem_type, tmp_path):
     pd.testing.assert_frame_equal(_predict(predictor, shuffled).loc[test.index], pred)
 
 
+def _pooled_greedy_prediction(predictor: TabularPredictor, data: pd.DataFrame, pooling) -> pd.DataFrame:
+    """The weighted ensemble's prediction, recomputed: its weights over the base models' pooled predictions."""
+    ensemble = predictor._trainer.load_model(predictor.model_best)
+    codes = group_codes(data, ["patient"])
+    out = 0
+    for name, weight in ensemble._get_model_weights().items():
+        pred = _predict_model(predictor, data, name)
+        values = pred.to_numpy()[:, 1] if predictor.problem_type == "binary" else pred.to_numpy()
+        pooled = pool_within_groups(values, codes, predictor.problem_type, pooling)
+        if predictor.problem_type == "binary":
+            pooled = np.stack([1 - pooled, pooled], axis=1)
+        out = out + weight * pooled.reshape(pred.shape)
+    return pd.DataFrame(out, index=data.index, columns=pred.columns)
+
+
+def _predict_model(predictor: TabularPredictor, data: pd.DataFrame, model: str) -> pd.DataFrame:
+    if predictor.problem_type == "regression":
+        return predictor.predict(data, model=model).to_frame()
+    return predictor.predict_proba(data, model=model)
+
+
+@pytest.mark.parametrize(
+    "problem_type, pooling",
+    [("multiclass", "mean"), ("binary", "median"), ("regression", "median"), ("multiclass", _max_pool)],
+    ids=["multiclass-mean", "binary-median", "rmse-median", "multiclass-custom"],
+)
+def test_the_ensemble_pools_by_the_chosen_strategy(problem_type, pooling, tmp_path):
+    train = _label_per_group_frame(problem_type, n_groups=40, rows=5, seed=0)
+    test = _label_per_group_frame(problem_type, n_groups=15, rows=5, seed=1)
+    predictor = _fit(train, tmp_path, validation_structure={"group_on": "patient"}, group_views={"pooling": pooling})
+    ensemble = predictor._trainer.load_model(predictor.model_best)
+    assert ensemble.params["group_pooling"] == pooling
+
+    pred = _predict(predictor, test)
+    pd.testing.assert_frame_equal(
+        pred, _pooled_greedy_prediction(predictor, test, pooling), atol=1e-5, check_dtype=False
+    )
+    loaded = TabularPredictor.load(predictor.path)
+    pd.testing.assert_frame_equal(_predict(loaded, test), pred)
+
+
 def test_group_views_help_on_label_per_group_data(tmp_path):
     """A sanity check on a clear case, not a benchmark: groups of noisy rows, one label per group."""
     train = _label_per_group_frame("binary", n_groups=60, rows=8, seed=0)
@@ -189,9 +285,10 @@ def test_a_size_curve_can_turn_group_views_on(tmp_path):
         train,
         tmp_path,
         validation_structure={"group_on": "patient"},
-        validation_size_curves={"group_views": [[50, False], "auto"]},
+        validation_size_curves={"group_views": [[50, False], {"enabled": "auto", "pooling": "median"}]},
     )
     assert any(GROUP_COLLAPSED_SUFFIX in name for name in predictor.model_names())
+    assert predictor._trainer.load_model(predictor.model_best).params["group_pooling"] == "median"
 
 
 def test_refit_full_keeps_both_views(tmp_path):
@@ -240,6 +337,24 @@ def test_errors(tmp_path):
         _fit(train, tmp_path / "b", num_bag_folds=0, validation_structure={"group_on": "patient"}, group_views=True)
     with pytest.raises(ValueError, match="must be True, False or 'auto'"):
         _fit(train, tmp_path / "c", validation_structure={"group_on": "patient"}, group_views="yes")
+    # A pooling strategy that cannot apply is rejected before any model is fit, "auto" or not.
+    regression = _label_per_group_frame("regression", n_groups=20, rows=4, seed=0)
+    for enabled in (True, "auto"):
+        with pytest.raises(ValueError, match="does not apply to regression"):
+            _fit(
+                regression,
+                tmp_path / f"e_{enabled}",
+                validation_structure={"group_on": "patient"},
+                group_views={"enabled": enabled, "pooling": "geometric_mean"},
+            )
+        assert not (tmp_path / f"e_{enabled}" / "predictor" / "models").exists()
+    with pytest.raises(ValueError, match="must be picklable"):
+        _fit(
+            train,
+            tmp_path / "f",
+            validation_structure={"group_on": "patient"},
+            group_views={"pooling": lambda pred, groups: pred},
+        )
 
     predictor = _fit(train, tmp_path / "d", validation_structure={"group_on": "patient"}, group_views=True)
     with pytest.raises(KeyError, match="group_on"):

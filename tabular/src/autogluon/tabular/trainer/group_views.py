@@ -4,8 +4,9 @@ When the rows of a group share one label (for example several measurements of th
 labelled with the patient's diagnosis), a row is one noisy observation of a group-level target. Two views
 of each base model use that:
 
-- the model's row predictions pooled within each group: the geometric mean of the class probabilities,
-  renormalised (the mean for regression), so every row of a group gets the group's prediction;
+- the model's row predictions pooled within each group, so every row of a group gets the group's prediction
+  (`GroupViews.pooling`: by default the geometric mean of the class probabilities, renormalised, and the mean
+  for regression);
 - the same model fit on the collapsed table, one row per group (numeric features averaged, the others
   set to their most frequent value in the group, plus the log of the group's row count), its prediction
   for a group copied to the group's rows.
@@ -23,6 +24,9 @@ from __future__ import annotations
 import copy
 import logging
 import os
+import pickle
+from dataclasses import dataclass, fields
+from typing import Callable
 
 import numpy as np
 import pandas as pd
@@ -47,6 +51,9 @@ GROUP_LOG_ROWS_COLUMN = "__ag_group_log_rows__"
 GROUP_VIEWS_PROBLEM_TYPES = (BINARY, MULTICLASS, REGRESSION)
 
 _LOG_CLIP = 1e-15
+
+GroupPooling = Callable[[np.ndarray, np.ndarray], np.ndarray]
+"""A custom pooling strategy, `pooling(pred, groups) -> pooled` (see `GroupViews.pooling`)."""
 
 
 def group_key_feature_metadata() -> FeatureMetadata:
@@ -118,20 +125,138 @@ def _group_mode(column: pd.Series, group: np.ndarray, n_groups: int) -> pd.Serie
     return values
 
 
-def pool_within_groups(pred: np.ndarray, codes: np.ndarray, problem_type: str) -> np.ndarray:
-    """One model's predictions pooled within each group.
+def _pool_geometric_mean(pred: np.ndarray, groups: np.ndarray) -> np.ndarray:
+    """The geometric mean over each group's rows: the exponentiated mean of the log-predictions."""
+    return np.exp(_group_mean(np.log(np.clip(pred, _LOG_CLIP, 1)), groups))
 
-    Class probabilities (binary: the positive class's, as a 1-d array) by their geometric mean over the group,
-    renormalised; regression predictions by their mean.
+
+def _pool_median(pred: np.ndarray, groups: np.ndarray) -> np.ndarray:
+    """The median over each group's rows, per column."""
+    return pd.DataFrame(pred).groupby(groups, sort=False).transform("median").to_numpy()
+
+
+GROUP_POOLING: dict[str, GroupPooling] = {
+    "geometric_mean": _pool_geometric_mean,
+    "mean": _group_mean,
+    "median": _pool_median,
+}
+"""The built-in pooling strategies of `GroupViews.pooling`, by name."""
+
+
+def default_group_pooling(problem_type: str) -> str:
+    """The pooling strategy `GroupViews.pooling=None` stands for."""
+    return "mean" if problem_type == REGRESSION else "geometric_mean"
+
+
+def group_pooling_function(pooling: str | GroupPooling | None, problem_type: str) -> GroupPooling:
+    """The function of a pooling strategy (see `GroupViews.pooling`), checked against `problem_type`."""
+    if pooling is None:
+        pooling = default_group_pooling(problem_type)
+    if callable(pooling):
+        return pooling
+    if pooling not in GROUP_POOLING:
+        raise ValueError(
+            f"`group_views` pooling must be one of {sorted(GROUP_POOLING)} or a callable, got {pooling!r}."
+        )
+    if pooling == "geometric_mean" and problem_type == REGRESSION:
+        raise ValueError(
+            "`group_views` pooling 'geometric_mean' pools class probabilities, so it does not apply to regression: "
+            "use 'mean', 'median' or a callable."
+        )
+    return GROUP_POOLING[pooling]
+
+
+def pool_within_groups(
+    pred: np.ndarray, codes: np.ndarray, problem_type: str, pooling: str | GroupPooling | None = None
+) -> np.ndarray:
+    """One model's predictions pooled within each group, by `pooling` (see `GroupViews.pooling`).
+
+    Binary class probabilities are the positive class's, as a 1-d array, and are pooled as both classes'.
+    Pooled class probabilities are floored at 1e-15 and renormalised.
     """
+    pool = group_pooling_function(pooling, problem_type)
     pred = np.asarray(pred)
-    if problem_type == REGRESSION:
-        return _group_mean(pred.astype(np.float64), codes).astype(pred.dtype)
-    proba = np.stack([1 - pred, pred], axis=1) if problem_type == BINARY else pred
-    log_proba = np.log(np.clip(proba.astype(np.float64), _LOG_CLIP, 1))
-    pooled = np.exp(_group_mean(log_proba, codes))
-    pooled /= pooled.sum(axis=1, keepdims=True)
-    return (pooled[:, 1] if problem_type == BINARY else pooled).astype(pred.dtype)
+    if problem_type == BINARY:
+        values = np.stack([1 - pred, pred], axis=1)
+    else:
+        values = pred.reshape(len(pred), -1)
+    values = values.astype(np.float64)
+    pooled = np.asarray(pool(values, codes), dtype=np.float64)
+    if pooled.shape != values.shape:
+        raise ValueError(
+            f"`group_views` pooling must return an array of the shape of its input {values.shape}, got {pooled.shape}."
+        )
+    if problem_type != REGRESSION:
+        pooled = np.maximum(pooled, _LOG_CLIP)
+        pooled /= pooled.sum(axis=1, keepdims=True)
+    if problem_type == BINARY:
+        pooled = pooled[:, 1]
+    return pooled.reshape(pred.shape).astype(pred.dtype)
+
+
+@dataclass(frozen=True)
+class GroupViews:
+    """[EXPERIMENTAL] `group_views` of `TabularPredictor.fit` (which documents the views), as a dataclass.
+
+    The equivalent dict works too: `group_views={"pooling": "median"}`. `group_views=True` is `GroupViews()`
+    and `group_views="auto"` is `GroupViews(enabled="auto")`.
+
+    Parameters
+    ----------
+    enabled : bool | str, default True
+        True: on, raising if the fit does not allow it. "auto": on when the data and fit allow it. False: off.
+    pooling : str | callable, default None
+        How the weighted ensemble pools each model's row predictions within a group: "geometric_mean",
+        "mean", "median" or a callable `pooling(pred, groups)`. None: "geometric_mean" for classification and
+        "mean" for regression.
+    """
+
+    enabled: bool | str = True
+    pooling: str | GroupPooling | None = None
+
+    def __post_init__(self):
+        if self.enabled not in (True, False, "auto"):
+            raise ValueError(f"group_views must be True, False or 'auto', got {self.enabled!r}.")
+        if self.pooling is not None and not callable(self.pooling) and self.pooling not in GROUP_POOLING:
+            raise ValueError(
+                f"`group_views` pooling must be one of {sorted(GROUP_POOLING)} or a callable, got {self.pooling!r}."
+            )
+
+    @classmethod
+    def from_input(cls, value: bool | str | dict | GroupViews | None) -> GroupViews | None:
+        """`fit`'s `group_views` as a `GroupViews`, or None when off."""
+        if value is None or value is False:
+            return None
+        if value is True or isinstance(value, str):
+            value = cls(enabled=value)
+        elif isinstance(value, dict):
+            invalid = set(value) - {f.name for f in fields(cls)}
+            if invalid:
+                raise ValueError(
+                    f"Invalid `group_views` keys: {sorted(invalid)}. Valid keys: {[f.name for f in fields(cls)]}"
+                )
+            value = cls(**value)
+        elif not isinstance(value, cls):
+            raise ValueError(f"group_views must be True, False, 'auto', a dict or a GroupViews, got {value!r}.")
+        return None if value.enabled is False else value
+
+    def resolve_pooling(self, problem_type: str, check_picklable: bool = True) -> str | GroupPooling:
+        """The pooling strategy for `problem_type`: a built-in's name, or the callable.
+
+        A callable is saved with the predictor, so `check_picklable` checks that up front rather than once
+        every model is fit.
+        """
+        pooling = default_group_pooling(problem_type) if self.pooling is None else self.pooling
+        group_pooling_function(pooling, problem_type)
+        if callable(pooling) and check_picklable:
+            try:
+                pickle.dumps(pooling)
+            except (pickle.PicklingError, AttributeError, TypeError) as err:
+                raise ValueError(
+                    "A custom `group_views` pooling is saved with the predictor, so it must be picklable: a function "
+                    f"defined at module level, not a lambda or a nested function. Got {pooling!r}."
+                ) from err
+        return pooling
 
 
 class GroupCollapsedModel(AbstractModel):
@@ -309,9 +434,14 @@ class GroupPooledWeightedEnsembleModel(WeightedEnsembleModel):
     """`WeightedEnsembleModel` over the group views: every base model's predictions are pooled within groups.
 
     The base models are the bagged models and their `GroupCollapsedModel` counterparts, so the ensemble
-    selects among each model's pooled row predictions and its collapsed predictions (pooling leaves the
-    latter unchanged, being constant within a group already). The data passed in carries `GROUP_KEY_COLUMN`.
+    selects among each model's pooled row predictions and its collapsed predictions (the built-in pooling
+    strategies leave the latter unchanged, being constant within a group already). The data passed in carries
+    `GROUP_KEY_COLUMN`. The `group_pooling` hyperparameter is the pooling strategy (see `GroupViews.pooling`).
     """
+
+    def _set_default_params(self):
+        self._set_default_param_value("group_pooling", None)
+        super()._set_default_params()
 
     def preprocess(self, X, preprocess_nonadaptive: bool = True, model=None, **kwargs):
         if GROUP_KEY_COLUMN not in X.columns:
@@ -331,6 +461,6 @@ class GroupPooledWeightedEnsembleModel(WeightedEnsembleModel):
             values = X[columns].to_numpy()
             if k == 1:
                 values = values[:, 0]
-            pooled = pool_within_groups(values, codes, self.problem_type)
+            pooled = pool_within_groups(values, codes, self.problem_type, self.params["group_pooling"])
             X[columns] = pooled.reshape(len(X), k)
         return X
