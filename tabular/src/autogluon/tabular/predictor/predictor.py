@@ -76,7 +76,7 @@ from ..configs.pipeline_presets import (
     USE_BAG_HOLDOUT_AUTO_THRESHOLD,
     ValidationSizeCurves,
     get_validation_and_stacking_method,
-    resolve_ensemble_model,
+    resolve_ensemble_hyperparameters,
     resolve_hyperparameters_curve,
     resolve_validation_mode,
 )
@@ -980,12 +980,14 @@ class TabularPredictor:
                 Only valid with `validation_mode="none"`, where there is no held-out data to learn
                 weights from. With validation data AutoGluon learns them, so passing fixed weights
                 there is rejected rather than silently overriding the search.
-            ensemble_model : dict, default = None
-                The model that combines the base models' predictions in the weighted ensemble, in
-                place of greedy ensemble selection, as a one-entry `{model: hyperparameters}` dict
-                like an entry of `hyperparameters`: `model` is a registered model key or an
-                `AbstractModel` subclass, e.g. `{MyEnsembleModel: {}}`. None (default) uses greedy
-                ensemble selection (`"ENS_WEIGHTED"`).
+            ensemble_hyperparameters : dict, default = None
+                The model that combines the base models' predictions in the weighted ensemble and its
+                hyperparameters, as a one-entry `{model: hyperparameters}` dict, mirroring
+                `hyperparameters` for the base models: `model` is a registered model key or an
+                `AbstractModel` subclass. None (default) is greedy ensemble selection with its default
+                hyperparameters, `{"ENS_WEIGHTED": {}}`; `{"ENS_WEIGHTED": {"ensemble_size": 50}}`
+                changes them, and `{MyEnsembleModel: {}}` fits `MyEnsembleModel` in place of greedy
+                ensemble selection.
 
                 The model is fit once, as greedy ensemble selection is, on the base models'
                 out-of-fold predictions when bagging (validation predictions otherwise) and their
@@ -1007,7 +1009,7 @@ class TabularPredictor:
                 cannot be combined with `ensemble_weights`, `validation_mode="none"` or
                 `fit_weighted_ensemble=False`. `fit_extra` and `fit_weighted_ensemble()` keep greedy
                 ensemble selection. Can also be set by a size curve, e.g.
-                `validation_size_curves={"ensemble_model": [[100_000, {MyEnsembleModel: {}}], None]}`
+                `validation_size_curves={"ensemble_hyperparameters": [[100_000, {MyEnsembleModel: {}}], None]}`
                 uses `MyEnsembleModel` up to 100,000 rows and greedy ensemble selection above.
             validation_structure : dict | ValidationStructure, default = None
                 Declarative description of the dataset's validation-relevant structure, as a dict with keys
@@ -1050,7 +1052,7 @@ class TabularPredictor:
                 `use_bag_holdout` / `num_stack_levels` / `dynamic_stacking` / `refit_full` argument still wins over any
                 curve. A knob given a curve is not overridden by `auto_stack`, since supplying the curve
                 is itself a request for size-driven selection of it. `validation_mode`, `ensemble_weights`,
-                `ensemble_model` and `hyperparameters` can be given curves too (see their entries).
+                `ensemble_hyperparameters` and `hyperparameters` can be given curves too (see their entries).
                     `validation_size_curves={'num_bag_sets': [[2000, 5], 1]}` -> 5 repeats at or below
                     2000 rows and 1 above, i.e. repeated cross-validation on small data.
                     `validation_size_curves={'num_bag_folds': [[50000, 8], 0], 'refit_full': [[50000, False], True]}`
@@ -1650,29 +1652,29 @@ class TabularPredictor:
             size_on_groups=(validation_structure is not None and validation_structure.size_validation_on_groups),
         )
         no_validation = validation_mode == "none"
-        ensemble_model = resolve_ensemble_model(
-            ensemble_model=kwargs["ensemble_model"],
+        ensemble_hyperparameters = resolve_ensemble_hyperparameters(
+            ensemble_hyperparameters=kwargs["ensemble_hyperparameters"],
             num_train_rows=len(train_data),
             validation_size_curves=kwargs["validation_size_curves"],
             num_group_instances=num_group_instances,
             size_on_groups=(validation_structure is not None and validation_structure.size_validation_on_groups),
         )
-        if ensemble_model is not None:
+        if ensemble_hyperparameters is not None:
             # Checked before any model is fit: each of these leaves the ensemble model nothing to
             # learn from or no ensemble to fit, which would otherwise surface only after training.
             if ensemble_weights is not None:
                 raise ValueError(
-                    "`ensemble_model` and `ensemble_weights` cannot be combined: fixed weights leave nothing "
+                    "`ensemble_hyperparameters` and `ensemble_weights` cannot be combined: fixed weights leave nothing "
                     "for the ensemble model to learn. Drop one of the two."
                 )
             if no_validation:
                 raise ValueError(
-                    "`ensemble_model` learns from validation or out-of-fold predictions, which "
+                    "The model of `ensemble_hyperparameters` learns from validation or out-of-fold predictions, which "
                     "validation_mode='none' does not produce. Drop one of the two."
                 )
             if not fit_weighted_ensemble:
                 raise ValueError(
-                    "`ensemble_model` sets the model of the weighted ensemble, so it cannot be combined with "
+                    "`ensemble_hyperparameters` sets the model of the weighted ensemble, so it cannot be combined with "
                     "fit_weighted_ensemble=False."
                 )
 
@@ -1892,7 +1894,7 @@ class TabularPredictor:
             no_validation=no_validation,
             ensemble_weights=ensemble_weights,
             ensemble_weights_missing=ensemble_weights_missing,
-            ensemble_model=ensemble_model,
+            ensemble_hyperparameters=ensemble_hyperparameters,
         )
         ag_post_fit_kwargs = dict(
             keep_only_best=kwargs["keep_only_best"],
@@ -6387,7 +6389,7 @@ class TabularPredictor:
             validation_size_curves=None,
             ensemble_weights=None,
             ensemble_weights_missing="error",
-            ensemble_model=None,
+            ensemble_hyperparameters=None,
             hyperparameter_tune_kwargs=None,
             ag_args=None,
             ag_args_fit=None,

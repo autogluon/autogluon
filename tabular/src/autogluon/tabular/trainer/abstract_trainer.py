@@ -1172,8 +1172,8 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         """
         Trains auxiliary models (currently a single weighted ensemble) using the provided base models.
         Level must be greater than the level of any of the base models.
-        Auxiliary models train on the predictions of the base models. They use the original features only when an
-        `ensemble_model` asks for them via `ag_args_ensemble={"use_orig_features": True}`.
+        Auxiliary models train on the predictions of the base models. They use the original features only when the
+        model of `ensemble_hyperparameters` asks for them via `ag_args_ensemble={"use_orig_features": True}`.
         """
         if self._callback_early_stop:
             return []
@@ -1207,9 +1207,9 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
 
         ensemble_weights = kwargs.pop("ensemble_weights", None)
         ensemble_weights_missing = kwargs.pop("ensemble_weights_missing", "error")
-        ensemble_model = kwargs.pop("ensemble_model", None)
-        if ensemble_weights is not None and ensemble_model is not None:
-            raise ValueError("`ensemble_weights` and `ensemble_model` cannot be combined.")
+        ensemble_hyperparameters = kwargs.pop("ensemble_hyperparameters", None)
+        if ensemble_weights is not None and ensemble_hyperparameters is not None:
+            raise ValueError("`ensemble_weights` and `ensemble_hyperparameters` cannot be combined.")
         if ensemble_weights is not None:
             # Fixed weights are not learned from anything, so the base models' validation or
             # out-of-fold predictions are never needed -- which is what makes this reachable with
@@ -1253,11 +1253,11 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
 
         child_cls = "ENS_WEIGHTED"
         use_orig_features = False
-        if ensemble_model is not None:
-            ((child_cls, ensemble_model_hyperparameters),) = ensemble_model.items()
+        if ensemble_hyperparameters is not None:
+            ((child_cls, model_hyperparameters),) = ensemble_hyperparameters.items()
             # The caller's hyperparameters first, then what this call adds (e.g. the name suffix).
             child_hyperparameters = {
-                **copy.deepcopy(ensemble_model_hyperparameters or {}),
+                **copy.deepcopy(model_hyperparameters or {}),
                 **copy.deepcopy(child_hyperparameters or {}),
             }
             child_ag_args = dict(child_hyperparameters.get("ag_args", None) or {})
@@ -1321,7 +1321,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
 
     @staticmethod
     def _ensemble_model_uses_orig_features(child_hyperparameters: dict) -> bool:
-        """Whether an `ensemble_model`'s hyperparameters ask for the original features alongside the stack columns.
+        """Whether the hyperparameters of the `ensemble_hyperparameters` model ask for the original features too.
 
         Read from `ag_args_ensemble` or the equivalent `ag.ens.` prefix, the two ways a model's hyperparameters set its
         ensemble wrapper's parameters.

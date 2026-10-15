@@ -61,7 +61,7 @@ class AutoTrainer(AbstractTabularTrainer):
         no_validation: bool = False,
         ensemble_weights: dict | None = None,
         ensemble_weights_missing: str = "error",
-        ensemble_model: dict | None = None,
+        ensemble_hyperparameters: dict | None = None,
         callbacks: list[callable] = None,
         label_cleaner=None,
         **kwargs,
@@ -182,9 +182,9 @@ class AutoTrainer(AbstractTabularTrainer):
             aux_kwargs = dict(aux_kwargs or {})
             aux_kwargs["ensemble_weights"] = ensemble_weights
             aux_kwargs["ensemble_weights_missing"] = ensemble_weights_missing
-        if ensemble_model is not None:
+        if ensemble_hyperparameters is not None:
             aux_kwargs = dict(aux_kwargs or {})
-            aux_kwargs["ensemble_model"] = ensemble_model
+            aux_kwargs["ensemble_hyperparameters"] = ensemble_hyperparameters
 
         self._train_multi_and_ensemble(
             X=X,

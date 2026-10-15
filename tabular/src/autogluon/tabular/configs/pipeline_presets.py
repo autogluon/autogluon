@@ -96,10 +96,10 @@ class ValidationSizeCurves:
     whether raw text features are enabled, and so shapes the feature generator -- which means it is
     always read at the row count, never at the group count.
 
-    ``ensemble_model`` swaps the model that combines the base models' predictions, for example a
-    learned combiner up to a size and greedy ensemble selection above it::
+    ``ensemble_hyperparameters`` sets the model that combines the base models' predictions, for
+    example a learned combiner up to a size and greedy ensemble selection above it::
 
-        {"ensemble_model": [[100_000, {MyEnsembleModel: {}}], None]}
+        {"ensemble_hyperparameters": [[100_000, {MyEnsembleModel: {}}], None]}
 
     It has no default curve; ``None`` means greedy ensemble selection.
     """
@@ -113,7 +113,7 @@ class ValidationSizeCurves:
     refit_full: SizeCurve = None
     validation_mode: SizeCurve = None
     ensemble_weights: SizeCurve = None
-    ensemble_model: SizeCurve = None
+    ensemble_hyperparameters: SizeCurve = None
     hyperparameters: SizeCurve = None
 
     @classmethod
@@ -294,34 +294,34 @@ def resolve_validation_mode(
     return validation_mode, ensemble_weights
 
 
-def resolve_ensemble_model(
-    ensemble_model: dict | None,
+def resolve_ensemble_hyperparameters(
+    ensemble_hyperparameters: dict | None,
     num_train_rows: int,
     validation_size_curves: ValidationSizeCurves | dict[str, SizeCurve] | None = None,
     num_group_instances: int | None = None,
     size_on_groups: bool = False,
 ) -> dict | None:
-    """Resolve ``ensemble_model`` from its curve, if one was given, and check its form.
+    """Resolve ``ensemble_hyperparameters`` from its curve, if one was given, and check its form.
 
     Read at the effective sample size, like ``ensemble_weights``. A caller-supplied value wins over
     the curve, as for every other knob. ``None`` means greedy ensemble selection.
     """
-    if ensemble_model is None:
+    if ensemble_hyperparameters is None:
         overrides = ValidationSizeCurves.from_input(validation_size_curves)
-        if overrides is not None and overrides.ensemble_model is not None:
+        if overrides is not None and overrides.ensemble_hyperparameters is not None:
             effective_size = resolve_effective_sample_size(
                 num_train_rows=num_train_rows,
                 num_group_instances=num_group_instances,
                 size_on_groups=size_on_groups,
             )
-            ensemble_model = resolve_size_curve(overrides.ensemble_model, effective_size)
-    if ensemble_model is not None:
-        validate_ensemble_model(ensemble_model)
-    return ensemble_model
+            ensemble_hyperparameters = resolve_size_curve(overrides.ensemble_hyperparameters, effective_size)
+    if ensemble_hyperparameters is not None:
+        validate_ensemble_hyperparameters(ensemble_hyperparameters)
+    return ensemble_hyperparameters
 
 
-def validate_ensemble_model(ensemble_model: dict) -> None:
-    """Check that ``ensemble_model`` is a one-entry ``{model: hyperparameters}`` dict.
+def validate_ensemble_hyperparameters(ensemble_hyperparameters: dict) -> None:
+    """Check that ``ensemble_hyperparameters`` is a one-entry ``{model: hyperparameters}`` dict.
 
     The model is a registered model key or an ``AbstractModel`` subclass, as in ``hyperparameters``.
     Checked before anything is fit, so a typo does not cost the whole fit.
@@ -330,25 +330,27 @@ def validate_ensemble_model(ensemble_model: dict) -> None:
 
     from ..registry import ag_model_registry
 
-    if not isinstance(ensemble_model, dict) or len(ensemble_model) != 1:
+    if not isinstance(ensemble_hyperparameters, dict) or len(ensemble_hyperparameters) != 1:
         raise ValueError(
-            "`ensemble_model` must be a dict with exactly one entry, `{model: hyperparameters}`, "
-            f"e.g. `{{MyEnsembleModel: {{}}}}`. Got: {ensemble_model!r}"
+            "`ensemble_hyperparameters` must be a dict with exactly one entry, `{model: hyperparameters}`, "
+            f"e.g. `{{MyEnsembleModel: {{}}}}`. Got: {ensemble_hyperparameters!r}"
         )
-    ((model, hyperparameters),) = ensemble_model.items()
+    ((model, hyperparameters),) = ensemble_hyperparameters.items()
     if isinstance(model, str):
         if model not in ag_model_registry.keys:
             raise ValueError(
-                f"`ensemble_model` names {model!r}, which is not a registered model key. "
+                f"`ensemble_hyperparameters` names {model!r}, which is not a registered model key. "
                 "Pass the model class, or register it with `ag_model_registry.add`."
             )
     elif not (isinstance(model, type) and issubclass(model, AbstractModel)):
         raise ValueError(
-            f"`ensemble_model`'s key must be a registered model key or an AbstractModel subclass, got: {model!r}"
+            "The model in `ensemble_hyperparameters` must be a registered model key or an AbstractModel subclass, "
+            f"got: {model!r}"
         )
     if hyperparameters is not None and not isinstance(hyperparameters, dict):
         raise ValueError(
-            f"`ensemble_model`'s value must be the model's hyperparameters as a dict, got: {hyperparameters!r}"
+            "The value in `ensemble_hyperparameters` must be the model's hyperparameters as a dict, "
+            f"got: {hyperparameters!r}"
         )
 
 

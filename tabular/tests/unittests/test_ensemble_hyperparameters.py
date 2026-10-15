@@ -1,4 +1,4 @@
-"""`ensemble_model`: a model of the caller's choice combines the base models in place of greedy ensemble selection.
+"""`ensemble_hyperparameters`: the model that combines the base models, and its hyperparameters.
 
 The toy ensemble models below exercise the plumbing: which columns the model sees, where it is used,
 and that the fitted predictor behaves like any other (save/load, refit_full, leaderboard, info).
@@ -15,7 +15,7 @@ from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
 from autogluon.core.models import AbstractModel
 from autogluon.core.models.greedy_ensemble.greedy_weighted_ensemble_model import GreedyWeightedEnsembleModel
 from autogluon.tabular import TabularPredictor
-from autogluon.tabular.configs.pipeline_presets import resolve_ensemble_model
+from autogluon.tabular.configs.pipeline_presets import resolve_ensemble_hyperparameters
 
 HYPERPARAMETERS = {"GBM": {"num_boost_round": 20}, "LR": {}}
 PROBLEM_TYPES = [BINARY, MULTICLASS, REGRESSION]
@@ -113,7 +113,7 @@ def test_ensemble_model_replaces_greedy(tmp_path, problem_type):
     """The ensemble serves the chosen base model's predictions, under the weighted ensemble's name."""
     train = _data(problem_type)
     test = _data(problem_type, n=60, seed=1).drop(columns=["label"])
-    predictor = _fit(tmp_path, train, problem_type, ensemble_model={BestBaseModelEnsemble: {}})
+    predictor = _fit(tmp_path, train, problem_type, ensemble_hyperparameters={BestBaseModelEnsemble: {}})
 
     assert predictor.model_best == "WeightedEnsemble_L2"
     child = _child(predictor)
@@ -134,6 +134,20 @@ def test_ensemble_model_replaces_greedy(tmp_path, problem_type):
     assert "WeightedEnsemble_L2" in predictor.info()["model_info"]
 
 
+def test_greedy_ensemble_selection_takes_its_hyperparameters(tmp_path):
+    """`ENS_WEIGHTED` keeps greedy ensemble selection and sets its hyperparameters, as `hyperparameters` does."""
+    train = _data(BINARY)
+    default = _fit(tmp_path / "default", train, BINARY)
+    tuned = _fit(tmp_path / "tuned", train, BINARY, ensemble_hyperparameters={"ENS_WEIGHTED": {"ensemble_size": 3}})
+
+    child = _child(tuned)
+    assert type(child) is GreedyWeightedEnsembleModel
+    assert child.params["ensemble_size"] == 3
+    assert child.params["ensemble_size"] != _child(default).params["ensemble_size"]
+    assert tuned.model_best == "WeightedEnsemble_L2"
+    assert _ensemble(tuned)._get_model_weights(), "greedy ensemble selection reports its weights"
+
+
 @pytest.mark.parametrize("problem_type", PROBLEM_TYPES, ids=PROBLEM_TYPE_IDS)
 def test_original_features_reach_the_ensemble_model_only_on_request(tmp_path, problem_type):
     train = _data(problem_type)
@@ -142,7 +156,7 @@ def test_original_features_reach_the_ensemble_model_only_on_request(tmp_path, pr
         tmp_path / "orig",
         train,
         problem_type,
-        ensemble_model={MeanWithTableStatsEnsemble: {"ag_args_ensemble": {"use_orig_features": True}}},
+        ensemble_hyperparameters={MeanWithTableStatsEnsemble: {"ag_args_ensemble": {"use_orig_features": True}}},
     )
     stats = _child(with_orig).table_stats_
     assert stats == {"n_rows": len(train), "n_original_features": 4}, "every row, NaN features included"
@@ -157,7 +171,7 @@ def test_original_features_reach_the_ensemble_model_only_on_request(tmp_path, pr
     # Weights from the child are reported as greedy's are.
     assert _ensemble(with_orig)._get_model_weights() == {n: 0.5 for n in names}
 
-    without = _fit(tmp_path / "stack", train, problem_type, ensemble_model={MeanWithTableStatsEnsemble: {}})
+    without = _fit(tmp_path / "stack", train, problem_type, ensemble_hyperparameters={MeanWithTableStatsEnsemble: {}})
     assert _child(without).table_stats_["n_original_features"] == 0
 
 
@@ -168,7 +182,7 @@ def test_predictions_do_not_depend_on_the_batch(tmp_path):
         tmp_path,
         train,
         BINARY,
-        ensemble_model={MeanWithTableStatsEnsemble: {"ag_args_ensemble": {"use_orig_features": True}}},
+        ensemble_hyperparameters={MeanWithTableStatsEnsemble: {"ag_args_ensemble": {"use_orig_features": True}}},
     )
     full = predictor.predict_proba(test)[1].to_numpy()
     rows = np.concatenate([predictor.predict_proba(test.iloc[[i]])[1].to_numpy() for i in range(len(test))])
@@ -182,7 +196,7 @@ def test_ensemble_model_survives_save_load_and_refit_full(tmp_path):
         tmp_path,
         train,
         MULTICLASS,
-        ensemble_model={MeanWithTableStatsEnsemble: {"ag_args_ensemble": {"use_orig_features": True}}},
+        ensemble_hyperparameters={MeanWithTableStatsEnsemble: {"ag_args_ensemble": {"use_orig_features": True}}},
     )
     before = predictor.predict_proba(test)
     loaded = TabularPredictor.load(str(tmp_path), verbosity=0)
@@ -202,7 +216,7 @@ def test_holdout_validation_fits_the_ensemble_model_on_the_validation_rows(tmp_p
         BINARY,
         num_bag_folds=0,
         holdout_frac=0.25,
-        ensemble_model={MeanWithTableStatsEnsemble: {"ag_args_ensemble": {"use_orig_features": True}}},
+        ensemble_hyperparameters={MeanWithTableStatsEnsemble: {"ag_args_ensemble": {"use_orig_features": True}}},
     )
     assert abs(_child(predictor).table_stats_["n_rows"] - len(train) * 0.25) <= 1, "the validation rows only"
 
@@ -215,19 +229,19 @@ def test_size_curve_switches_the_ensemble_model(tmp_path, threshold, expected):
         tmp_path,
         train,
         BINARY,
-        validation_size_curves={"ensemble_model": [[threshold, {BestBaseModelEnsemble: {}}], None]},
+        validation_size_curves={"ensemble_hyperparameters": [[threshold, {BestBaseModelEnsemble: {}}], None]},
     )
     assert type(_child(predictor)) is expected
 
 
-def test_explicit_ensemble_model_wins_over_the_curve(tmp_path):
+def test_explicit_ensemble_hyperparameters_win_over_the_curve(tmp_path):
     train = _data(BINARY)
     predictor = _fit(
         tmp_path,
         train,
         BINARY,
-        ensemble_model={MeanWithTableStatsEnsemble: {}},
-        validation_size_curves={"ensemble_model": [[1_000, {BestBaseModelEnsemble: {}}], None]},
+        ensemble_hyperparameters={MeanWithTableStatsEnsemble: {}},
+        validation_size_curves={"ensemble_hyperparameters": [[1_000, {BestBaseModelEnsemble: {}}], None]},
     )
     assert isinstance(_child(predictor), MeanWithTableStatsEnsemble)
 
@@ -245,12 +259,12 @@ def test_explicit_ensemble_model_wins_over_the_curve(tmp_path):
 )
 def test_ensemble_model_rejects_what_leaves_it_nothing_to_learn(tmp_path, kwargs, match):
     with pytest.raises(ValueError, match=match):
-        _fit(tmp_path, _data(BINARY), BINARY, ensemble_model={BestBaseModelEnsemble: {}}, **kwargs)
+        _fit(tmp_path, _data(BINARY), BINARY, ensemble_hyperparameters={BestBaseModelEnsemble: {}}, **kwargs)
     assert not (tmp_path / "models").exists(), "rejected before any model is fit"
 
 
 @pytest.mark.parametrize(
-    "ensemble_model, match",
+    "ensemble_hyperparameters, match",
     [
         ({BestBaseModelEnsemble: {}, MeanWithTableStatsEnsemble: {}}, "exactly one entry"),
         ({}, "exactly one entry"),
@@ -259,19 +273,19 @@ def test_ensemble_model_rejects_what_leaves_it_nothing_to_learn(tmp_path, kwargs
         ({BestBaseModelEnsemble: [{}]}, "hyperparameters as a dict"),
     ],
 )
-def test_malformed_ensemble_model_is_rejected(ensemble_model, match):
+def test_malformed_ensemble_hyperparameters_are_rejected(ensemble_hyperparameters, match):
     with pytest.raises(ValueError, match=match):
-        resolve_ensemble_model(ensemble_model, num_train_rows=100)
+        resolve_ensemble_hyperparameters(ensemble_hyperparameters, num_train_rows=100)
 
 
-def test_resolve_ensemble_model_reads_the_curve_at_the_effective_size():
-    curves = {"ensemble_model": [[100, {BestBaseModelEnsemble: {}}], None]}
-    assert resolve_ensemble_model(None, num_train_rows=100, validation_size_curves=curves) == {
+def test_resolve_ensemble_hyperparameters_reads_the_curve_at_the_effective_size():
+    curves = {"ensemble_hyperparameters": [[100, {BestBaseModelEnsemble: {}}], None]}
+    assert resolve_ensemble_hyperparameters(None, num_train_rows=100, validation_size_curves=curves) == {
         BestBaseModelEnsemble: {}
     }
-    assert resolve_ensemble_model(None, num_train_rows=101, validation_size_curves=curves) is None
+    assert resolve_ensemble_hyperparameters(None, num_train_rows=101, validation_size_curves=curves) is None
     # Sized on groups when asked to.
-    assert resolve_ensemble_model(
+    assert resolve_ensemble_hyperparameters(
         None, num_train_rows=5_000, validation_size_curves=curves, num_group_instances=50, size_on_groups=True
     ) == {BestBaseModelEnsemble: {}}
-    assert resolve_ensemble_model(None, num_train_rows=100) is None
+    assert resolve_ensemble_hyperparameters(None, num_train_rows=100) is None

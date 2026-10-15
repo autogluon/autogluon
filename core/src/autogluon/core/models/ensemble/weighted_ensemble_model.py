@@ -19,10 +19,10 @@ class WeightedEnsembleModel(StackerEnsembleModel):
     Weighted ensemble meta-model that implements Ensemble Selection: https://www.cs.cornell.edu/~alexn/papers/shotgun.icml04.revised.rev2.pdf
 
     By default the `model_base` is a :class:`autogluon.core.models.GreedyWeightedEnsembleModel`. Any model fit on the
-    base models' predictions can take its place (see `ensemble_model` in `TabularPredictor.fit`). The ensemble keeps
-    the base models with a stack column among the model's `features` after fit, so a model that uses only some of
-    them can drop the others' columns from `self.features`, as greedy ensemble selection does. A model may also
-    implement `_get_model_weights()`, a `{base model: weight}` dict; without it, no weights are reported.
+    base models' predictions can take its place (see `ensemble_hyperparameters` in `TabularPredictor.fit`). The
+    ensemble keeps the base models with a stack column among the model's `features` after fit, so a model that uses
+    only some of them can drop the others' columns from `self.features`, as greedy ensemble selection does. A model
+    may also implement `_get_model_weights()`, a `{base model: weight}` dict; without it, no weights are reported.
     """
 
     def __init__(self, **kwargs):
