@@ -6,15 +6,23 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from autogluon.common.features.types import S_STACK
+from autogluon.common.features.feature_metadata import FeatureMetadata
+from autogluon.common.features.types import S_GROUP_KEY, S_STACK
 from autogluon.core.models import AbstractModel
 from autogluon.tabular import TabularPredictor
+from autogluon.tabular.models import LGBModel
 from autogluon.tabular.trainer.group_views import (
     GROUP_COLLAPSED_SUFFIX,
+    GROUP_KEY_COLUMN,
+    GROUP_LOG_ROWS_COLUMN,
+    GROUP_ORDER_COLUMN,
     GROUP_POOLED_SEPARATOR,
+    GroupCollapse,
+    GroupCollapsedModel,
     GroupViews,
     _group_mode,
     group_codes,
+    group_order,
     group_pooling_name,
     group_pooling_strategies,
     label_constant_within_groups,
@@ -147,6 +155,97 @@ def test_group_views_input_forms():
             GroupViews(views=views)
     with pytest.raises(ValueError, match="fits only the collapsed ones"):
         GroupViews(pooling="median", views="collapsed")
+    with pytest.raises(ValueError, match="fits only the pooled ones"):
+        GroupViews(views="pooled", collapse={"other": "first"})
+    assert GroupViews(views="collapsed", collapse={"other": "first"}).collapse == GroupCollapse(other="first")
+
+
+def test_group_collapse_input_forms():
+    assert GroupViews().collapse is None
+    collapse = {"numeric": ["mean", "last"], "other": "last", "order_on": "visit", "exclude_special_types": ["agg"]}
+    views = GroupViews.from_input({"pooling": "median", "collapse": collapse})
+    assert views.collapse == GroupCollapse(
+        numeric=("mean", "last"), other="last", order_on="visit", exclude_special_types=("agg",)
+    )
+    assert hash(views) == hash(GroupViews(pooling="median", collapse=GroupCollapse(**collapse)))
+    assert views.collapse.numeric_summaries == ("mean", "last") and views.collapse.order_columns == ["visit"]
+    assert GroupCollapse(numeric="median").numeric_summaries == ("median",)
+    assert GroupCollapse(other="first", order_on=["a", "b"]).order_columns == ["a", "b"]
+    assert not GroupCollapse().ordered and GroupCollapse(numeric=["mean", "first"]).ordered
+    with pytest.raises(ValueError, match="Invalid `group_views` collapse keys"):
+        GroupViews(collapse={"summaries": "mean"})
+    with pytest.raises(ValueError, match="must be a dict or a GroupCollapse"):
+        GroupViews(collapse="mean")
+    with pytest.raises(ValueError, match="`numeric` must be one of"):
+        GroupCollapse(numeric="mode")
+    with pytest.raises(ValueError, match="at least one summary"):
+        GroupCollapse(numeric=[])
+    with pytest.raises(ValueError, match="must be distinct"):
+        GroupCollapse(numeric=["mean", "mean"])
+    with pytest.raises(ValueError, match="`other` must be one of"):
+        GroupCollapse(other="mean")
+    with pytest.raises(ValueError, match="neither `numeric` nor `other` uses"):
+        GroupCollapse(order_on="visit")
+
+
+def test_group_order_is_the_position_in_the_sorted_frame():
+    df = pd.DataFrame({"t": [3.0, 1.0, None, 1.0], "u": [0, 1, 0, 0]})
+    # ties keep the frame's order, missing values come first
+    np.testing.assert_array_equal(group_order(df, ["t"]), [3, 1, 0, 2])
+    np.testing.assert_array_equal(group_order(df, ["t", "u"]), [3, 2, 0, 1])
+    with pytest.raises(KeyError, match="order_on"):
+        group_order(df, ["missing"])
+
+
+def _collapse_frame(
+    collapse: GroupCollapse | None, X: pd.DataFrame, feature_metadata: FeatureMetadata
+) -> pd.DataFrame:
+    model = GroupCollapsedModel(
+        model_base=LGBModel(), collapse=collapse, problem_type="binary", eval_metric="accuracy", name="collapsed"
+    )
+    model._features_internal = list(X.columns)
+    model._feature_metadata = feature_metadata
+    model._set_collapse_features()
+    return model._collapse(X)[0]
+
+
+def test_the_collapse_summarises_each_feature_as_set():
+    X = pd.DataFrame(
+        {
+            "f": [1.0, np.nan, 3.0, 4.0, 5.0, 6.0],
+            "c": pd.Categorical(["a", "b", None, "b", "a", "a"]),
+            "agg": [9.0] * 6,
+            GROUP_KEY_COLUMN: [0, 0, 0, 1, 1, 2],
+            # group 0's rows in reverse order, group 1's in frame order
+            GROUP_ORDER_COLUMN: group_order(pd.DataFrame({"t": [3, 2, 1, 1, 2, 5]}), ["t"]),
+        }
+    )
+    feature_metadata = FeatureMetadata(
+        type_map_raw={
+            "f": "float",
+            "c": "category",
+            "agg": "float",
+            GROUP_KEY_COLUMN: "int",
+            GROUP_ORDER_COLUMN: "int",
+        },
+        type_group_map_special={S_GROUP_KEY: [GROUP_KEY_COLUMN, GROUP_ORDER_COLUMN], "agg_type": ["agg"]},
+    )
+    default = _collapse_frame(None, X, feature_metadata)
+    assert list(default.columns) == ["f", "agg", "c", GROUP_LOG_ROWS_COLUMN]
+    np.testing.assert_allclose(default["f"], [2.0, 4.5, 6.0])
+    assert default["c"].tolist() == ["a", "a", "a"]  # group 0 ties "a" and "b": the smallest
+    np.testing.assert_allclose(default[GROUP_LOG_ROWS_COLUMN], np.log([3, 2, 1]))
+
+    collapse = GroupCollapse(numeric=["mean", "last", "std"], other="last", exclude_special_types=["agg_type"])
+    table = _collapse_frame(collapse, X, feature_metadata)
+    assert list(table.columns) == ["f.mean", "f.last", "f.std", "c", GROUP_LOG_ROWS_COLUMN]
+    # the last non-missing value in the rows' order: group 0's earliest row is the frame's last
+    np.testing.assert_allclose(table["f.last"], [1.0, 5.0, 6.0])
+    assert table["c"].tolist() == ["a", "a", "a"]
+    assert table["c"].dtype == X["c"].dtype
+    first = _collapse_frame(GroupCollapse(numeric="first", other="first"), X, feature_metadata)
+    np.testing.assert_allclose(first["f"], [3.0, 4.0, 6.0])
+    assert first["c"].tolist() == ["b", "b", "a"]
 
 
 def test_group_codes_number_the_groups_of_the_frame():
@@ -461,6 +560,55 @@ def test_the_pooled_views_alone_fit_no_collapsed_models(tmp_path):
     assert not any(GROUP_COLLAPSED_SUFFIX in name for name in predictor.model_names())
     pred = predictor.predict_proba(test)
     assert pred.groupby(test["patient"].to_numpy()).nunique().max().max() == 1
+
+
+def test_a_collapse_by_last_value_follows_order_on(tmp_path):
+    """The collapsed views summarise as `collapse` says, read each group's rows in the order of `order_on` (so the
+    rows' order in the data does not matter), and leave out the features of `exclude_special_types`."""
+    rng = np.random.default_rng(0)
+    train = _label_per_group_frame("binary", n_groups=40, rows=5, seed=0)
+    test = _label_per_group_frame("binary", n_groups=15, rows=5, seed=1)
+    for data in (train, test):
+        data["visit"] = rng.permutation(len(data))
+        data["patient_mean_f0"] = data.groupby("patient")["f0"].transform("mean")
+    feature_metadata = FeatureMetadata.from_df(train.drop(columns="label")).add_special_types(
+        {"patient_mean_f0": ["per_group"]}
+    )
+    collapse = {
+        "numeric": ["mean", "last"],
+        "other": "last",
+        "order_on": "visit",
+        "exclude_special_types": ["per_group"],
+    }
+    predictor = _fit(
+        train,
+        tmp_path,
+        validation_structure={"group_on": "patient"},
+        group_views={"collapse": collapse},
+        feature_metadata=feature_metadata,
+        raise_on_model_failure=True,
+    )
+    bag = predictor._trainer.load_model(f"LightGBM{GROUP_COLLAPSED_SUFFIX}_BAG_L1")
+    child = bag.load_child(bag.models[0])
+    assert child.collapse == GroupCollapse(**collapse)
+    numeric = ["f0", "f1", "f2", "visit"]
+    assert child.model.features == [
+        *(f"{f}.mean" for f in numeric),
+        *(f"{f}.last" for f in numeric),
+        "color",
+        GROUP_LOG_ROWS_COLUMN,
+    ]
+    # The order travels as a group key feature that the other models leave out.
+    assert GROUP_ORDER_COLUMN not in predictor._trainer.load_model("LightGBM_BAG_L1").features
+
+    pred = _predict(predictor, test)
+    assert pred.groupby(test["patient"].to_numpy()).nunique().max().max() == 1
+    shuffled = test.sample(frac=1, random_state=0)
+    pd.testing.assert_frame_equal(_predict(predictor, shuffled).loc[test.index], pred)
+    loaded = TabularPredictor.load(predictor.path)
+    pd.testing.assert_frame_equal(_predict(loaded, test), pred)
+    with pytest.raises(KeyError, match="order_on"):
+        predictor.predict(test.drop(columns=["visit", "label"]))
 
 
 def test_errors(tmp_path):
