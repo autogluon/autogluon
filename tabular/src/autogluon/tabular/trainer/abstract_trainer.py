@@ -185,6 +185,9 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         self.group_views: list[str] | None = group_views
         #: How the weighted ensemble pools predictions within groups under group views (see `GroupViews.pooling`).
         self.group_pooling: str | GroupPooling | tuple[str | GroupPooling, ...] | None = group_pooling
+        #: During a fit with `validation_folds` (see `TabularPredictor.fit`), the number of folds each bagged model
+        #: fits before the weighted ensemble; `complete_bags` fits the rest of the bags the best model uses.
+        self._validation_folds: int | None = None
         #: When False, nothing is written to ``path`` during fit: the trainer keeps every model in memory (as
         #: ``low_memory=False`` does) and skips its own pickle, so the fitted trainer lives only in this process.
         self.save_to_disk: bool = save_to_disk
@@ -2958,6 +2961,13 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             can_fit=model.can_fit(),
             is_valid=model.is_valid(),
             refit_folds_pending=isinstance(model, BaggedEnsembleModel) and model._refit_folds_pending,
+            # Fit on part of its folds and predicts from them (an all-rows refit, pending or done, predicts instead).
+            folds_pending=(
+                isinstance(model, BaggedEnsembleModel)
+                and model._folds_pending
+                and not model._refit_folds_pending
+                and model.save_bag_folds
+            ),
             stack_name=stack_name,
             level=level,
             num_children=num_children,
@@ -3591,7 +3601,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                 models=models,
                 hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
                 k_fold_start=0,
-                k_fold_end=k_fold,
+                k_fold_end=self._planned_k_fold_end(k_fold),
                 n_repeats=n_repeats,
                 n_repeat_start=0,
                 time_limit=time_limit,
@@ -4109,6 +4119,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         if X_test is not None:
             self._num_rows_test = len(X_test)
         self._num_cols_train = len(list(X.columns))
+        time_start = time.time()
         model_names_fit = self.train_multi_levels(
             X,
             y,
@@ -4123,6 +4134,18 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             time_limit=time_limit,
             **kwargs,
         )
+        if self._validation_folds is not None:
+            # The ensemble chose its weights on the validation folds' rows; the bags it uses now fit the rest.
+            core_kwargs = kwargs.get("core_kwargs") or {}
+            self.complete_bags(
+                X=X,
+                y=y,
+                time_limit=None if time_limit is None else time_limit - (time.time() - time_start),
+                total_resources=core_kwargs.get("total_resources"),
+                label_cleaner=core_kwargs.get("label_cleaner"),
+            )
+            self._validation_folds = None
+            self.save()
         if len(self.get_model_names()) == 0:
             # TODO v1.0: Add toggle to raise exception if no models trained
             logger.log(30, "Warning: AutoGluon did not successfully train any models")
@@ -4421,6 +4444,76 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             model = model.name
         base_model_set = list(self.model_graph.predecessors(model))
         return base_model_set
+
+    def _planned_k_fold_end(self, k_fold: int) -> int:
+        """How many of a bag's `k_fold` folds a first fit fits: all, or `validation_folds` during a fit with it."""
+        if self._validation_folds is None or k_fold <= 1:
+            return k_fold
+        return min(self._validation_folds, k_fold)
+
+    def models_with_folds_pending(self) -> list[str]:
+        """Bagged models fit on only their first folds (`validation_folds`) that predict from those folds;
+        `complete_bags` fits the rest."""
+        return [m for m in self.get_model_names() if self.get_model_attribute(m, "folds_pending", default=False)]
+
+    def complete_bags(
+        self,
+        X: pd.DataFrame,
+        y: pd.Series,
+        models: list[str] | None = None,
+        time_limit: float | None = None,
+        **kwargs,
+    ) -> list[str]:
+        """Fit the remaining folds of the bags in `models` that a `validation_folds` fit left at their first folds.
+
+        `models` defaults to the models the best model depends on. Each bag continues with the same splits, so the
+        out-of-fold predictions then cover every row and its predictions average every fold. Its validation score stays
+        the one on the rows of the folds it fit first, so it stays comparable with the bags that keep only those folds
+        and with the weighted ensemble, whose weights were chosen on the same rows and are kept. `kwargs` go to
+        `_train_single_full` (e.g. `total_resources`, `label_cleaner`). Returns the completed models.
+        """
+        if models is None:
+            if self.model_best is None:
+                return []
+            models = self.get_minimum_model_set(self.model_best)
+        pending = [m for m in models if self.get_model_attribute(m, "folds_pending", default=False)]
+        if not pending:
+            return []
+        logger.log(20, f"Fitting the remaining folds of the {len(pending)} bagged model(s) the best model uses ...")
+        time_start = time.time()
+        completed = []
+        for name in pending:
+            time_left = None if time_limit is None else time_limit - (time.time() - time_start)
+            if time_left is not None and time_left <= 0:
+                logger.log(20, f"\tNo time left to complete {name}: it keeps the folds it has.")
+                continue
+            model = self.load_model(name)
+            base_models = self.get_base_model_names(name)
+            val_score = model.val_score
+            completed += self._train_single_full(
+                X=self.get_inputs_to_stacker(X, base_models=base_models, fit=True),
+                y=y,
+                model=model,
+                k_fold=model._k,
+                k_fold_start=model._k_fold_end,
+                k_fold_end=model._k,
+                n_repeats=1,
+                n_repeat_start=0,
+                level=self.get_model_attribute(name, "level"),
+                stack_name=self.get_model_attribute(name, "stack_name"),
+                time_limit=time_left,
+                fit_kwargs=dict(
+                    num_classes=self.num_classes,
+                    feature_metadata=self.get_feature_metadata(use_orig_features=True, base_models=base_models),
+                ),
+                **kwargs,
+            )
+            if name in completed:
+                model = self.load_model(name)
+                model.val_score = val_score
+                self.save_model(model=model)
+                self._update_model_attr(name, val_score=val_score)
+        return completed
 
     def models_with_refit_pending(self) -> list[str]:
         """Bagged models fit with `refit_folds="after_ensemble"`: their folds are gone and they

@@ -79,7 +79,9 @@ from ..configs.pipeline_presets import (
     resolve_ensemble_hyperparameters,
     resolve_group_views,
     resolve_hyperparameters_curve,
+    resolve_validation_folds,
     resolve_validation_mode,
+    validate_validation_folds,
 )
 from ..configs.presets_configs import tabular_presets_alias, tabular_presets_dict
 from ..learner import AbstractTabularLearner, DefaultLearner
@@ -1092,6 +1094,23 @@ class TabularPredictor:
                   weights; the weight of each input is logged.
 
                 Supported for the first stack layer only.
+            validation_folds : int, default = None
+                [EXPERIMENTAL] With bagging, the number of each bagged model's `num_bag_folds` folds
+                fit before the weighted ensemble. The ensemble chooses its weights on those folds'
+                out-of-fold rows; then the models the best model uses fit their remaining folds and
+                predict with every fold, while the other models keep their first folds. With
+                `num_bag_folds=8`, `validation_folds=1` validates every model on 1/8 of the rows
+                and fits all eight folds only for the models the ensemble uses. The folds are the
+                ones a full bag uses, so they follow `validation_structure`. Rows of the other folds
+                get no out-of-fold prediction until a model completes, and every validation score,
+                the ensemble's included, is the one on the first folds' rows. Models fit with
+                `refit_folds` predict from their all-rows refit and are not completed.
+                None (default) or a value of at least `num_bag_folds` fits every fold. Requires one
+                bagging set (`num_bag_sets=1`) and no stacking, and cannot be combined with
+                `ensemble_weights`, `validation_mode="none"` or `fit_weighted_ensemble=False`. Can
+                also be set by a size curve, e.g.
+                `validation_size_curves={"validation_folds": [[100_000, None], 1]}` fits every fold up
+                to 100,000 rows and one fold above.
             validation_size_curves : dict | ValidationSizeCurves, default = None
                 [EXPERIMENTAL] Overrides for how the automatically selected validation method scales
                 with data size, as a `ValidationSizeCurves` or an equivalent dict. The curve format
@@ -1104,7 +1123,8 @@ class TabularPredictor:
                 `use_bag_holdout` / `num_stack_levels` / `dynamic_stacking` / `refit_full` argument still wins over any
                 curve. A knob given a curve is not overridden by `auto_stack`, since supplying the curve
                 is itself a request for size-driven selection of it. `validation_mode`, `ensemble_weights`,
-                `ensemble_hyperparameters` and `hyperparameters` can be given curves too (see their entries).
+                `ensemble_hyperparameters`, `hyperparameters`, `group_views` and `validation_folds` can be
+                given curves too (see their entries).
                     `validation_size_curves={'num_bag_sets': [[2000, 5], 1]}` -> 5 repeats at or below
                     2000 rows and 1 above, i.e. repeated cross-validation on small data.
                     `validation_size_curves={'num_bag_folds': [[50000, 8], 0], 'refit_full': [[50000, False], True]}`
@@ -1792,6 +1812,25 @@ class TabularPredictor:
                 "learns the weights; pass fixed weights only when there is nothing to learn them from."
             )
 
+        validation_folds, validation_folds_from_curve = resolve_validation_folds(
+            validation_folds=kwargs["validation_folds"],
+            num_train_rows=len(train_data),
+            validation_size_curves=kwargs["validation_size_curves"],
+            num_group_instances=num_group_instances,
+            size_on_groups=(validation_structure is not None and validation_structure.size_validation_on_groups),
+        )
+        validation_folds = validate_validation_folds(
+            validation_folds,
+            num_bag_folds=num_bag_folds,
+            num_bag_sets=num_bag_sets,
+            num_stack_levels=num_stack_levels,
+            dynamic_stacking=dynamic_stacking,
+            no_validation=no_validation,
+            ensemble_weights=ensemble_weights,
+            fit_weighted_ensemble=fit_weighted_ensemble,
+            from_curve=validation_folds_from_curve,
+        )
+
         if validation_structure is not None and validation_structure.splitter is not None:
             # A splitter can leave rows unvalidated exactly as forward-chaining does -- a
             # `TimeSeriesSplit` never validates its earliest block -- so the same restriction
@@ -1947,6 +1986,7 @@ class TabularPredictor:
             ensemble_weights=ensemble_weights,
             ensemble_weights_missing=ensemble_weights_missing,
             ensemble_hyperparameters=ensemble_hyperparameters,
+            validation_folds=validation_folds,
             **self._resolve_group_views(
                 group_views=kwargs["group_views"],
                 train_data=train_data,
@@ -6245,6 +6285,7 @@ class TabularPredictor:
             _experimental_dynamic_hyperparameters=False,
             adapt_num_bag_folds_to_n_classes=False,
             group_views=None,
+            validation_folds=None,
         )
         kwargs, ds_valid_keys = self._sanitize_dynamic_stacking_kwargs(kwargs)
         kwargs = self._validate_fit_extra_kwargs(

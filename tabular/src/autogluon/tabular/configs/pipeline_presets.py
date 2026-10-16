@@ -105,6 +105,10 @@ class ValidationSizeCurves:
 
     ``group_views`` (any value ``fit`` takes for it, e.g. ``"auto"`` or ``{"pooling": "median"}``)
     has no default curve either; see :func:`resolve_group_views`.
+
+    ``validation_folds`` (no default curve) lets the bags fit only some of their folds before the weighted
+    ensemble on large data, e.g. ``{"validation_folds": [[100_000, None], 1]}`` fits every fold up to 100,000 rows
+    and one fold above; see :func:`resolve_validation_folds`.
     """
 
     num_bag_folds: SizeCurve = None
@@ -119,6 +123,7 @@ class ValidationSizeCurves:
     ensemble_hyperparameters: SizeCurve = None
     hyperparameters: SizeCurve = None
     group_views: SizeCurve = None
+    validation_folds: SizeCurve = None
 
     @classmethod
     def from_input(cls, value: ValidationSizeCurves | dict | None) -> ValidationSizeCurves | None:
@@ -277,6 +282,82 @@ def resolve_group_views(
     )
     value = resolve_size_curve(overrides.group_views, effective_size)
     return False if value is None else value
+
+
+def resolve_validation_folds(
+    validation_folds: int | None,
+    num_train_rows: int,
+    validation_size_curves: ValidationSizeCurves | dict[str, SizeCurve] | None = None,
+    num_group_instances: int | None = None,
+    size_on_groups: bool = False,
+) -> tuple[int | None, bool]:
+    """Resolve ``validation_folds`` at the effective sample size; returns ``(value, from_curve)``.
+
+    A caller-supplied value wins over its curve, as everywhere else; ``None`` means every fold.
+    """
+    if validation_folds is not None:
+        return validation_folds, False
+    overrides = ValidationSizeCurves.from_input(validation_size_curves)
+    if overrides is None or overrides.validation_folds is None:
+        return None, False
+    effective_size = resolve_effective_sample_size(
+        num_train_rows=num_train_rows,
+        num_group_instances=num_group_instances,
+        size_on_groups=size_on_groups,
+    )
+    return resolve_size_curve(overrides.validation_folds, effective_size), True
+
+
+def validate_validation_folds(
+    validation_folds: int | None,
+    *,
+    num_bag_folds: int,
+    num_bag_sets: int,
+    num_stack_levels: int,
+    dynamic_stacking: bool,
+    no_validation: bool,
+    ensemble_weights: dict | None,
+    fit_weighted_ensemble: bool,
+    from_curve: bool = False,
+) -> int | None:
+    """Check ``validation_folds`` against the resolved fit; returns it, or ``None`` when every fold is fit anyway.
+
+    Checked before any model is fit, at the size a curve resolved it to.
+    """
+    if validation_folds is None:
+        return None
+    if isinstance(validation_folds, bool) or not isinstance(validation_folds, int) or validation_folds < 1:
+        raise ValueError(f"validation_folds must be a positive int or None, got {validation_folds!r}.")
+    if no_validation:
+        conflicts = ["validation_mode='none'"]
+    else:
+        conflicts = []
+        if num_bag_folds < 2:
+            conflicts.append(f"num_bag_folds={num_bag_folds} (it needs bagging)")
+        if num_bag_sets != 1:
+            conflicts.append(f"num_bag_sets={num_bag_sets}")
+        if num_stack_levels:
+            conflicts.append(f"num_stack_levels={num_stack_levels}")
+        if dynamic_stacking:
+            conflicts.append("dynamic_stacking=True")
+        if ensemble_weights is not None:
+            conflicts.append("ensemble_weights")
+        if not fit_weighted_ensemble:
+            conflicts.append("fit_weighted_ensemble=False")
+    if conflicts:
+        source = (
+            " The size curves resolved to this combination at this data size; check that the curves switch at the "
+            "same threshold."
+            if from_curve
+            else ""
+        )
+        raise ValueError(
+            f"validation_folds={validation_folds} chooses the weighted ensemble on some of one bagging set's folds and "
+            f"then completes the bags it uses, so it cannot be combined with {', '.join(conflicts)}.{source}"
+        )
+    if validation_folds >= num_bag_folds:
+        return None
+    return validation_folds
 
 
 def resolve_validation_mode(
