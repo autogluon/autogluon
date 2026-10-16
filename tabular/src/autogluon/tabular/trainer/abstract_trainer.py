@@ -67,6 +67,7 @@ from .group_views import (
     GROUP_COLLAPSED_SUFFIX,
     GROUP_KEY_COLUMN,
     GROUP_VIEW_KINDS,
+    GroupCollapse,
     GroupCollapsedModel,
     GroupPooledWeightedEnsembleModel,
     GroupPooling,
@@ -175,6 +176,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         group_views: list[str] | None = None,
         group_pooling: str | GroupPooling | tuple[str | GroupPooling, ...] | None = None,
         group_view_kinds: tuple[str, ...] | None = None,
+        group_collapse: GroupCollapse | None = None,
     ):
         super().__init__(
             path=path,
@@ -190,6 +192,8 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         #: The views fit under group views (see `GroupViews.views`): the bagged models on the rows, their
         #: `GroupCollapsedModel` counterparts, or both.
         self.group_view_kinds: tuple[str, ...] = GROUP_VIEW_KINDS if group_view_kinds is None else group_view_kinds
+        #: How the collapsed views build their table under group views (see `GroupViews.collapse`).
+        self.group_collapse: GroupCollapse | None = group_collapse
         #: During a fit with `validation_folds` (see `TabularPredictor.fit`), the number of folds each bagged model
         #: fits before the weighted ensemble; `complete_bags` fits the rest of the bags the best model uses.
         self._validation_folds: int | None = None
@@ -1104,6 +1108,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                 eval_metric=inner.eval_metric,
                 model_base=inner,
                 group_columns=self.group_views,
+                collapse=self.group_collapse,
             )
             params["model_base"] = collapsed
             params["name"] = model.name.replace(inner.name, collapsed.name, 1)
