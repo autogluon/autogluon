@@ -66,6 +66,7 @@ from autogluon.core.utils.savers import save_pkl
 from .group_views import (
     GROUP_COLLAPSED_SUFFIX,
     GROUP_KEY_COLUMN,
+    GROUP_VIEW_KINDS,
     GroupCollapsedModel,
     GroupPooledWeightedEnsembleModel,
     GroupPooling,
@@ -173,6 +174,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         save_to_disk: bool = True,
         group_views: list[str] | None = None,
         group_pooling: str | GroupPooling | tuple[str | GroupPooling, ...] | None = None,
+        group_view_kinds: tuple[str, ...] | None = None,
     ):
         super().__init__(
             path=path,
@@ -185,6 +187,9 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         self.group_views: list[str] | None = group_views
         #: How the weighted ensemble pools predictions within groups under group views (see `GroupViews.pooling`).
         self.group_pooling: str | GroupPooling | tuple[str | GroupPooling, ...] | None = group_pooling
+        #: The views fit under group views (see `GroupViews.views`): the bagged models on the rows, their
+        #: `GroupCollapsedModel` counterparts, or both.
+        self.group_view_kinds: tuple[str, ...] = GROUP_VIEW_KINDS if group_view_kinds is None else group_view_kinds
         #: During a fit with `validation_folds` (see `TabularPredictor.fit`), the number of folds each bagged model
         #: fits before the weighted ensemble; `complete_bags` fits the rest of the bags the best model uses.
         self._validation_folds: int | None = None
@@ -1073,16 +1078,22 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
     def _with_group_collapsed_models(
         self, models: list[AbstractModel], model_args_fit: dict | None
     ) -> tuple[list[AbstractModel], dict | None]:
-        """`models` with each bagged model followed by its `GroupCollapsedModel` counterpart.
+        """`models` with each bagged model followed by its `GroupCollapsedModel` counterpart, or replaced by it
+        when `group_view_kinds` leaves out the pooled views (and kept alone when it leaves out the collapsed ones).
 
         The counterpart bags the same configuration fit on the collapsed table, under the base model's name with
         `GROUP_COLLAPSED_SUFFIX` (e.g. `LightGBM_GroupCollapsed_BAG_L1`), and shares its fit arguments.
         """
+        pooled, collapsed_views = "pooled" in self.group_view_kinds, "collapsed" in self.group_view_kinds
         out = []
         model_args_fit = dict(model_args_fit) if model_args_fit else model_args_fit
         for model in models:
-            out.append(model)
             if not isinstance(model, BaggedEnsembleModel):
+                out.append(model)
+                continue
+            if pooled:
+                out.append(model)
+            if not collapsed_views:
                 continue
             params = copy.deepcopy(model.get_params())
             inner = params["model_base"]
@@ -1099,6 +1110,8 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             out.append(type(model)(**params))
             if model_args_fit and model.name in model_args_fit:
                 model_args_fit[params["name"]] = copy.deepcopy(model_args_fit[model.name])
+                if not pooled:
+                    del model_args_fit[model.name]
         return out, model_args_fit
 
     def _stack_new_level_aux(

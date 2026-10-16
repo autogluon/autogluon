@@ -13,7 +13,9 @@ of each base model use that:
 
 Neither view depends on the order of the rows within a group.
 
-The weighted ensemble chooses among both views of every base model. The group a row belongs to travels as
+The weighted ensemble chooses among both views of every base model, or among one kind of view when
+`GroupViews.views` names only that one (the collapsed views alone skip the fits on the rows). The group a row
+belongs to travels as
 `GROUP_KEY_COLUMN`, a feature of special type `S_GROUP_KEY` holding integer codes computed from the raw
 `group_on` columns of the frame being processed (so unseen test groups stay distinct). Models other than the
 ones defined here leave that feature out.
@@ -50,6 +52,10 @@ GROUP_LOG_ROWS_COLUMN = "__ag_group_log_rows__"
 """The collapsed table's feature holding the log of each group's row count."""
 
 GROUP_VIEWS_PROBLEM_TYPES = (BINARY, MULTICLASS, REGRESSION)
+
+GROUP_VIEW_KINDS = ("pooled", "collapsed")
+"""The views of `GroupViews.views`: every bagged model's row predictions pooled within groups, and the model fit on
+the collapsed table."""
 
 _LOG_CLIP = 1e-15
 
@@ -229,16 +235,34 @@ class GroupViews:
         "mean", "median" or a callable `pooling(pred, groups)`. None: "geometric_mean" for classification and
         "mean" for regression. A list of these gives every model one pooled view per strategy, each a separate
         input to the weighted ensemble, named `<model>@<strategy>` (a callable's `__name__`).
+    views : str | list[str], default ("pooled", "collapsed")
+        The views to fit (`GROUP_VIEW_KINDS`): "pooled", every bagged model fit on the rows with its predictions
+        pooled within groups, and "collapsed", every bagged model also fit on the collapsed table. "collapsed"
+        alone fits each bagged model on the collapsed table only, under its `_GroupCollapsed` name, and skips
+        its fit on the rows; `pooling` then cannot be set. "pooled" alone fits no collapsed models.
     """
 
     enabled: bool | str = True
     pooling: str | GroupPooling | Sequence[str | GroupPooling] | None = None
+    views: str | Sequence[str] = GROUP_VIEW_KINDS
 
     def __post_init__(self):
         if self.enabled not in (True, False, "auto"):
             raise ValueError(f"group_views must be True, False or 'auto', got {self.enabled!r}.")
+        views = (self.views,) if isinstance(self.views, str) else tuple(self.views)
+        if not views or any(view not in GROUP_VIEW_KINDS for view in views) or len(set(views)) < len(views):
+            raise ValueError(
+                f"`group_views` views must be a non-empty list of distinct views among {list(GROUP_VIEW_KINDS)}, "
+                f"got {self.views!r}."
+            )
+        # In `GROUP_VIEW_KINDS` order; a frozen dataclass is hashable only with hashable fields.
+        object.__setattr__(self, "views", tuple(view for view in GROUP_VIEW_KINDS if view in views))
         if self.pooling is None:
             return
+        if "pooled" not in self.views:
+            raise ValueError(
+                "`group_views` pooling sets how the pooled views pool, but `views` fits only the collapsed ones."
+            )
         strategies = group_pooling_strategies(self.pooling)
         if not strategies:
             raise ValueError("`group_views` pooling must list at least one strategy.")
@@ -537,7 +561,8 @@ class GroupPooledWeightedEnsembleModel(WeightedEnsembleModel):
         types_inner = self._base_model_types_inner_dict
         if types_inner is not None:
             # `max_base_models_per_type` counts a collapsed model under the type it collapses, as a type of its
-            # own, rather than every collapsed model as one type.
+            # own, rather than every collapsed model as one type. Without its model on the rows (`views` of the
+            # collapsed views alone), each collapsed model is a type of its own.
             self._base_model_types_inner_dict = {
                 model: (
                     (GroupCollapsedModel, types_inner.get(model.replace(GROUP_COLLAPSED_SUFFIX, "", 1), model))

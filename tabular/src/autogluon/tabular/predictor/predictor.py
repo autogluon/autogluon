@@ -1093,6 +1093,10 @@ class TabularPredictor:
                   pooled by the first strategy. A model's ensemble weight is the sum of its inputs'
                   weights; the weight of each input is logged.
 
+                The dict's `views` chooses the views to fit: `["pooled", "collapsed"]` (default);
+                `"collapsed"`, every bagged model fit on the collapsed table only, which skips its fit
+                on the rows (`pooling` cannot be set then); or `"pooled"`, no collapsed models.
+
                 Supported for the first stack layer only.
             validation_folds : int, default = None
                 [EXPERIMENTAL] With bagging, the number of each bagged model's `num_bag_folds` folds
@@ -6483,12 +6487,13 @@ class TabularPredictor:
         validation_size_curves,
         num_group_instances: int | None,
     ) -> dict:
-        """The learner's `group_views` and `group_pooling` for this fit (see `fit`'s `group_views`).
+        """The learner's `group_views`, `group_pooling` and `group_view_kinds` for this fit (see `fit`'s
+        `group_views`).
 
-        `group_views` is the `group_on` columns when the fit uses group views, `group_pooling` the pooling strategy;
-        both are None when it does not.
+        `group_views` is the `group_on` columns when the fit uses group views, `group_pooling` the pooling strategy
+        and `group_view_kinds` the views fit (`GroupViews.views`); all are None when it does not.
         """
-        off = dict(group_views=None, group_pooling=None)
+        off = dict(group_views=None, group_pooling=None, group_view_kinds=None)
         size_on_groups = validation_structure is not None and validation_structure.size_validation_on_groups
         group_views = GroupViews.from_input(
             resolve_group_views(
@@ -6536,12 +6541,15 @@ class TabularPredictor:
                 "per group: the collapsed models are fit on each group's most frequent label (the mean for "
                 "regression).",
             )
-        logger.log(
-            20,
-            f"Group views on (group_on={group_on}, pooling={pooling!r}): every bagged model also gets a "
-            "`_GroupCollapsed` view.",
-        )
-        return dict(group_views=group_on, group_pooling=pooling)
+        views = group_views.views
+        if "pooled" not in views:
+            fits = "every bagged model is fit on the collapsed table only, as its `_GroupCollapsed` view."
+        elif "collapsed" not in views:
+            fits = "every bagged model's predictions are pooled within groups; no `_GroupCollapsed` views."
+        else:
+            fits = "every bagged model also gets a `_GroupCollapsed` view."
+        logger.log(20, f"Group views on (group_on={group_on}, pooling={pooling!r}): {fits}")
+        return dict(group_views=group_on, group_pooling=pooling, group_view_kinds=views)
 
     def _fit_extra_kwargs_dict(self) -> dict:
         """
