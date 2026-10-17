@@ -660,7 +660,7 @@ recall = make_scorer("recall", sklearn.metrics.recall_score, needs_class=True, n
 quadratic_kappa = make_scorer("quadratic_kappa", classification_metrics.quadratic_kappa, needs_class=True)
 
 
-def customized_log_loss(y_true, y_pred, eps=1e-15):
+def customized_log_loss(y_true, y_pred, eps=1e-15, sample_weight=None):
     """
 
     Parameters
@@ -674,6 +674,9 @@ def customized_log_loss(y_true, y_pred, eps=1e-15):
     eps : float
         The epsilon
 
+    sample_weight : array-like of shape (n_samples,), default=None
+        Sample weights. The loss is their weighted mean, as in sklearn.metrics.log_loss.
+
     Returns
     -------
     loss
@@ -686,11 +689,12 @@ def customized_log_loss(y_true, y_pred, eps=1e-15):
         # First clip the y_pred which is also used in sklearn
         # Convert to float64 to avoid rounding error on the clip operation with epsilon
         y_pred = np.clip(np.asarray(y_pred, dtype=float), eps, 1 - eps)
-        return -(y_true * np.log(y_pred) + (1 - y_true) * np.log(1 - y_pred)).mean()
+        losses = -(y_true * np.log(y_pred) + (1 - y_true) * np.log(1 - y_pred))
+        return np.average(losses, weights=sample_weight)
     else:
         assert y_pred.ndim == 2, "Only ndim=2 is supported"
         labels = np.arange(y_pred.shape[1], dtype=np.int32)
-        return sklearn.metrics.log_loss(y_true.astype(np.int32), y_pred, labels=labels)
+        return sklearn.metrics.log_loss(y_true.astype(np.int32), y_pred, labels=labels, sample_weight=sample_weight)
 
 
 def customized_roc_auc(y_true, y_pred, **kwargs):
