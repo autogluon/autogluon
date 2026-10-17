@@ -75,7 +75,15 @@ class TrainerFinetune(BaseEstimator):
 
     def set_device(self, device: str):
         self.device = device
-        self.model = self.model.to(device=device, non_blocking=True)
+        # CPU weights must be ready before save() serializes them.
+        self.model = self.model.to(device=device, non_blocking=not str(device).startswith("cpu"))
+        if hasattr(self, "bins"):
+            self.bins = self.bins.to(device=device)
+            self.bin_width = self.bin_width.to(device=device)
+
+    def _decode_regression(self, logits):
+        indices = torch.argmax(logits, dim=-1)
+        return self.bins[indices] + self.bin_width / 2
 
     def post_fit_optimize(self):
         # Minimize memory usage post-fit
@@ -264,8 +272,7 @@ class TrainerFinetune(BaseEstimator):
                     self.cfg.task == Task.REGRESSION
                     and self.cfg.hyperparams["regression_loss"] == LossName.CROSS_ENTROPY
                 ):
-                    y_hat = torch.argmax(y_hat, dim=-1)
-                    y_hat = self.bins[y_hat] + self.bin_width / 2
+                    y_hat = self._decode_regression(y_hat)
 
                 y_hat = y_hat.float()
                 prediction_metrics_tracker.update(y_hat, y_q, train=False)
@@ -317,16 +324,14 @@ class TrainerFinetune(BaseEstimator):
                     elif self.cfg.model_name in [ModelName.TAB2D, ModelName.TAB2D_COL_ROW, ModelName.TAB2D_SDPA]:
                         y_hat = self.model(x_s, y_s, x_q, padding_features, padding_obs_support, padding_obs_query)
 
-                y_hat = y_hat[0].float().cpu().numpy()
-
                 # Convert bin id predictions to numerical values
                 if (
                     self.cfg.task == Task.REGRESSION
                     and self.cfg.hyperparams["regression_loss"] == LossName.CROSS_ENTROPY
                 ):
-                    y_hat = np.argmax(y_hat, axis=-1)
-                    y_hat = (self.bins[y_hat] + self.bin_width / 2).cpu().numpy()
+                    y_hat = self._decode_regression(y_hat)
 
+                y_hat = y_hat[0].float().cpu().numpy()
                 y_hat = self.preprocessor.inverse_transform_y(y_hat)
                 y_pred_list.append(y_hat)
 

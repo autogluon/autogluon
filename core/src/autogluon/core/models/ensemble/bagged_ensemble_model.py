@@ -1725,7 +1725,10 @@ class BaggedEnsembleModel(AbstractModel):
         return load_pkl.load(path=os.path.join(self.path, "utils", "model_template.pkl"))
 
     def save_model_base(self, model_base: AbstractModel):
-        save_pkl.save(path=os.path.join(self.path, "utils", "model_template.pkl"), object=model_base)
+        save_pkl.save(
+            path=os.path.join(self.path, "utils", "model_template.pkl"),
+            object=model_base._get_model_template_for_save(),
+        )
 
     def save(self, path: str = None, verbose: bool = True, save_oof: bool = True, save_children: bool = False) -> str:
         if path is None:

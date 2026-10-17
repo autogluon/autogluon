@@ -11,7 +11,7 @@ AutoGluon is modularized into [sub-modules](https://packaging.python.org/guides/
     - Optional dependency: `tabpfn`. This will enable the TabPFN models: RealTabPFN-v2 (key=`REALTABPFN-V2`), used in the `extreme` preset, along with RealTabPFN-v2.5 (key=`REALTABPFN-V2.5`), TabPFN-2.6 (key=`TABPFN-2.6`), TabPFN-3 (key=`TABPFN-3`) and TabPFN-3.5 (key=`TABPFN-3.5`). The `TABPFNV2` key was renamed to `REALTABPFN-V2` in v1.5.0. RealTabPFN-v2 is free for commercial use; commercial use of RealTabPFN-v2.5, TabPFN-2.6, TabPFN-3 and TabPFN-3.5 requires a license from Prior Labs ([license FAQ](https://docs.priorlabs.ai/models#tabpfn-model-license)).
     - Optional dependency: `tabdpt`. This will enable the TabDPT model, used in the `extreme` preset (key=`TABDPT`), along with TabDPT-Turbo (key=`TABDPT-TURBO`).
     - Optional dependency: `tabm`. This will enable the TabM model, used in the `extreme` preset (key=`TABM`). Included in `all`.
-    - Optional dependency: `mitra`. This will enable the Mitra model, used in the `extreme` preset (key=`MITRA`). Included in `all`.
+    - Optional dependency: `mitra`. This enables Mitra v2 by default (key=`MITRA`), with the shared new fine-tuning recipe for both checkpoint versions. Use `model_version="1"` for v1 weights; add `fine_tune_recipe="1"` to select legacy settings explicitly. Included in `all`.
     - Optional dependency: `tabpfnmix`. This will enable the TabPFNMix model (key=`TABPFNMIX`). Refer to `mitra`, which is an improved version of `tabpfnmix`.
     - Optional dependency: `realmlp`. This will enable the RealMLP model (key=`REALMLP`).
     - Optional dependency: `nori`. This will enable the Nori model, used in the `extreme` preset (key=`NORI`). Regression only.

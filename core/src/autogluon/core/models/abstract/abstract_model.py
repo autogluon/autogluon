@@ -2693,6 +2693,10 @@ class AbstractModel(ModelBase, Tunable):
 
         return template
 
+    def _get_model_template_for_save(self):
+        """Return the model-base state that should be persisted by a bagged ensemble."""
+        return self
+
     def convert_to_refit_full_template(self):
         """
         After calling this function, returned model should be able to be fit without X_val, y_val using the iterations trained by the original model.
