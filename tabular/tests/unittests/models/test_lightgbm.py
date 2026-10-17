@@ -231,3 +231,33 @@ def test_bool_int_key_collision_raises_value_error():
         match="features contains duplicates; cannot create 1-to-1 mapping with a dict.",
     ):
         LGBModel._rename_columns(features)
+
+
+def test_learning_curves_do_not_rename_the_eval_metric(tmp_path):
+    """Learning curves for a stopping metric LightGBM has no native version of must not rename the metric's Scorer.
+
+    The Scorer is shared (here the object `get_metric` returns), so renaming it renamed the metric for the whole process.
+    """
+    import pandas as pd
+
+    from autogluon.core.metrics import get_metric
+
+    rng = np.random.default_rng(0)
+    X = pd.DataFrame(rng.normal(size=(1000, 4)), columns=list("abcd"))
+    y = pd.Series((X["a"] + rng.normal(size=1000) > 0).astype(int))
+    f1 = get_metric("f1", "binary", "eval_metric")
+    model = LGBModel(
+        path=str(tmp_path),
+        name="LightGBM",
+        problem_type="binary",
+        eval_metric=f1,
+        hyperparameters={"num_boost_round": 30, "ag.generate_curves": True},
+    )
+    try:
+        model.fit(X=X.iloc[:800], y=y.iloc[:800], X_val=X.iloc[800:], y_val=y.iloc[800:])
+        assert f1.name == "f1"
+        assert get_metric("f1", "binary", "eval_metric").name == "f1"
+        _, metrics, _ = LGBModel.load_learning_curves(model.path)
+        assert metrics == ["f1"]
+    finally:
+        f1.name = "f1"  # keep a failure here from renaming the metric for the rest of the test session
