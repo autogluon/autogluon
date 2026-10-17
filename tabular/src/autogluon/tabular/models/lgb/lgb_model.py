@@ -327,9 +327,11 @@ class LGBModel(AbstractModel):
             metric_names = [scorer.name for scorer in scorers]
 
             if stopping_metric_name in metric_names:
+                # The stopping metric is already reported under its name, so the curve's copy needs another one.
+                # Only the reported name changes: the Scorer is shared (often the object `get_metric` returns), so
+                # renaming it would rename the metric for the whole process.
                 idx = metric_names.index(stopping_metric_name)
-                scorers[idx].name = f"_{stopping_metric_name}"
-                metric_names[idx] = scorers[idx].name
+                metric_names[idx] = f"_{stopping_metric_name}"
 
             custom_metrics = [
                 lgb_utils.func_generator(
@@ -338,8 +340,9 @@ class LGBModel(AbstractModel):
                     needs_pred_proba=not scorer.needs_pred,
                     problem_type=self.problem_type,
                     error=use_curve_metric_error,
+                    name=metric_name,
                 )
-                for scorer in scorers
+                for scorer, metric_name in zip(scorers, metric_names)
             ]
 
             eval_results = {}

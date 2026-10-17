@@ -36,23 +36,26 @@ def convert_ag_metric_to_lgbm(ag_metric_name, problem_type):
     return _ag_to_lgbm_metric_dict.get(problem_type, dict()).get(ag_metric_name, None)
 
 
-def func_generator(metric, is_higher_better, needs_pred_proba, problem_type, error=False):
+def func_generator(metric, is_higher_better, needs_pred_proba, problem_type, error=False, name=None):
+    """`name` is the name LightGBM reports the metric under, `metric.name` by default."""
     if error:
         is_higher_better = False
+    if name is None:
+        name = metric.name
 
     compute = metric.error if error else metric
     if problem_type in [REGRESSION, QUANTILE]:
         # TODO: Might not work for custom quantile metrics
         def function_template(y_hat, data):
             y_true = data.get_label()
-            return metric.name, compute(y_true, y_hat), is_higher_better
+            return name, compute(y_true, y_hat), is_higher_better
 
     elif needs_pred_proba:
         if problem_type == MULTICLASS:
 
             def function_template(y_hat, data):
                 y_true = data.get_label()
-                return metric.name, compute(y_true, y_hat), is_higher_better
+                return name, compute(y_true, y_hat), is_higher_better
 
         elif problem_type == SOFTCLASS:  # metric must take in soft labels array, like soft_log_loss
 
@@ -61,13 +64,13 @@ def func_generator(metric, is_higher_better, needs_pred_proba, problem_type, err
                 y_hat = y_hat.reshape(y_true.shape[1], -1).T
                 y_hat = np.exp(y_hat)
                 y_hat = np.multiply(y_hat, 1 / np.sum(y_hat, axis=1)[:, np.newaxis])
-                return metric.name, compute(y_true, y_hat), is_higher_better
+                return name, compute(y_true, y_hat), is_higher_better
 
         else:
 
             def function_template(y_hat, data):
                 y_true = data.get_label()
-                return metric.name, compute(y_true, y_hat), is_higher_better
+                return name, compute(y_true, y_hat), is_higher_better
 
     else:
         if problem_type == MULTICLASS:
@@ -75,17 +78,17 @@ def func_generator(metric, is_higher_better, needs_pred_proba, problem_type, err
             def function_template(y_hat, data):
                 y_true = data.get_label()
                 y_hat = y_hat.argmax(axis=1)
-                return metric.name, compute(y_true, y_hat), is_higher_better
+                return name, compute(y_true, y_hat), is_higher_better
 
         else:
 
             def function_template(y_hat, data):
                 y_true = data.get_label()
                 y_hat = np.round(y_hat)
-                return metric.name, compute(y_true, y_hat), is_higher_better
+                return name, compute(y_true, y_hat), is_higher_better
 
     # allows lgb library to output autogluon metric name in the evaluation logs
-    function_template.__name__ = metric.name
+    function_template.__name__ = name
 
     return function_template
 
