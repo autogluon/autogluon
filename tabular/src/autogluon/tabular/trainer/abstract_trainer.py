@@ -5595,6 +5595,16 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                     X, weights = extract_column(X=X, col_name=self.sample_weight)
                 y: np.array = self.load_y()
                 y_pred_proba = self.get_model_oof(model=model)
+                # Rows no fold validated have NaN out-of-fold predictions (see `BaggedEnsembleModel._predict_proba_oof`),
+                # which every threshold would turn into negative predictions. Calibrate on the covered rows, as
+                # `calibrate_model` does and as `score_with_oof` scores. Only reachable when the validation scheme
+                # leaves rows unvalidated, as forward-chaining temporal splits do with the earliest time block.
+                covered = ~np.isnan(np.asarray(y_pred_proba, dtype=float))
+                if not covered.all():
+                    y = y[covered]
+                    y_pred_proba = y_pred_proba[covered]
+                    if weights is not None:
+                        weights = weights[covered]
         else:
             y_pred_proba = self.predict_proba(X=X, model=model)
 

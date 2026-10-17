@@ -1313,3 +1313,47 @@ def test__predictor_fit__splitter__stacking_refused_only_when_rows_are_unvalidat
     else:
         with pytest.raises(ValueError, match="without out-of-fold predictions"):
             TabularPredictor(label="y", verbosity=0).fit(df, **fit_kwargs)
+
+
+def test__temporal_forward_only__decision_threshold_ignores_unvalidated_rows():
+    """Threshold calibration on out-of-fold predictions uses only the rows some fold validated.
+
+    Forward-chaining never validates the earliest time block, whose out-of-fold predictions are NaN. Every threshold
+    turned those into negative predictions, so here, where those rows are all positive, they counted as false negatives
+    no threshold could fix, and skewed the threshold that maximizes balanced accuracy.
+    """
+    from autogluon.core.calibrate import calibrate_decision_threshold
+    from autogluon.tabular import TabularPredictor
+
+    rng = np.random.default_rng(0)
+    n_rows = 600
+    data = pd.DataFrame(
+        {
+            "num": rng.normal(size=n_rows),
+            "ts": pd.to_datetime("2026-01-01") + pd.to_timedelta(np.sort(rng.integers(0, 60, size=n_rows)), unit="D"),
+        }
+    )
+    data["y"] = (data["num"] + rng.normal(size=n_rows) > 0).astype(int)
+    data.loc[data.index[: n_rows // 4], "y"] = 1  # the earliest rows, which no fold validates, are all positive
+
+    predictor = TabularPredictor(label="y", eval_metric="balanced_accuracy", verbosity=0).fit(
+        data,
+        hyperparameters={"GBM": [{"num_boost_round": 50}]},
+        num_bag_folds=4,
+        num_bag_sets=1,
+        num_stack_levels=0,
+        dynamic_stacking=False,
+        fit_weighted_ensemble=False,
+        calibrate_decision_threshold=False,
+        validation_structure={"time_on": "ts", "temporal_forward_only": True},
+    )
+    model = predictor.model_best
+    y = predictor._trainer.load_y().to_numpy()
+    oof = np.asarray(predictor._trainer.get_model_oof(model), dtype=float)
+    covered = ~np.isnan(oof)
+    assert covered.any() and not covered.all(), "expected the earliest time block to be unvalidated"
+
+    expected = calibrate_decision_threshold(
+        y=y[covered], y_pred_proba=oof[covered], metric=predictor.eval_metric, verbose=False
+    )
+    assert predictor.calibrate_decision_threshold(model=model, verbose=False) == expected
