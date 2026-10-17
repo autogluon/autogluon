@@ -18,7 +18,15 @@ from autogluon.core.utils.time import sample_df_for_time_func, time_func
 from autogluon.core.utils.utils import augment_rare_classes, extract_column
 
 from ..trainer import AutoTrainer
-from ..trainer.group_views import GROUP_KEY_COLUMN, GroupPooling, group_codes, group_key_feature_metadata
+from ..trainer.group_views import (
+    GROUP_KEY_COLUMN,
+    GROUP_ORDER_COLUMN,
+    GroupCollapse,
+    GroupPooling,
+    group_codes,
+    group_key_feature_metadata,
+    group_order,
+)
 from .abstract_learner import AbstractTabularLearner
 
 logger = logging.getLogger(__name__)
@@ -66,6 +74,7 @@ class DefaultLearner(AbstractTabularLearner):
         group_views: list[str] | None = None,
         group_pooling: str | GroupPooling | tuple[str | GroupPooling, ...] | None = None,
         group_view_kinds: tuple[str, ...] | None = None,
+        group_collapse: GroupCollapse | None = None,
         **trainer_fit_kwargs,
     ):
         """Arguments:
@@ -92,6 +101,7 @@ class DefaultLearner(AbstractTabularLearner):
         # TODO: if provided, feature_types in X, X_val are ignored right now, need to pass to Learner/trainer and update this documentation.
         self._time_limit = time_limit
         self._group_views = group_views
+        self._group_order_on = group_collapse.order_columns if group_views and group_collapse else None
         if time_limit:
             logger.log(20, f"Beginning AutoGluon training ... Time limit = {time_limit:.0f}s")
         else:
@@ -223,6 +233,7 @@ class DefaultLearner(AbstractTabularLearner):
             group_views=group_views,
             group_pooling=group_pooling,
             group_view_kinds=group_view_kinds,
+            group_collapse=group_collapse,
         )
 
         self.trainer_path = trainer.path
@@ -500,6 +511,11 @@ class DefaultLearner(AbstractTabularLearner):
             if self._group_views
             else None
         )
+        group_orders = (
+            [None if data is None else group_order(data, self._group_order_on) for data in (X, X_val, X_test)]
+            if self._group_order_on
+            else None
+        )
 
         datasets = [X, X_val, X_test_super, X_unlabeled]
         X_super = pd.concat(datasets, ignore_index=True)
@@ -545,6 +561,11 @@ class DefaultLearner(AbstractTabularLearner):
                 data if data is None else data.assign(**{GROUP_KEY_COLUMN: keys})
                 for data, keys in zip((X, X_val, X_test), group_keys)
             )
+        if group_orders is not None:
+            X, X_val, X_test = (
+                data if data is None else data.assign(**{GROUP_ORDER_COLUMN: orders})
+                for data, orders in zip((X, X_val, X_test), group_orders)
+            )
 
         # TODO: consider not bundling sample-weights inside X, X_val
         X = self.bundle_weights(X, w, "X", is_train=True)
@@ -566,11 +587,13 @@ class DefaultLearner(AbstractTabularLearner):
         )
 
     def _trainer_feature_metadata(self) -> FeatureMetadata:
-        """The metadata of the features the trainer receives: the generated features, plus the group key under
-        group views."""
+        """The metadata of the features the trainer receives: the generated features, plus the group key (and the
+        rows' order within groups, with `order_on`) under group views."""
         feature_metadata = self.feature_generator.feature_metadata
         if self._group_views:
-            feature_metadata = feature_metadata.join_metadata(group_key_feature_metadata())
+            feature_metadata = feature_metadata.join_metadata(
+                group_key_feature_metadata(order=self._group_order_on is not None)
+            )
         return feature_metadata
 
     def bundle_weights(self, X: DataFrame | None, w: Series | None, name: str, is_train=False) -> DataFrame:

@@ -1051,8 +1051,9 @@ class TabularPredictor:
 
                 - its row predictions pooled within each group (see `pooling` below);
                 - the same model configuration fit on the collapsed table, one row per group
-                  (numeric features averaged, other features at their most frequent value in the
-                  group, plus the log of the group's row count), named with a `_GroupCollapsed` suffix.
+                  (by default numeric features averaged, other features at their most frequent value
+                  in the group, plus the log of the group's row count; see `collapse` below), named with
+                  a `_GroupCollapsed` suffix.
 
                 The weighted ensemble then chooses among both views of every model. Predictions for a
                 row depend on the other rows of its group in the data passed to `predict`, which
@@ -1092,6 +1093,21 @@ class TabularPredictor:
                   strategies per model as it weighs the models. A collapsed view is a single input,
                   pooled by the first strategy. A model's ensemble weight is the sum of its inputs'
                   weights; the weight of each input is logged.
+
+                `collapse`, a dict or the equivalent
+                `autogluon.tabular.trainer.group_views.GroupCollapse`, sets how the collapsed table
+                summarises each feature over a group's rows (default None: the collapse above), e.g.
+                `{"collapse": {"numeric": ["mean", "last"], "order_on": "date"}}`:
+
+                - `numeric` (default "mean"): "mean", "median", "min", "max", "std", "first" or "last",
+                  or a list of these, giving each numeric feature one column per summary;
+                - `other` (default "mode"): "mode", "first" or "last" for the other features;
+                - `order_on` (default None): the column(s) of the data that order a group's rows for
+                  "first" and "last" (the first or last non-missing value), e.g. a timestamp so that
+                  "last" is the latest value; None keeps the row order of the data. The data passed to
+                  `predict` then needs these columns too.
+                - `exclude_special_types` (default none): special types whose features the collapsed
+                  table leaves out, e.g. features the feature generator already aggregated per group.
 
                 The dict's `views` chooses the views to fit: `["pooled", "collapsed"]` (default);
                 `"collapsed"`, every bagged model fit on the collapsed table only, which skips its fit
@@ -6487,13 +6503,14 @@ class TabularPredictor:
         validation_size_curves,
         num_group_instances: int | None,
     ) -> dict:
-        """The learner's `group_views`, `group_pooling` and `group_view_kinds` for this fit (see `fit`'s
-        `group_views`).
+        """The learner's `group_views`, `group_pooling`, `group_view_kinds` and `group_collapse` for this fit (see
+        `fit`'s `group_views`).
 
-        `group_views` is the `group_on` columns when the fit uses group views, `group_pooling` the pooling strategy
-        and `group_view_kinds` the views fit (`GroupViews.views`); all are None when it does not.
+        `group_views` is the `group_on` columns when the fit uses group views, `group_pooling` the pooling strategy,
+        `group_view_kinds` the views fit (`GroupViews.views`) and `group_collapse` the collapse (None: the default);
+        all are None when it does not.
         """
-        off = dict(group_views=None, group_pooling=None, group_view_kinds=None)
+        off = dict(group_views=None, group_pooling=None, group_view_kinds=None, group_collapse=None)
         size_on_groups = validation_structure is not None and validation_structure.size_validation_on_groups
         group_views = GroupViews.from_input(
             resolve_group_views(
@@ -6548,8 +6565,11 @@ class TabularPredictor:
             fits = "every bagged model's predictions are pooled within groups; no `_GroupCollapsed` views."
         else:
             fits = "every bagged model also gets a `_GroupCollapsed` view."
-        logger.log(20, f"Group views on (group_on={group_on}, pooling={pooling!r}): {fits}")
-        return dict(group_views=group_on, group_pooling=pooling, group_view_kinds=views)
+        collapse = "" if group_views.collapse is None else f", collapse={group_views.collapse!r}"
+        logger.log(20, f"Group views on (group_on={group_on}, pooling={pooling!r}{collapse}): {fits}")
+        return dict(
+            group_views=group_on, group_pooling=pooling, group_view_kinds=views, group_collapse=group_views.collapse
+        )
 
     def _fit_extra_kwargs_dict(self) -> dict:
         """
