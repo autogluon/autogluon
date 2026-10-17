@@ -381,6 +381,12 @@ class Chronos2Model(AbstractTimeSeriesModel):
             )
             callbacks.append(LoggerCallback())
 
+        fine_tune_trainer_kwargs = hyperparameters["fine_tune_trainer_kwargs"]
+        if "seed" not in fine_tune_trainer_kwargs:
+            # transformers.Trainer reseeds all RNGs with `seed` (42 by default), so derive it from the current
+            # random state. Otherwise fine-tuning gives the same result for every random_seed.
+            fine_tune_trainer_kwargs["seed"] = int(np.random.randint(np.iinfo(np.int32).max))
+
         self._model_pipeline = self._model_pipeline.fit(
             inputs=convert_data(train_data),
             prediction_length=self.prediction_length,
@@ -396,7 +402,7 @@ class Chronos2Model(AbstractTimeSeriesModel):
             callbacks=callbacks,
             remove_printer_callback=True,
             min_past=1,
-            **hyperparameters["fine_tune_trainer_kwargs"],
+            **fine_tune_trainer_kwargs,
         )
         self._is_fine_tuned = True
 
