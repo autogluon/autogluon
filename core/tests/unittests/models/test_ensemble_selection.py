@@ -111,3 +111,21 @@ def test_ensemble_selection_finite_scores_still_pick_better_model():
     assert ensemble.weights_[1] > ensemble.weights_[0]
     assert np.isclose(np.sum(ensemble.weights_), 1.0)
     assert np.isfinite(ensemble.train_score_)
+
+
+def test_ensemble_selection_subsample_keeps_sample_weights():
+    """Subsampled rows keep their weights: full-length weights no longer matched the subsampled labels, and the metric
+    then silently ignored them."""
+    from autogluon.core.metrics import accuracy
+
+    n = 1000
+    labels = np.random.default_rng(0).integers(0, 2, size=n)
+    heavy = np.arange(n) < 100
+    sample_weight = np.where(heavy, 50.0, 1.0)
+    # Model A is right only on the heavy rows and model B only on the others: A wins weighted, B wins unweighted
+    pred_a = np.where(heavy, labels, 1 - labels).astype(float)
+    pred_b = np.where(heavy, 1 - labels, labels).astype(float)
+
+    ensemble = EnsembleSelection(ensemble_size=1, problem_type="binary", metric=accuracy, subsample_size=500)
+    ensemble.fit(predictions=[pred_a, pred_b], labels=labels, sample_weight=sample_weight)
+    assert list(ensemble.weights_) == [1.0, 0.0]
