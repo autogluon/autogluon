@@ -1006,6 +1006,22 @@ def test_when_aggregation_method_is_changed_then_aggregated_result_is_correct(ag
     assert np.all(aggregated.values.ravel() == np.array(values_after_aggregation))
 
 
+@pytest.mark.parametrize("agg_method", ["mean", "median", "min", "max", "first", "last", "sum"])
+def test_when_period_has_no_values_then_aggregated_value_is_missing(agg_method):
+    ts_df = TimeSeriesDataFrame(
+        pd.DataFrame(
+            {
+                ITEMID: ["A", "A", "A", "A"],
+                TIMESTAMP: ["2022-01-01", "2022-01-03", "2022-01-10", "2022-01-24"],
+                "target": [1.0, 2.0, np.nan, 3.0],
+            }
+        )
+    )
+    aggregated = ts_df.convert_frequency(freq="W", agg_numeric=agg_method)
+    # weeks ending on 2022-01-16 (only NaN) and 2022-01-23 (no rows) have no values
+    assert aggregated["target"].isna().tolist() == [False, False, True, True, False]
+
+
 @pytest.mark.parametrize("freq", ["D", "W", "ME", "QE", "YE", "h", "min", "s", "30min", "2h", "17s"])
 def test_when_convert_frequency_called_then_categorical_columns_are_preserved(freq):
     freq = to_supported_pandas_freq(freq)
