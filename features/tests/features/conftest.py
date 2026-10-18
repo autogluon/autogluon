@@ -181,13 +181,10 @@ class DataHelper:
 
     @staticmethod
     def generate_datetime_feature() -> Series:
-        from autogluon.common.utils.pandas_utils import PANDAS_V3_OR_NEWER
-
         series = pd.to_datetime(DataHelper.generate_datetime_as_object_feature(), errors="coerce", format="mixed")
-        if PANDAS_V3_OR_NEWER:
-            # Force ns resolution to match legacy behavior (coerce out-of-bounds to NaT)
-            series = series.where((series >= pd.Timestamp.min) & (series <= pd.Timestamp.max), pd.NaT)
-        return series
+        # Nanosecond resolution on any pandas version: pandas>=3 parses at microseconds, where the out-of-range
+        # dates of this feature (years 1000 and 2700) are valid rather than NaT
+        return series.where((series >= pd.Timestamp.min) & (series <= pd.Timestamp.max)).dt.as_unit("ns")
 
     @staticmethod
     def generate_bool_feature_int(name="int_bool") -> DataFrame:

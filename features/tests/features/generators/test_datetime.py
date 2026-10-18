@@ -119,7 +119,6 @@ def test_datetime_feature_generator_advanced(generator_helper, data_helper):
         1610040803938000000,
     ]
 
-
     # When
     output_data = generator_helper.fit_transform_assert(
         input_data=input_data,
@@ -249,7 +248,9 @@ def test_datetime_feature_generator_permuted_index_fill_value(data_helper):
     generator = DatetimeFeatureGenerator()
     generator.fit_transform(permuted)
 
-    good = pd.to_datetime(pd.Series([v for v in values if v != "not-a-date"]), utc=True).dt.as_unit("ns").astype(np.int64)
+    good = (
+        pd.to_datetime(pd.Series([v for v in values if v != "not-a-date"]), utc=True).dt.as_unit("ns").astype(np.int64)
+    )
     assert generator._fillna_map["datetime_as_object"] == pd.to_datetime(int(good.mean()), utc=True)
 
 

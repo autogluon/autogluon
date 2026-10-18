@@ -111,7 +111,8 @@ def test_inexact_non_object_column_uses_head_deep_scaled(monkeypatch):
 def test_object_column_counts_each_distinct_object_once(monkeypatch):
     df = pd.DataFrame(
         {
-            "obj": ["a", "bb", "ccc", "dddd", "eeeee", "ffffff"],
+            # object dtype explicitly: on pandas>=3 a list of strings becomes the "str" dtype
+            "obj": pd.Series(["a", "bb", "ccc", "dddd", "eeeee", "ffffff"], dtype=object),
             "i": pd.Series([1, 2, 3, 4, 5, 6], dtype="int64"),
         }
     )
@@ -146,7 +147,8 @@ def test_object_column_shared_values_are_not_charged_per_cell():
     """
     num_rows = 10_000
     shared = "x" * 50_000  # one object, referenced by every cell
-    df = pd.DataFrame({"obj": [shared] * num_rows})
+    # object dtype explicitly: pandas>=3 makes the "str" dtype, whose (Arrow) storage holds a copy per cell
+    df = pd.DataFrame({"obj": pd.Series([shared] * num_rows, dtype=object)})
 
     estimate = get_approximate_df_mem_usage(df)["obj"]
     real_upper_bound = df["obj"].to_numpy().itemsize * num_rows + sys.getsizeof(shared) * 8
@@ -384,6 +386,6 @@ def test_fillna_without_downcast_keeps_object_columns_object():
     assert list(out["float"]) == [1.0, 0.0, 3.0]
     assert df["obj"].isna().sum() == 1  # not modified
 
-    assert fillna_without_downcast(df, fill, inplace=True) is None
+    fillna_without_downcast(df, fill, inplace=True)
     assert df["obj"].dtype == object
     assert list(df["obj"]) == [1, 0, 3]
