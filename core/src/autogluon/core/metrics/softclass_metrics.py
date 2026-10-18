@@ -29,4 +29,4 @@ def _soft_log_loss(true_probs, predicted_probs):
 
 
 # Score for soft-classification (with soft, probabilistic labels):
-soft_log_loss = make_scorer("soft_log_loss", _soft_log_loss, greater_is_better=False, needs_proba=True)
+soft_log_loss = make_scorer("soft_log_loss", _soft_log_loss, optimum=0, greater_is_better=False, needs_proba=True)
