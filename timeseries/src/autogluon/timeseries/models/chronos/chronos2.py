@@ -1,5 +1,6 @@
 import logging
 import os
+from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -8,6 +9,7 @@ from typing_extensions import Self
 
 from autogluon.timeseries.dataset import TimeSeriesDataFrame
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
+from autogluon.timeseries.utils.warning_filters import warning_filter
 
 logger = logging.getLogger(__name__)
 
@@ -88,6 +90,7 @@ class Chronos2Model(AbstractTimeSeriesModel):
 
     _supports_known_covariates = True
     _supports_past_covariates = True
+    _supports_export = True
 
     def __init__(
         self,
@@ -273,22 +276,44 @@ class Chronos2Model(AbstractTimeSeriesModel):
         return TimeSeriesDataFrame(forecast_df)
 
     def load_model_pipeline(self):
-        from chronos.chronos2.pipeline import Chronos2Pipeline
-
-        device = (self.get_hyperparameter("device") or "cuda") if self._is_gpu_available() else "cpu"
+        device = self.get_hyperparameter("device") or ("cuda" if self._is_gpu_available() else "cpu")
 
         assert self.model_path is not None
-        pipeline = Chronos2Pipeline.from_pretrained(
-            self.model_path,
-            device_map=device,
-            revision=self.get_hyperparameter("revision"),
-        )
+        # importing chronos triggers `import tqdm.auto`, which emits a TqdmWarning if ipywidgets is missing
+        with warning_filter(all_warnings=True):
+            from chronos.chronos2.pipeline import Chronos2Pipeline
+
+            pipeline = Chronos2Pipeline.from_pretrained(
+                self.model_path,
+                device_map=device,
+                revision=self.get_hyperparameter("revision"),
+            )
 
         self._model_pipeline = pipeline
 
     def persist(self) -> Self:
         self.load_model_pipeline()
         return self
+
+    def export_model(self, path: str | Path) -> str:
+        """Export the model as a Hugging Face checkpoint that can be loaded with
+        ``chronos.chronos2.Chronos2Pipeline.from_pretrained``.
+
+        If the model was fine-tuned with LoRA, the adapter weights are merged into the base model, so that the
+        exported checkpoint is self-contained.
+
+        See `TimeSeriesPredictor.export_model` for details.
+        """
+        from chronos.chronos2.pipeline import Chronos2Pipeline
+
+        self._assert_no_transforms_for_export()
+
+        path = Path(path)
+        # after fine-tuning, `model_path` points at a checkpoint that only contains the LoRA adapter, and the
+        # pipeline in memory holds a `PeftModel`. Reloading merges the adapter into the base model, so that the
+        # exported checkpoint contains the full weights and is self-contained.
+        Chronos2Pipeline.from_pretrained(self.model_path).save_pretrained(path)
+        return str(path)
 
     def _update_transformers_loggers(self, log_level: int):
         for logger_name in logging.root.manager.loggerDict:
@@ -303,34 +328,28 @@ class Chronos2Model(AbstractTimeSeriesModel):
         time_limit: float | None = None,
         verbosity: int = 2,
     ):
-        from chronos.df_utils import convert_df_input_to_list_of_dicts_input
+        from chronos.chronos2 import preprocess
 
         from .utils import LoggerCallback, TimeLimitCallback
 
         def convert_data(df: TimeSeriesDataFrame):
             past_df = df.reset_index().to_data_frame()
             past_df, _ = self._remove_disabled_covariates(past_df, None)
+            if (
+                self.get_hyperparameter("disable_known_covariates")
+                or len(self.covariate_metadata.known_covariates) == 0
+            ):
+                known_covariates_names = None
+            else:
+                known_covariates_names = self.covariate_metadata.known_covariates
 
-            inputs, _, _ = convert_df_input_to_list_of_dicts_input(
-                df=past_df,
-                future_df=None,
+            return preprocess.from_data_frame(
+                past_df,
                 target_columns=[self.target],
                 prediction_length=self.prediction_length,
                 validate_inputs=False,
+                known_covariates_names=known_covariates_names,
             )
-
-            # The above utility will only split the dataframe into target and past_covariates, where past_covariates contains
-            # past values of both past-only and known-future covariates. We need to add future_covariates to enable fine-tuning
-            # with known covariates by indicating which covariates are known in the future.
-            if not self.get_hyperparameter("disable_known_covariates"):
-                known_covariates = self.covariate_metadata.known_covariates
-                if len(known_covariates) > 0:
-                    for input_dict in inputs:
-                        # NOTE: the covariates are empty because the actual values are not used
-                        # This only indicates which covariates are known in the future
-                        input_dict["future_covariates"] = {name: np.array([]) for name in known_covariates}
-
-            return inputs
 
         assert self._model_pipeline is not None
         hyperparameters = self.get_hyperparameters()

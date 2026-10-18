@@ -57,7 +57,12 @@ class AutoTrainer(AbstractTabularTrainer):
         infer_limit=None,
         infer_limit_batch_size=None,
         use_bag_holdout=False,
-        groups=None,
+        validation_structure=None,
+        no_validation: bool = False,
+        ensemble_weights: dict | None = None,
+        ensemble_weights_missing: str = "error",
+        ensemble_hyperparameters: dict | None = None,
+        validation_folds: int | None = None,
         callbacks: list[callable] = None,
         label_cleaner=None,
         **kwargs,
@@ -76,30 +81,59 @@ class AutoTrainer(AbstractTabularTrainer):
                     f"Warning: use_bag_holdout={use_bag_holdout}, but bagged mode is not enabled. use_bag_holdout will be ignored."
                 )
 
-        if (y_val is None) or (X_val is None):
+        if no_validation:
+            # Train on every row and score nothing. `_train_and_save` already treats `X_val=None`
+            # as "no score available" (it is the same path `refit_full` takes), so nothing below
+            # needs to change -- only the split has to be skipped.
+            logger.log(20, f"validation_mode='none': training on all {len(X)} rows, no validation split.")
+        elif (y_val is None) or (X_val is None):
             if not self.bagged_mode or use_bag_holdout:
-                if groups is not None:
-                    raise AssertionError(
-                        f"Validation data must be manually specified if use_bag_holdout and groups are both specified."
-                    )
+                # `groups` used to be rejected here: it had no say in the holdout, so
+                # use_bag_holdout without explicit validation data would have split rows at random
+                # and put the same group on both sides. It now arrives as a `ValidationStructure`,
+                # whose `holdout_split_indices` carves the holdout group-disjointly below, so the
+                # combination is supported rather than refused.
                 if self.bagged_mode:
                     # Need at least 2 samples of each class in train data after split for downstream k-fold splits
                     # to ensure each k-fold has at least 1 sample of each class in training data
                     min_cls_count_train = 2
                 else:
                     min_cls_count_train = 1
-                X, X_val, y, y_val = generate_train_test_split(
-                    X,
-                    y,
-                    problem_type=self.problem_type,
-                    test_size=holdout_frac,
-                    random_state=self.random_state,
-                    min_cls_count_train=min_cls_count_train,
-                )
-                logger.log(
-                    20,
-                    f"Automatically generating train/validation split with holdout_frac={holdout_frac}, Train Rows: {len(X)}, Val Rows: {len(X_val)}",
-                )
+                structure_split = None
+                if validation_structure is not None:
+                    # Group-disjoint or temporally-forward holdout; None when the
+                    # structure needs no correction (stratify-only).
+                    structure_split = validation_structure.holdout_split_indices(
+                        X,
+                        y,
+                        holdout_frac=holdout_frac,
+                        random_state=self.random_state,
+                        problem_type=self.problem_type,
+                        # Same per-class floor the unstructured split below enforces; without it
+                        # the structured path was the only one with no such guarantee.
+                        min_cls_count_train=min_cls_count_train,
+                    )
+                if structure_split is not None:
+                    train_idx, val_idx = structure_split
+                    X, X_val, y, y_val = X.iloc[train_idx], X.iloc[val_idx], y.iloc[train_idx], y.iloc[val_idx]
+                    logger.log(
+                        20,
+                        f"Generating structure-aware train/validation split with holdout_frac={holdout_frac}, "
+                        f"Train Rows: {len(X)}, Val Rows: {len(X_val)}",
+                    )
+                else:
+                    X, X_val, y, y_val = generate_train_test_split(
+                        X,
+                        y,
+                        problem_type=self.problem_type,
+                        test_size=holdout_frac,
+                        random_state=self.random_state,
+                        min_cls_count_train=min_cls_count_train,
+                    )
+                    logger.log(
+                        20,
+                        f"Automatically generating train/validation split with holdout_frac={holdout_frac}, Train Rows: {len(X)}, Val Rows: {len(X_val)}",
+                    )
         elif self.bagged_mode:
             if not use_bag_holdout:
                 # TODO: User could be intending to blend instead. Add support for blend stacking.
@@ -145,6 +179,21 @@ class AutoTrainer(AbstractTabularTrainer):
 
         if label_cleaner is not None:
             core_kwargs["label_cleaner"] = label_cleaner
+        if ensemble_weights is not None:
+            aux_kwargs = dict(aux_kwargs or {})
+            aux_kwargs["ensemble_weights"] = ensemble_weights
+            aux_kwargs["ensemble_weights_missing"] = ensemble_weights_missing
+        if ensemble_hyperparameters is not None:
+            aux_kwargs = dict(aux_kwargs or {})
+            aux_kwargs["ensemble_hyperparameters"] = ensemble_hyperparameters
+        partial = validation_folds is not None and self.bagged_mode and validation_folds < self.k_fold
+        self._validation_folds = validation_folds if partial else None
+        if self._validation_folds is not None:
+            logger.log(
+                20,
+                f"validation_folds={self._validation_folds}: every bagged model fits {self._validation_folds} of its "
+                f"{self.k_fold} folds before the weighted ensemble, and the models the best model uses then fit the rest.",
+            )
 
         self._train_multi_and_ensemble(
             X=X,
@@ -161,7 +210,6 @@ class AutoTrainer(AbstractTabularTrainer):
             aux_kwargs=aux_kwargs,
             infer_limit=infer_limit,
             infer_limit_batch_size=infer_limit_batch_size,
-            groups=groups,
             callbacks=callbacks,
         )
 

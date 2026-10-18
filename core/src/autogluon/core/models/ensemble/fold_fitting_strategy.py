@@ -9,17 +9,16 @@ import pickle
 import time
 import traceback
 from abc import abstractmethod
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Optional, Tuple, Type, Union
 
 import pandas as pd
 from numpy import ndarray
 from pandas import DataFrame, Series
 
-from autogluon.common.utils.distribute_utils import DistributedContext
 from autogluon.common.utils.log_utils import reset_logger_for_remote_call
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.common.utils.resource_utils import ResourceManager
-from autogluon.common.utils.s3_utils import download_s3_folder, s3_path_to_bucket_prefix, upload_s3_folder
 from autogluon.common.utils.try_import import try_import_ray
 
 from ...pseudolabeling.pseudolabeling import assert_pseudo_column_match
@@ -267,7 +266,9 @@ class FoldFittingStrategy(AbstractFoldFittingStrategy):
         model_to_append = fold_model
         if not self.save_folds:
             fold_model.model = None
-        if self.bagged_ensemble_model.low_memory:
+        # A bag awaiting its refit keeps the (now weightless) fold model in memory: nothing of the
+        # folds goes to disk, and the bag reads what the refit needs from it before dropping it.
+        if self.bagged_ensemble_model.low_memory and not self.bagged_ensemble_model._refit_folds_pending:
             self.bagged_ensemble_model.save_child(fold_model, verbose=False)
             model_to_append = fold_model.name
         self.models.append(model_to_append)
@@ -297,7 +298,7 @@ class FoldFittingStrategy(AbstractFoldFittingStrategy):
         y_pred_proba = fold_model.predict_proba(X_val_fold, record_time=True)
         fold_model.val_score = fold_model.score_with_y_pred_proba(y=y_val_fold, y_pred_proba=y_pred_proba)
         fold_model.reduce_memory_size(remove_fit=True, remove_info=False, requires_save=True)
-        if not self.bagged_ensemble_model.params.get("save_bag_folds", True):
+        if not self.bagged_ensemble_model.save_bag_folds:
             fold_model.model = None
         return fold_model, y_pred_proba
 
@@ -438,6 +439,77 @@ class SequentialLocalFoldFittingStrategy(FoldFittingStrategy):
         return fold_model
 
 
+def plan_gpu_assignments(
+    requests: List[Union[int, float]],
+    total_gpus: int,
+    per_device_vram: Optional[List[float]] = None,
+    vram_est_per_task: Optional[float] = None,
+) -> List[List[int]]:
+    """Assign each GPU request to device(s), packing devices toward full utilization.
+
+    Requests are processed in order; each holds its assignment for as long as it runs, so
+    the plan describes concurrent load. A request is a GPU fraction (< 1, one device) or a
+    whole-device count (int >= 1). Device selection sorts candidates on two priorities:
+
+    1. progress toward 1.0 utilization -- the device whose assigned fraction is already
+       highest (and still fits this request) is filled first, so one device reaches exactly
+       1.0 before the next is touched. E.g. requests ``[0.5, 1, 0.25, 0.5]`` on 4 GPUs go to
+       devices ``0, 1, 0, 2``, leaving utilizations ``0.75, 1.0, 0.5, 0``.
+    2. available VRAM -- among equally-utilized devices, the most VRAM headroom, which is
+       spent by ``vram_est_per_task`` as requests are placed (when both are known).
+
+    A request that fits nowhere by these constraints falls back to the least-utilized
+    device(s): the fraction/VRAM budgets upstream should prevent that, but assignment must
+    never fail where round-robin would have produced something.
+    """
+    fraction_used = [0.0] * total_gpus
+    vram_used = [0.0] * total_gpus
+
+    def headroom(device: int) -> float:
+        if not per_device_vram or device >= len(per_device_vram):
+            return 0.0
+        return per_device_vram[device] - vram_used[device]
+
+    def vram_fits(device: int) -> bool:
+        if not per_device_vram or not vram_est_per_task or device >= len(per_device_vram):
+            return True
+        return vram_used[device] + vram_est_per_task <= per_device_vram[device]
+
+    plan: List[List[int]] = []
+    for request in requests:
+        if request >= 1:
+            # whole devices: idle ones first, preferring the most VRAM headroom
+            order = sorted(range(total_gpus), key=lambda d: (fraction_used[d], -headroom(d)))
+            chosen = sorted(order[: int(request)])
+            fraction_per_device = 1.0
+        else:
+            candidates = [
+                device
+                for device in range(total_gpus)
+                if fraction_used[device] + request <= 1.0 + 1e-9 and vram_fits(device)
+            ]
+            if candidates:
+                # priority 1: closest to reaching 1.0 utilization; priority 2: most VRAM
+                chosen = [max(candidates, key=lambda d: (fraction_used[d], headroom(d)))]
+            else:
+                chosen = [min(range(total_gpus), key=lambda d: fraction_used[d])]
+            fraction_per_device = request
+        for device in chosen:
+            fraction_used[device] += fraction_per_device
+            if vram_est_per_task:
+                vram_used[device] += vram_est_per_task
+        plan.append(chosen)
+    return plan
+
+
+@dataclass
+class _UnsavedFold:
+    """A fold a worker fit and did not save: what a bag awaiting its refit keeps of it."""
+
+    name: str
+    params_trained: dict
+
+
 def _ray_fit(
     *,
     model_base: AbstractModel,
@@ -454,8 +526,13 @@ def _ray_fit(
     resources: Dict[str, Any],
     kwargs_fold: Dict[str, Any],
     head_node_id: str,
-    model_sync_path: Optional[str] = None,
+    keep_fold: bool = True,
 ):
+    """Fit one fold on a Ray worker.
+
+    With `keep_fold`, the fold model is saved under the bag's path and handed back by name. Without
+    it (a bag awaiting its refit), nothing is written and its trained parameters come back instead.
+    """
     import ray  # ray must be present
 
     if task_gpu_ids:
@@ -534,7 +611,8 @@ def _ray_fit(
             num_cpus=resources["num_cpus"],
             save_bag_folds=save_bag_folds,
         )
-        save_path = fold_model.save()
+        if keep_fold:
+            fold_model.save()
     except (AutoGluonException, ImportError, MemoryError) as e:
         e = encode_exception(e)
         return {
@@ -542,10 +620,6 @@ def _ray_fit(
             "error": e,
         }
 
-    if model_sync_path is not None and not is_head_node:
-        model_sync_path = model_sync_path + f"{fold_model.name}/"  # s3 path hence need "/" as the saperator
-        bucket, prefix = s3_path_to_bucket_prefix(model_sync_path)
-        upload_s3_folder(bucket=bucket, prefix=prefix, folder_to_upload=save_path, verbose=False)
     return (
         fold_model.name,
         pred_proba,
@@ -556,6 +630,7 @@ def _ray_fit(
         fold_model.predict_n_size,
         fold_model.fit_num_cpus,
         fold_model.fit_num_gpus,
+        None if keep_fold else dict(fold_model.params_trained),
     )
 
 
@@ -589,10 +664,6 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
         max_memory_usage_ratio: float, default=0.8
             The ratio of max memory usage for parallel folding.
             If the estimated usage exceeds this ratio, will fall back to sequential folding.
-        model_sync_path: Optional[str], default=None
-            The path to be used for workers to upload model artifacts and for headers to download
-            Currently supports providing a s3 path.
-            If None, model artifacts will be saved locally meaning no sync is required
     Attributes
     ----------
         num_cpus: int
@@ -619,14 +690,12 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
         num_jobs: int,
         num_folds_parallel: int,
         max_memory_usage_ratio: float = 0.8,
-        model_sync_path: Optional[str] = None,
         debug_gpu_assignment: bool = False,
         **kwargs,
     ):
         super().__init__(**kwargs)
         self.ray = try_import_ray()
         self.max_memory_usage_ratio = max_memory_usage_ratio
-        self.model_sync_path = model_sync_path
         self.debug_gpu_assignment = debug_gpu_assignment
         self.time_start_fit = None
         self.time_end_fit = None
@@ -636,11 +705,6 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
         self.predict_n_size_lst = None
         self.fit_num_cpus = None
         self.fit_num_gpus = None
-        # max_calls to guarantee release of gpu resource
-        ray_remote_kwargs = {"max_calls": 1}
-        if os.getenv("RAY_DISABLE_RETRIES") == "1":
-            ray_remote_kwargs["max_retries"] = 0
-        self._ray_fit = self.ray.remote(**ray_remote_kwargs)(_ray_fit)
         self.mem_est_model = self._initialized_model_base.estimate_memory_usage(X=self.X, y=self.y)
         self.mem_est_data = self._estimate_data_memory_usage()
         self.mem_available = ResourceManager.get_available_virtual_mem()
@@ -653,6 +717,24 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
             user_specified_num_folds_parallel=num_folds_parallel,
             user_resources_per_job=self.user_resources_per_job,
         )
+        self._ray_fit = self._make_ray_fit()
+
+    def _make_ray_fit(self):
+        """The Ray remote function that fits one fold, with the worker recycling policy of this bag.
+
+        Ray exits a worker after it has run `max_calls` tasks; 0 (Ray's default) keeps the worker for
+        the next task. A fresh process per fold is kept where a reused one would carry state into the
+        next fold: a fold holding a GPU (any `num_gpus` in the per-task resources) leaves a CUDA context
+        and the `CUDA_VISIBLE_DEVICES` set in `_ray_fit` behind, and the pseudo sequential runner relies
+        on a clean process per fold for its memory hygiene (see `_run_pseudo_sequential`). CPU folds fit
+        in parallel reuse their workers, so ray, autogluon and the model library are imported once per
+        worker instead of inside every timed fold fit.
+        """
+        fresh_worker_per_fold = self.resources["num_gpus"] > 0 or self._pseudo_sequential
+        ray_remote_kwargs = {"max_calls": 1 if fresh_worker_per_fold else 0}
+        if os.getenv("RAY_DISABLE_RETRIES") == "1":
+            ray_remote_kwargs["max_retries"] = 0
+        return self.ray.remote(**ray_remote_kwargs)(_ray_fit)
 
     def mem_est_proportion_per_fold(self):
         return (self.mem_est_model + self.mem_est_data) / self.mem_available
@@ -674,6 +756,9 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
                 approx_mem_size_req=mem_est_total, available_mem=mem_available
             )
         num_folds_parallel = user_specified_num_folds_parallel
+        max_folds_to_train_with_mem = min(
+            max_folds_to_train_with_mem, self._max_folds_in_parallel_with_vram(max_memory_usage_ratio)
+        )
         if max_folds_to_train_with_mem < user_specified_num_folds_parallel:
             # If memory is not sufficient to train num_folds_parallel, reduce to max power of 2 folds that's smaller than folds_can_be_fit_in_parallel.
             num_folds_parallel = int(
@@ -686,6 +771,70 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
                 f"{num_folds_parallel * mem_proportion_per_fold * 100:.2f}%/{max_memory_usage_ratio * 100:.2f}% total).",
             )
         return num_folds_parallel
+
+    def _max_folds_in_parallel_with_vram(self, max_memory_usage_ratio: float) -> float:
+        """Folds that fit on the GPU at once, or ``inf`` when VRAM cannot constrain them.
+
+        Parallel folds share one device, so co-scheduling them multiplies VRAM use while the
+        RAM budget above sees nothing: only a fraction of the GPU is reserved per fold, and a
+        model's memory estimate is compared against host memory. On a RAM-rich node that lets
+        every fold land on one card and exhaust it, which surfaces as a CUDA OOM mid-fit
+        rather than as a scheduling decision.
+
+        Returns ``inf`` -- leaving the RAM budget to decide alone -- when no GPU is used, when
+        the model cannot estimate its GPU memory (most cannot; the estimate is opt-in per
+        model), or when free VRAM cannot be read. Those are the pre-existing behaviour.
+        """
+        if not self.num_gpus:
+            return math.inf
+        model = self._initialized_model_base
+        if not model.can_estimate_gpu_memory_usage_static():
+            return math.inf
+        vram_est_model = model.estimate_gpu_memory_usage(X=self.X)
+        if not vram_est_model:
+            return math.inf
+        per_device_vram = self._per_device_available_vram()
+        if not per_device_vram:
+            return math.inf
+        self._vram_est_per_fold = vram_est_model
+
+        # Folds only contend with folds on the *same* device, so capacity is summed per
+        # device rather than read off one card -- and per device, because with mixed cards
+        # the smallest device bounds what a fold assigned there can use.
+        max_folds = sum(int(vram / vram_est_model * max_memory_usage_ratio) for vram in per_device_vram)
+        if max_folds <= 1:
+            # The cap bottoming out is ambiguous on its own: it means either "run folds one at a
+            # time" or "not even one fold fits". Ask the model's VRAM check to tell them apart, as
+            # the host-memory path does -- it raises NotEnoughCudaMemoryError, which the trainer
+            # turns into a graceful skip, instead of letting the fit reach a CUDA OOM. Checked
+            # against the largest device, since a single fold would be placed there.
+            model._validate_fit_gpu_memory_usage(
+                approx_mem_size_req=vram_est_model,
+                available_mem=max(per_device_vram),
+                num_gpus=self.num_gpus,
+            )
+            max_folds = 1
+        logger.log(
+            15,
+            f"\tGPU memory allows {max_folds} fold(s) in parallel "
+            f"(estimated {vram_est_model / 1e9:.2f} GB per fold over {len(per_device_vram)} device(s)).",
+        )
+        return max_folds
+
+    def _per_device_available_vram(self) -> list[float]:
+        """Available VRAM in bytes per device this bag may use; empty when undetectable.
+
+        Devices are the logical ids ``0..num_gpus-1``, matching the ids
+        ``_calculate_gpu_assignment`` hands to workers as ``CUDA_VISIBLE_DEVICES``.
+        """
+        n_devices = max(1, int(self.num_gpus))
+        per_device = []
+        for device in range(n_devices):
+            vram = ResourceManager.get_available_vram(device=device)
+            if not vram:
+                return []
+            per_device.append(float(vram))
+        return per_device
 
     def _estimate_data_memory_usage(self):
         X_mem = get_approximate_df_mem_usage(self.X).sum()
@@ -724,7 +873,10 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
                     predict_n_size,
                     fit_num_cpus,
                     fit_num_gpus,
+                    params_trained,
                 ) = out
+                if params_trained is not None:
+                    fold_model = _UnsavedFold(name=fold_model, params_trained=params_trained)
             assert fold_ctx is not None
             self._update_bagged_ensemble(
                 fold_model=fold_model,
@@ -737,14 +889,6 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
                 fit_num_cpus=fit_num_cpus,
                 fit_num_gpus=fit_num_gpus,
                 fold_ctx=fold_ctx,
-            )
-            model_sync_path = None
-            if self.model_sync_path is not None:
-                model_sync_path: str = self.model_sync_path + fold_model
-                if not model_sync_path.endswith("/"):
-                    model_sync_path += "/"
-            self.sync_model_artifact(
-                local_path=os.path.join(self.bagged_ensemble_model.path, fold_model), model_sync_path=model_sync_path
             )
         except TimeLimitExceeded:
             # Terminate all ray tasks because a fold failed
@@ -866,15 +1010,41 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
         if total_gpus == 0:
             logger.debug(f"No GPUs available, CPU-only mode for task {task_id}")
             return []
-        if gpus_per_task >= 1:
-            gpu_id = task_id * gpus_per_task
-            assigned_gpus = []
-            for i in range(gpus_per_task):
-                assigned_gpus.append((gpu_id + i) % total_gpus)
-            return sorted(assigned_gpus)
-        else:
-            gpu_id = task_id % total_gpus
-            return [gpu_id]
+        plan = self._gpu_slot_plan(gpus_per_task=gpus_per_task, total_gpus=total_gpus)
+        return plan[task_id % len(plan)]
+
+    def _gpu_slot_plan(self, gpus_per_task: int | float, total_gpus: int) -> list[list[int]]:
+        """Device assignment per concurrent slot, packing GPUs toward full utilization.
+
+        One slot per concurrently running task (``num_parallel_jobs``); tasks reuse slots as
+        earlier ones finish, so the plan describes the steady-state concurrent load. Each slot
+        picks device(s) by sorting candidates on two priorities:
+
+        1. progress toward 1.0 utilization -- the device whose assigned GPU fraction is
+           already highest (but still fits this task) is filled first, so one device reaches
+           exactly 1.0 (e.g. two 0.5-GPU folds) before the next is touched;
+        2. available VRAM -- among equally-utilized devices, the one with the most VRAM
+           headroom, which also spends the per-fold VRAM estimate as slots are placed.
+
+        A slot that fits on no device by these constraints falls back to the least-utilized
+        device: the fraction/VRAM budgets upstream should prevent that, but assignment must
+        never fail where the old round-robin would have produced something.
+        """
+        cache_key = (gpus_per_task, total_gpus, self.num_parallel_jobs)
+        cached = getattr(self, "_gpu_slot_plan_cache", None)
+        if cached is not None and cached[0] == cache_key:
+            return cached[1]
+
+        num_slots = max(1, int(self.num_parallel_jobs))
+        vram_est = getattr(self, "_vram_est_per_fold", None)
+        plan = plan_gpu_assignments(
+            requests=[gpus_per_task] * num_slots,
+            total_gpus=total_gpus,
+            per_device_vram=self._per_device_available_vram() if vram_est else None,
+            vram_est_per_task=vram_est,
+        )
+        self._gpu_slot_plan_cache = (cache_key, plan)
+        return plan
 
     def after_all_folds_scheduled(self):
         if not self.ray.is_initialized():
@@ -892,8 +1062,8 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
         if self._pseudo_sequential:
             logger.log(
                 30,
-                f"\t\tSwitching to pseudo sequential ParallelFoldFittingStrategy to avoid Python memory leakage.\n"
-                f"\t\tOverrule this behavior by setting fold_fitting_strategy to 'sequential_local' in ag_args_ensemble when when calling `predictor.fit`",
+                "\t\tSwitching to pseudo sequential ParallelFoldFittingStrategy to avoid Python memory leakage.\n"
+                "\t\tOverrule this behavior by setting fold_fitting_strategy to 'sequential_local' in ag_args_ensemble when when calling `predictor.fit`",
             )
             self._run_pseudo_sequential(X, y, X_pseudo, y_pseudo, model_base_ref, time_limit_fold, head_node_id)
         else:
@@ -943,6 +1113,10 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
         save_bag_folds = self.save_folds
         kwargs_fold = kwargs.copy()
         kwargs_fold["debug_gpu_assignment"] = self.debug_gpu_assignment
+        # The estimate made on the full training data (`mem_est_model`) stands in for the fold's own: a
+        # fold is a subset of that data, so the estimate is at least as large, and the fold skips the
+        # estimation (for some models as costly as preprocessing the whole fold).
+        kwargs_fold["approx_mem_size_req"] = self.mem_est_model
         is_pseudo = X_pseudo_ref is not None and y_pseudo_ref is not None
         if self.sample_weight is not None:
             if is_pseudo:
@@ -954,8 +1128,11 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
         if random_seed is not None:
             kwargs_fold["random_seed"] = random_seed
         pg = self.ray.util.get_current_placement_group()
+        gpus_per_task = resources["num_gpus"]
+        if gpus_per_task >= 1:
+            gpus_per_task = int(gpus_per_task)
         gpu_assignments[task_id] = self._calculate_gpu_assignment(
-            task_id=task_id, gpus_per_task=int(resources["num_gpus"]), total_gpus=self.num_gpus
+            task_id=task_id, gpus_per_task=gpus_per_task, total_gpus=self.num_gpus
         )
         return self._ray_fit.options(
             **resources,
@@ -977,7 +1154,7 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
             resources=resources_model,
             kwargs_fold=kwargs_fold,
             head_node_id=head_node_id,
-            model_sync_path=self.model_sync_path,
+            keep_fold=not self.bagged_ensemble_model._refit_folds_pending,
         )
 
     def _update_bagged_ensemble(
@@ -1162,23 +1339,6 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
             e = NotEnoughCudaMemoryError
         return e
 
-    def sync_model_artifact(self, local_path: str, model_sync_path: str):
-        """
-        Sync model artifacts being uploaded to `model_sync_path` to `local_path`
-        This method is expected to be called on the head node in the cluster to collect model artifacts after training
-
-        Parameters
-        ----------
-        local_path: str
-            local path to download artifacts
-        model_sync_path: str
-            remote path to download model artifacts from
-        """
-        self._sync_model_artifact(local_path=local_path, model_sync_path=model_sync_path)
-
-    def _sync_model_artifact(self, **kwargs):
-        pass
-
 
 class ParallelLocalFoldFittingStrategy(ParallelFoldFittingStrategy):
     def _get_ray_init_args(self):
@@ -1189,22 +1349,11 @@ class ParallelLocalFoldFittingStrategy(ParallelFoldFittingStrategy):
 
 
 class ParallelDistributedFoldFittingStrategy(ParallelFoldFittingStrategy):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+    """Fits folds in parallel on an existing multi-node Ray cluster.
 
-        # Append bag model name in the path, only use when sync path is required.
-        if not DistributedContext.is_shared_network_file_system():
-            self.model_sync_path = (
-                self.model_sync_path + os.path.basename(os.path.normpath(self.bagged_ensemble_model.path)) + "/"
-            )
-
-    def _sync_model_artifact(self, local_path, model_sync_path):
-        if DistributedContext.is_shared_network_file_system():
-            # Not need to sync model artifacts in a shared file system.
-            return
-
-        bucket, path = s3_path_to_bucket_prefix(model_sync_path)
-        download_s3_folder(bucket=bucket, prefix=path, local_path=local_path, error_if_exists=False, verbose=False)
+    Fold models are saved under the bagged model's path by whichever node fits them, so that path must be on a
+    file system shared by all nodes (for example NFS).
+    """
 
 
 def _json_safe(x: Any) -> Any:

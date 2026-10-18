@@ -97,7 +97,9 @@ class PipelineFeatureGenerator(BulkFeatureGenerator):
 
     def _infer_features_in_full(self, X: DataFrame, feature_metadata_in: FeatureMetadata = None):
         super()._infer_features_in_full(X=X, feature_metadata_in=feature_metadata_in)
-        type_map_real = get_type_map_real(X[self.feature_metadata_in.get_features()])
+        features = self.feature_metadata_in.get_features()
+        # Selecting every column copies the frame (see the same step in `AsTypeFeatureGenerator`).
+        type_map_real = get_type_map_real(X if features == list(X.columns) else X[features])
         self._feature_metadata_in_real = FeatureMetadata(
             type_map_raw=type_map_real, type_group_map_special=self.feature_metadata_in.get_type_group_map_raw()
         )

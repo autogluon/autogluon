@@ -6,12 +6,19 @@ from __future__ import annotations
 
 import logging
 
+import numpy as np
 import pandas as pd
 
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
-from autogluon.common.utils.resource_utils import ResourceManager
+from autogluon.common.utils.pretrained_weights import (
+    PretrainedWeightsUnavailableError,
+    fetch_allowed,
+    unavailable_message,
+)
 from autogluon.tabular import __version__
 from autogluon.tabular.models.abstract.abstract_torch_model import AbstractTorchModel
+
+from ._weight_fetch import weight_fetch_policy
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +46,7 @@ class TabICLModel(AbstractTorchModel):
     .. versionadded:: 1.4.0
     """
 
+    gpu_strongly_recommended: bool = True  # in-context inference is 12-63x slower on CPU
     ag_key = "TABICL"
     ag_name = "TabICL"
 
@@ -47,6 +55,27 @@ class TabICLModel(AbstractTorchModel):
 
     ag_priority = 65
     seed_name = "random_state"
+    _supported_problem_types = ["binary", "multiclass", "regression", "quantile"]
+
+    _default_auxiliary_params_extra = {
+        # TODO: Instead of caps, should we subsample for large datasets?
+        # Measured peak VRAM is already ~83 GB at 100k rows x 100 features, so a 1M-row fit is far
+        # outside what a single GPU serves; 500k keeps the cap within reach of a large card.
+        "max_rows": 500000,
+        "max_features": 2000,  # TODO: What should be the cap? 10k features works, but unsure if it is good
+        # No prediction chunking: tabicl batches internally (VRAM-adaptive with
+        # OOM-halving), and each external chunk would re-encode the full training
+        # context (kv_cache is off by default) — a 1024-row cap made a 100k-row
+        # predict ~100x slower while saving no VRAM.
+        "max_batch_size": None,
+    }
+    _default_ag_args_ensemble_extra = {
+        "fold_fitting_strategy": "sequential_local",
+        "refit_folds": True,  # Better to refit the model for faster inference and similar quality as the bag.
+    }
+    """Set fold_fitting_strategy to sequential_local, as parallel folding crashes if model weights aren't pre-downloaded."""
+    default_resources_physical_cores_only = True
+    default_num_gpus = 1
 
     def get_model_cls(self):
         if self.problem_type in ["binary", "multiclass"]:
@@ -61,12 +90,20 @@ class TabICLModel(AbstractTorchModel):
 
     @staticmethod
     def _get_batch_size(n_cells: int):
+        """Datasets-per-batch for tabicl's internal batching, by table size in cells.
+
+        tabicl halves the batch on OOM, so these are starting points rather than hard limits; the
+        tiers exist to avoid paying for a failed attempt first. The smallest tier matters because
+        the column-embedding output, shape ``(batch_size, n_rows, n_columns, embed_dim)``, is
+        tabicl's dominant allocation, so on the largest tables even 2 is too many.
+        """
         if n_cells <= 4_000_000:
             return 8
-        elif n_cells <= 6_000_000:
+        if n_cells <= 6_000_000:
             return 4
-        else:
+        if n_cells <= 500_000_000:
             return 2
+        return 1
 
     def get_checkpoint_version(self, hyperparameter: dict) -> str:
         clf_checkpoint = self.default_classification_model
@@ -90,6 +127,31 @@ class TabICLModel(AbstractTorchModel):
 
         return reg_checkpoint
 
+    def _preprocess(self, X: pd.DataFrame, is_train: bool = False, **kwargs) -> pd.DataFrame:
+        """Cast `category` columns that are entirely missing in a prediction batch to object dtype.
+
+        Temporary workaround for https://github.com/soda-inria/tabicl/issues/143 (tabicl<=2.1.1):
+        tabicl masks features that are all-NaN in the batch and fills them with the float 0.0, which
+        poisons a `category` column, and its fitted `OrdinalEncoder` then crashes
+        (`TypeError: ufunc 'isnan' not supported`). Happens whenever a categorical column is entirely
+        missing within one prediction batch, e.g. an out-of-fold validation split during bagging. As
+        an object column the same fill is dtype-legal and the 0.0 values go down the encoder's
+        unknown-value path, which is the behavior tabicl's masking intends. The columns are all-NaN,
+        so the cast loses nothing. Remove once the pinned tabicl carries the upstream fix.
+        """
+        X = super()._preprocess(X, **kwargs)
+        if not is_train:
+            all_nan_categoricals = [
+                col
+                for col, dtype in X.dtypes.items()
+                if isinstance(dtype, pd.CategoricalDtype) and X[col].isna().all()
+            ]
+            if all_nan_categoricals:
+                X = X.copy(deep=False)
+                for col in all_nan_categoricals:
+                    X[col] = pd.Series(np.nan, index=X.index, dtype=object)
+        return X
+
     def _fit(
         self,
         X: pd.DataFrame,
@@ -108,29 +170,76 @@ class TabICLModel(AbstractTorchModel):
             )
             raise err
 
-        from torch.cuda import is_available
-
-        device = "cuda" if num_gpus != 0 else "cpu"
-        if (device == "cuda") and (not is_available()):
-            # FIXME: warn instead and switch to CPU.
-            raise AssertionError(
-                "Fit specified to use GPU, but CUDA is not available on this machine. "
-                "Please switch to CPU usage instead.",
-            )
+        device = self._resolve_fit_device(num_gpus=num_gpus)
 
         model_cls = self.get_model_cls()
         hyp = self._get_model_params()
         hyp["batch_size"] = hyp.get("batch_size", self._get_batch_size(X.shape[0] * X.shape[1]))
+        # Pin the checkpoint rather than inheriting whatever the installed tabicl defaults to, and
+        # resolve the per-problem-type form of the `checkpoint_version` hyperparameter (a bare
+        # string, or a `(classification, regression)` tuple) that the library itself does not accept.
+        hyp["checkpoint_version"] = self.get_checkpoint_version(hyperparameter=hyp)
+        # tabicl exposes the fetch decision on the estimator itself, so `ag.fetch_pretrained_weights`
+        # needs no interception here. The guard only ever tightens: it can force fetching off, but a
+        # user who explicitly set `allow_auto_download=False` keeps that.
+        fetch_blocked_by_policy = not fetch_allowed(self.aux_params.fetch_pretrained_weights, stage="fit")
+        if fetch_blocked_by_policy:
+            hyp["allow_auto_download"] = False
         self.model = model_cls(
             **hyp,
             device=device,
             n_jobs=num_cpus,
         )
-        X = self.preprocess(X, y=y)
-        self.model = self.model.fit(
-            X=X,
-            y=y,
-        )
+        X = self.preprocess(X, y=y, is_train=True)
+        try:
+            self.model = self.model.fit(
+                X=X,
+                y=y,
+            )
+        except ValueError as err:
+            # Re-raise tabicl's "not cached and automatic download is disabled" as the shared error,
+            # so the message names the option that caused it rather than the library's own flag.
+            if fetch_blocked_by_policy and "download is disabled" in str(err):
+                raise PretrainedWeightsUnavailableError(
+                    unavailable_message(model_name=self.name, stage="fit")
+                ) from err
+            raise
+
+    def _predict_proba(self, X, **kwargs) -> np.ndarray:
+        if self.problem_type == "quantile":
+            X = self.preprocess(X, **kwargs)
+            return np.asarray(self.model.predict(X, output_type="quantiles", alphas=self.quantile_levels))
+        return super()._predict_proba(X=X, **kwargs)
+
+    def save(self, path: str | None = None, verbose: bool = True) -> str:
+        """Save the fitted estimator, embedding the foundation weights only when asked.
+
+        tabicl's own ``__getstate__`` drops ``model_`` from a plain pickle and its ``__setstate__``
+        rebuilds it from the checkpoint, so the *unflagged* behaviour already matches
+        ``ag.save_pretrained_weights=False`` -- and makes loading depend on the checkpoint still
+        being resolvable. The library exposes ``_save_model_weights`` to opt back in to a
+        self-contained artifact, so honoring ``ag.save_pretrained_weights=True`` means setting it.
+        """
+        if not self.is_fit() or not self.aux_params.save_pretrained_weights:
+            return super().save(path=path, verbose=verbose)
+
+        # Consumed by tabicl's __getstate__ during the pickle below, then removed.
+        self.model._save_model_weights = True
+        try:
+            return super().save(path=path, verbose=verbose)
+        finally:
+            del self.model._save_model_weights
+
+    @classmethod
+    def load(cls, path: str, reset_paths: bool = True, verbose: bool = True):
+        """Load the pickle, applying the load-stage weight-fetch policy.
+
+        When the weights were not embedded, tabicl's ``__setstate__`` reloads them from the
+        checkpoint -- a network fetch on a host with a cold cache. That unpickling happens inside
+        ``super().load``, so the policy has to be in force around it.
+        """
+        with weight_fetch_policy(stage="load", model_name=cls.__name__):
+            return super().load(path=path, reset_paths=reset_paths, verbose=verbose)
 
     def get_device(self) -> str:
         return self.model.device_.type
@@ -144,39 +253,6 @@ class TabICLModel(AbstractTorchModel):
         self.model.inference_config_.COL_CONFIG.device = self.model.device_
         self.model.inference_config_.ROW_CONFIG.device = self.model.device_
         self.model.inference_config_.ICL_CONFIG.device = self.model.device_
-
-    def _get_default_auxiliary_params(self) -> dict:
-        default_auxiliary_params = super()._get_default_auxiliary_params()
-        default_auxiliary_params.update(
-            {
-                # TODO: Instead of caps, should we subsample for large datasets?
-                "max_rows": 1000000,  # TODO: What should be the cap? 1 million rows works, but unsure if it is good
-                "max_features": 2000,  # TODO: What should be the cap? 10k features works, but unsure if it is good
-                "max_batch_size": 1024,  # avoid excessive VRAM usage
-            }
-        )
-        return default_auxiliary_params
-
-    @classmethod
-    def supported_problem_types(cls) -> list[str] | None:
-        return ["binary", "multiclass", "regression"]
-
-    def _get_default_resources(self) -> tuple[int, int]:
-        # Use only physical cores for better performance based on benchmarks
-        num_cpus = ResourceManager.get_cpu_count(only_physical_cores=True)
-
-        num_gpus = min(1, ResourceManager.get_gpu_count_torch(cuda_only=True))
-        return num_cpus, num_gpus
-
-    def _estimate_memory_usage(self, X: pd.DataFrame, **kwargs) -> int:
-        hyperparameters = self._get_model_params()
-        return self.estimate_memory_usage_static(
-            X=X,
-            problem_type=self.problem_type,
-            num_classes=self.num_classes,
-            hyperparameters=hyperparameters,
-            **kwargs,
-        )
 
     @classmethod
     def _estimate_memory_usage_static(
@@ -215,23 +291,30 @@ class TabICLModel(AbstractTorchModel):
         return mem_estimate
 
     @classmethod
-    def _get_default_ag_args_ensemble(cls, **kwargs) -> dict:
-        """
-        Set fold_fitting_strategy to sequential_local,
-        as parallel folding crashes if model weights aren't pre-downloaded.
-        """
-        default_ag_args_ensemble = super()._get_default_ag_args_ensemble(**kwargs)
-        extra_ag_args_ensemble = {
-            # FIXME: If parallel, uses way more memory, seems to behave incorrectly, so we force sequential.
-            "fold_fitting_strategy": "sequential_local",
-            "refit_folds": True,  # Better to refit the model for faster inference and similar quality as the bag.
-        }
-        default_ag_args_ensemble.update(extra_ag_args_ensemble)
-        return default_ag_args_ensemble
+    def _estimate_gpu_memory_usage_static(
+        cls,
+        *,
+        X: pd.DataFrame,
+        hyperparameters: dict = None,
+        **kwargs,
+    ) -> int:
+        """Minimum VRAM required across fit and prediction — NOT expected usage.
 
-    @classmethod
-    def _class_tags(cls) -> dict:
-        return {"can_estimate_memory_usage_static": True}
+        tabicl plans its internal batches from free device memory, so its usage is
+        opportunistic: the same task that reserves ~30 GB on an idle large GPU
+        completes in under 1.5 GB of free VRAM at ~2x the runtime. Estimating usage
+        instead of requirement would needlessly skip the model on busy/small devices.
+        Requirement floors measured on synthetic fit+predict tasks: ~1 GB at 2M total
+        cells (train + prediction rows x features), ~5 GB at 20M. The prediction-row
+        count is unknown at fit time; assume at least 100k.
+
+        Caveat: the plan is made from free memory at fit/predict start — VRAM claimed
+        by other processes afterwards can still cause a hard OOM.
+        """
+        n_train, n_features = X.shape
+        n_test = max(100_000, n_train)
+        total_cells = (n_train + n_test) * n_features
+        return int(0.7e9 + 250 * total_cells)
 
     def _more_tags(self) -> dict:
         return {"can_refit_full": True}

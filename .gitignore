@@ -41,7 +41,8 @@ wheels/
 .installed.cfg
 *.egg
 *.lock
-# Commit the uv workspace lockfile (PEP 621 + uv workspace migration)
+# Commit the uv workspace lockfile so Dependabot can scan a resolved dependency graph
+# (our per-package deps are supplied dynamically by setup.py and can't be parsed statically).
 !uv.lock
 *.dirlock
 
@@ -86,9 +87,6 @@ target/
 
 # Jupyter Notebook
 .ipynb_checkpoints
-
-# pyenv
-.python-version
 
 # celery beat schedule file
 celerybeat-schedule
@@ -137,3 +135,8 @@ multimodal/src/autogluon/multimodal/version.py
 
 AutogluonModels
 lightning_logs
+
+# Datasets and fitted predictors written by the test suite. Left unanchored because the location
+# depends on the directory pytest was run from (repo root, `tabular/`, ...), and no tracked file
+# lives under a `datasets` directory.
+datasets/

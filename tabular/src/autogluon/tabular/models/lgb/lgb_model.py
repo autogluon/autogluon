@@ -14,7 +14,6 @@ from pandas import DataFrame, Series
 
 from autogluon.common.features.types import R_BOOL, R_CATEGORY, R_FLOAT, R_INT
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
-from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.common.utils.try_import import try_import_lightgbm
 from autogluon.core.constants import BINARY, MULTICLASS, QUANTILE, REGRESSION, SOFTCLASS
 from autogluon.core.models import AbstractModel
@@ -49,6 +48,13 @@ class LGBModel(AbstractModel):
     ag_priority_by_problem_type = MappingProxyType({SOFTCLASS: 100})
     seed_name = "seed"
     seed_name_alt = ["seed_value", "random_seed", "random_state"]
+    _supported_problem_types = ["binary", "multiclass", "regression", "quantile", "softclass"]
+
+    _default_auxiliary_params_extra = dict(
+        valid_raw_types=[R_BOOL, R_INT, R_FLOAT, R_CATEGORY],
+    )
+    minimum_num_gpus = 0.5
+    default_resources_physical_cores_only = True
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -81,16 +87,6 @@ class LGBModel(AbstractModel):
         else:
             stopping_metric_name = stopping_metric
         return stopping_metric, stopping_metric_name
-
-    def _estimate_memory_usage(self, X: pd.DataFrame, **kwargs) -> int:
-        hyperparameters = self._get_model_params()
-        return self.estimate_memory_usage_static(
-            X=X,
-            problem_type=self.problem_type,
-            num_classes=self.num_classes,
-            hyperparameters=hyperparameters,
-            **kwargs,
-        )
 
     # FIXME: Don't use `hyperparameters.get("max_bins", 255)`, instead get the defaults all at once!
     @classmethod
@@ -181,7 +177,13 @@ class LGBModel(AbstractModel):
             n_estimators_min * mem_size_per_estimator
         )  # memory estimate after fitting up to 5000 estimators
 
-        approx_mem_size_req = data_mem_usage_bytes + histogram_mem_usage_bytes + mem_size_estimators
+        # Fixed overhead of a LightGBM fit (library init, threading buffers): measured
+        # ~25-40 MB regardless of data size; without it small fits are underestimated 3-10x.
+        fixed_overhead_bytes = 50e6
+
+        approx_mem_size_req = (
+            fixed_overhead_bytes + data_mem_usage_bytes + histogram_mem_usage_bytes + mem_size_estimators
+        )
         return int(approx_mem_size_req)
 
     def _fit(
@@ -234,7 +236,7 @@ class LGBModel(AbstractModel):
                 params["device"] = "gpu"
                 logger.log(
                     20,
-                    f"\tWarning: Training LightGBM with GPU. This may negatively impact model quality compared to CPU training.",
+                    "\tWarning: Training LightGBM with GPU. This may negatively impact model quality compared to CPU training.",
                 )
         logger.log(15, f"\tFitting {num_boost_round} rounds... Hyperparameters: {params}")
 
@@ -417,14 +419,14 @@ class LGBModel(AbstractModel):
                         if time_left < 0.5 * time_limit:
                             retrain = False
                     if retrain:
-                        logger.log(15, f"Retraining LGB model to optimal iterations ('dart' mode).")
+                        logger.log(15, "Retraining LGB model to optimal iterations ('dart' mode).")
                         train_params.pop("callbacks", None)
                         train_params.pop("valid_sets", None)
                         train_params.pop("valid_names", None)
                         train_params["num_boost_round"] = self.model.best_iteration
                         self.model = train_lgb_model(**train_params)
                     else:
-                        logger.log(15, f"Not enough time to retrain LGB model ('dart' mode)...")
+                        logger.log(15, "Not enough time to retrain LGB model ('dart' mode)...")
 
         if generate_curves:
 
@@ -682,14 +684,6 @@ class LGBModel(AbstractModel):
     def _get_early_stopping_rounds(self, num_rows_train, strategy="auto"):
         return get_early_stopping_rounds(num_rows_train=num_rows_train, strategy=strategy)
 
-    def _get_default_auxiliary_params(self) -> dict:
-        default_auxiliary_params = super()._get_default_auxiliary_params()
-        extra_auxiliary_params = dict(
-            valid_raw_types=[R_BOOL, R_INT, R_FLOAT, R_CATEGORY],
-        )
-        default_auxiliary_params.update(extra_auxiliary_params)
-        return default_auxiliary_params
-
     @staticmethod
     def _is_gpu_lgbm_installed():
         # Taken from https://github.com/microsoft/LightGBM/issues/3939
@@ -708,7 +702,7 @@ class LGBModel(AbstractModel):
             }
             gbm = lightgbm.train(params, num_boost_round=10, train_set=train_data)
             return True
-        except Exception as e:
+        except Exception:
             return False
 
     @staticmethod
@@ -729,26 +723,8 @@ class LGBModel(AbstractModel):
             }
             gbm = lightgbm.train(params, num_boost_round=10, train_set=train_data)
             return True
-        except Exception as e:
+        except Exception:
             return False
-
-    def get_minimum_resources(self, is_gpu_available=False):
-        minimum_resources = {
-            "num_cpus": 1,
-        }
-        if is_gpu_available:
-            minimum_resources["num_gpus"] = 0.5
-        return minimum_resources
-
-    def _get_default_resources(self):
-        # only_physical_cores=True is faster in training
-        num_cpus = ResourceManager.get_cpu_count(only_physical_cores=True)
-        num_gpus = 0
-        return num_cpus, num_gpus
-
-    @classmethod
-    def supported_problem_types(cls) -> list[str] | None:
-        return ["binary", "multiclass", "regression", "quantile", "softclass"]
 
     def _ag_params(self) -> set:
         return {"early_stop", "generate_curves", "curve_metrics", "use_error_for_curve_metrics"}
@@ -756,7 +732,6 @@ class LGBModel(AbstractModel):
     @classmethod
     def _class_tags(cls):
         return {
-            "can_estimate_memory_usage_static": True,
             "can_estimate_memory_usage_static_lite": True,
             "supports_learning_curves": True,
         }

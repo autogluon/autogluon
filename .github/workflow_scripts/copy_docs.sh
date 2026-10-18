@@ -20,17 +20,7 @@ then
     flags='--delete'
     cacheControl=''
 else
-    if [[ $BRANCH == 'master' ]]
-    then
-        path='dev'
-    else
-        if [[ $BRANCH == 'dev' ]]
-        then
-            path='dev-branch'
-        else
-            path=$BRANCH
-        fi
-    fi
+    path=$(docs_publish_path "$BRANCH")
     bucket='autogluon.mxnet.io'
     site=$bucket/$path
     if [[ $BRANCH == 'master' ]]; then flags=''; else flags='--delete'; fi

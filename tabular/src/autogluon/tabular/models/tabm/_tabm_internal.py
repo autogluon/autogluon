@@ -248,10 +248,18 @@ class TabMImplementation:
         cat_cardinalities = self.ord_enc_.get_cardinalities()
         self.n_classes_ = n_classes
 
-        # filter out numerical columns with only a single value
-        #  -> AG also does this already but preprocessing might create constant columns again
+        # Filter out numerical columns that are near-constant on the training split
+        #  -> AG also does this already but preprocessing might create constant columns again.
+        # The tolerance (vs exact equality) matters: float32 mean-imputation of a constant
+        # column yields a second value one ulp off the constant, which would otherwise survive
+        # as a "two-valued" column and build a single ~1e-8-wide piecewise-linear-embedding bin
+        # whose unclamped encoding explodes on out-of-range values at predict time (measured
+        # predictions of ~3e5 against ~2e-2 for in-range rows). The pipeline's outputs are
+        # bounded (quantile-transformed |z| <= 5.2, indicators 0/1), so an absolute tolerance is
+        # safe: legitimate columns have a range >= ~1e-3.
         x_cont_train = ds_parts["train"]["x_cont"]
-        self.num_col_mask_ = ~torch.all(x_cont_train == x_cont_train[0:1, :], dim=0)
+        col_range = x_cont_train.max(dim=0).values - x_cont_train.min(dim=0).values
+        self.num_col_mask_ = col_range > 1e-6
         for part in part_names:
             ds_parts[part]["x_cont"] = ds_parts[part]["x_cont"][:, self.num_col_mask_]
             # tensor infos are not correct anymore, but might not be used either

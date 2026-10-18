@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import sys
+
 import numpy as np
 import pandas as pd
 
@@ -77,9 +79,36 @@ def test_category_column_estimate_matches_formula(monkeypatch):
     pd.testing.assert_series_equal(got, expected)
 
 
-def test_inexact_object_column_uses_head_deep_scaled(monkeypatch):
-    # Choose n where ceil(sample_ratio*n) changes the effective ratio.
-    # n=6, sample_ratio=0.2 -> ceil(1.2)=2 -> sample_ratio_adj=2/6=0.333...
+def test_inexact_non_object_column_uses_head_deep_scaled(monkeypatch):
+    # Non-object "inexact" columns still extrapolate a deep sample. Choose n where
+    # ceil(sample_ratio*n) changes the effective ratio: n=6, 0.2 -> ceil(1.2)=2 -> 2/6.
+    df = pd.DataFrame(
+        {
+            "dt": pd.to_datetime(["2020-01-0%d" % i for i in range(1, 7)]),
+            "i": pd.Series([1, 2, 3, 4, 5, 6], dtype="int64"),
+        }
+    )
+    num_rows = len(df)
+    sample_ratio_in = 0.2
+    num_rows_sample = int(np.ceil(sample_ratio_in * num_rows))
+    sample_ratio_adj = num_rows_sample / num_rows
+
+    monkeypatch.setattr(
+        pandas_utils,
+        "get_type_map_raw",
+        lambda _df: {"dt": "datetime", "i": pandas_utils.R_INT},
+    )
+
+    got = get_approximate_df_mem_usage(df, sample_ratio=sample_ratio_in)
+
+    base = df.memory_usage()  # shallow
+    inexact = df[["dt"]].head(num_rows_sample).memory_usage(deep=True)[["dt"]] / sample_ratio_adj
+    expected = inexact.combine_first(base)
+
+    pd.testing.assert_series_equal(got, expected)
+
+
+def test_object_column_counts_each_distinct_object_once(monkeypatch):
     df = pd.DataFrame(
         {
             "obj": ["a", "bb", "ccc", "dddd", "eeeee", "ffffff"],
@@ -91,7 +120,6 @@ def test_inexact_object_column_uses_head_deep_scaled(monkeypatch):
     num_rows_sample = int(np.ceil(sample_ratio_in * num_rows))
     sample_ratio_adj = num_rows_sample / num_rows
 
-    # Mark "obj" as inexact by returning something not in {R_INT, R_FLOAT, R_CATEGORY}
     monkeypatch.setattr(
         pandas_utils,
         "get_type_map_raw",
@@ -100,47 +128,262 @@ def test_inexact_object_column_uses_head_deep_scaled(monkeypatch):
 
     got = get_approximate_df_mem_usage(df, sample_ratio=sample_ratio_in)
 
-    base = df.memory_usage()  # shallow
-    inexact = df[["obj"]].head(num_rows_sample).memory_usage(deep=True)[["obj"]] / sample_ratio_adj
-    expected = inexact.combine_first(base)
+    sample = df["obj"].to_numpy()[:num_rows_sample]
+    unique_bytes = sum(sys.getsizeof(obj) for obj in {id(o): o for o in sample}.values())
+    expected = df.memory_usage()  # shallow base
+    expected["obj"] = int(sample.itemsize * num_rows + unique_bytes / sample_ratio_adj)
 
     pd.testing.assert_series_equal(got, expected)
 
 
-def test_pandas_freq_alias(monkeypatch):
-    monkeypatch.setattr(pandas_utils, "PANDAS_V3_OR_NEWER", True)
-    # Basic aliases
-    assert pandas_utils.pandas_freq_alias("M") == "ME"
-    assert pandas_utils.pandas_freq_alias("Q") == "QE"
-    assert pandas_utils.pandas_freq_alias("Y") == "YE"
-    assert pandas_utils.pandas_freq_alias("A") == "YE"
-    assert pandas_utils.pandas_freq_alias("H") == "h"
-    assert pandas_utils.pandas_freq_alias("T") == "min"
-    assert pandas_utils.pandas_freq_alias("S") == "s"
-    assert pandas_utils.pandas_freq_alias("L") == "ms"
-    assert pandas_utils.pandas_freq_alias("U") == "us"
-    assert pandas_utils.pandas_freq_alias("N") == "ns"
+def test_object_column_shared_values_are_not_charged_per_cell():
+    """Regression test for #5433.
 
-    # Business and Semi-month
-    assert pandas_utils.pandas_freq_alias("BM") == "BME"
-    assert pandas_utils.pandas_freq_alias("BQ") == "BQE"
-    assert pandas_utils.pandas_freq_alias("BY") == "BYE"
-    assert pandas_utils.pandas_freq_alias("BH") == "bh"
-    assert pandas_utils.pandas_freq_alias("SM") == "SME"
+    ``memory_usage(deep=True)`` charges ``sys.getsizeof(value)`` once per cell, so a column whose
+    cells all reference one large string is reported as if each cell held its own copy. pandas'
+    C ``read_csv`` parser reuses one object per distinct value, so this is the ordinary case for a
+    low-cardinality string column loaded from disk.
+    """
+    num_rows = 10_000
+    shared = "x" * 50_000  # one object, referenced by every cell
+    df = pd.DataFrame({"obj": [shared] * num_rows})
 
-    # Numeric prefixes
-    assert pandas_utils.pandas_freq_alias("2M") == "2ME"
-    assert pandas_utils.pandas_freq_alias("10Q") == "10QE"
-    assert pandas_utils.pandas_freq_alias("3BM") == "3BME"
+    estimate = get_approximate_df_mem_usage(df)["obj"]
+    real_upper_bound = df["obj"].to_numpy().itemsize * num_rows + sys.getsizeof(shared) * 8
 
-    # Anchored frequencies
-    assert pandas_utils.pandas_freq_alias("M-JAN") == "ME-JAN"
-    assert pandas_utils.pandas_freq_alias("A-DEC") == "YE-DEC"
-    assert pandas_utils.pandas_freq_alias("2Q-FEB") == "2QE-FEB"
+    assert estimate < real_upper_bound, f"{estimate} not below {real_upper_bound}"
+    # The buggy formula charged the 50 KB string to all 10k cells: ~500 MB.
+    assert df.memory_usage(deep=True)["obj"] > 100 * estimate
 
-    # Non-standard or unaffected frequencies
-    assert pandas_utils.pandas_freq_alias("MS") == "MS"
-    assert pandas_utils.pandas_freq_alias("W-SUN") == "W-SUN"
-    assert pandas_utils.pandas_freq_alias("B") == "B"
-    assert pandas_utils.pandas_freq_alias("unknown") == "unknown"
-    assert pandas_utils.pandas_freq_alias(None) is None
+
+def test_object_column_distinct_values_are_not_undercounted():
+    """The shared-object fix must not make high-cardinality columns look free."""
+    num_rows = 10_000
+    df = pd.DataFrame({"obj": [f"{i}_{'p' * 200}" for i in range(num_rows)]})
+
+    estimate = get_approximate_df_mem_usage(df)["obj"]
+    deep = df.memory_usage(deep=True)["obj"]
+
+    # Every value is a distinct object, so the estimate should track deep accounting closely.
+    assert 0.9 * deep <= estimate <= 1.1 * deep, f"{estimate} vs {deep}"
+
+
+def test_memory_usage_shallow_matches_pandas():
+    import numpy as np
+    import pandas as pd
+
+    from autogluon.common.utils.pandas_utils import _memory_usage_shallow
+
+    df = pd.DataFrame(
+        {
+            "i8": np.arange(7, dtype=np.int8),
+            "i64": np.arange(7),
+            "f32": np.arange(7, dtype=np.float32),
+            "b": [True, False] * 3 + [True],
+            "o": ["x", "yy", None, "zzz", "", "a", "b"],
+            "dt": pd.date_range("2020", periods=7),
+            "s": pd.Series(["a", "b", None, "d", "e", "f", "g"], dtype="string"),
+            "c": pd.Series(list("abababa"), dtype="category"),
+            "ni": pd.Series([1, None, 3, 4, 5, 6, 7], dtype="Int64"),
+            "sp": pd.arrays.SparseArray([0, 0, 1, 0, 0, 2, 0]),
+            "tz": pd.date_range("2020", periods=7, tz="UTC"),
+        }
+    )
+    pd.testing.assert_series_equal(_memory_usage_shallow(df), df.memory_usage())
+    sliced = df.iloc[1:5]
+    pd.testing.assert_series_equal(_memory_usage_shallow(sliced), sliced.memory_usage())
+    empty = df.iloc[:0]
+    pd.testing.assert_series_equal(_memory_usage_shallow(empty), empty.memory_usage())
+
+
+def _constant_columns_reference(df):
+    return [column for column in df.columns if len(df[column].unique()) == 1]
+
+
+def test_get_constant_columns_edge_cases():
+    import numpy as np
+    import pandas as pd
+
+    from autogluon.common.utils.pandas_utils import get_constant_columns
+
+    df = pd.DataFrame(
+        {
+            "zero_signs": [0.0, -0.0, 0.0],
+            "all_nan": [np.nan, np.nan, np.nan],
+            "nan_and_value": [np.nan, 1.0, 1.0],
+            "inf": [np.inf, np.inf, np.inf],
+            "inf_mixed": [np.inf, -np.inf, np.inf],
+            "f32": np.array([1.5, 1.5, 1.5], dtype=np.float32),
+            "big_int": [2**53, 2**53 + 1, 2**53],
+            "int_const": [7, 7, 7],
+            "uint": np.array([3, 3, 3], dtype=np.uint8),
+            "bool_const": [True, True, True],
+            "bool_var": [True, False, True],
+            "obj_none": [None, None, None],
+            "obj_none_nan": [None, np.nan, None],
+            "obj_const": ["a", "a", "a"],
+            "string_na": pd.array(["a", None, "a"], dtype="string"),
+            "cat_const": pd.Categorical(["a", "a", "a"]),
+            "cat_nan": pd.Categorical(["a", None, "a"]),
+            "int64_na": pd.array([pd.NA, pd.NA, pd.NA], dtype="Int64"),
+            "nat": pd.Series([pd.NaT, pd.NaT, pd.NaT], dtype="datetime64[ns]"),
+            "dt_const": pd.to_datetime(["2020-01-01"] * 3),
+            "sparse_const": pd.arrays.SparseArray([0, 0, 0]),
+        }
+    )
+    assert get_constant_columns(df) == _constant_columns_reference(df)
+    assert get_constant_columns(df, columns=["int_const", "bool_var", "all_nan"]) == ["int_const", "all_nan"]
+    assert get_constant_columns(df.iloc[:0]) == []
+    assert get_constant_columns(df.iloc[:1]) == list(df.columns)
+    duplicated = pd.concat([df[["int_const", "bool_var"]], df[["int_const"]]], axis=1)
+    assert duplicated.columns.has_duplicates
+    assert get_constant_columns(duplicated[["bool_var"]]) == []
+
+
+def test_get_constant_columns_matches_unique_on_random_frames():
+    import numpy as np
+    import pandas as pd
+
+    from autogluon.common.utils.pandas_utils import get_constant_columns
+
+    def random_column(rng, n):
+        kind = rng.integers(10)
+        pick = lambda pool: rng.choice(pool, size=n)  # noqa: E731
+        if kind == 0:
+            return pick(np.array([0.0, -0.0, np.nan, np.inf, -np.inf, 1.5]))
+        if kind == 1:
+            return pick(np.array([2**53, 2**53 + 1, -1, 0])).astype(np.int64)
+        if kind == 2:
+            return pick(np.array([True, False]))
+        if kind == 3:
+            return pd.Series(pick(np.array(["a", "b", None], dtype=object)), dtype=object)
+        if kind == 4:
+            return pd.Categorical(pick(np.array(["a", "b", None], dtype=object)))
+        if kind == 5:
+            return pd.array(pick(np.array([1, 2, None], dtype=object)), dtype="Int64")
+        if kind == 6:
+            return pd.Series(pick(np.array(["2020-01-01", "2020-01-02", None], dtype=object))).astype("datetime64[ns]")
+        if kind == 7:
+            return pd.array(pick(np.array(["x", "y", None], dtype=object)), dtype="string")
+        if kind == 8:
+            return pick(np.array([0.25, np.nan], dtype=np.float32))
+        return pd.arrays.SparseArray(pick(np.array([0, 0, 3])))
+
+    for seed in range(150):
+        rng = np.random.default_rng(seed)
+        n = int(rng.choice([1, 2, 3, 20]))
+        df = pd.DataFrame({f"c{i}": random_column(rng, n) for i in range(int(rng.integers(1, 9)))})
+        assert get_constant_columns(df) == _constant_columns_reference(df), (seed, df.dtypes.to_dict())
+
+
+def _two_valued_reference(df):
+    out = {}
+    for column in df.columns:
+        uniques = df[column].unique()
+        if len(uniques) == 2:
+            out[column] = uniques
+    return out
+
+
+def _assert_same_two_valued(got, expected):
+    import numpy as np
+    import pandas as pd
+
+    assert list(got) == list(expected)
+    for column in expected:
+        a, b = got[column], expected[column]
+        assert len(a) == len(b) == 2
+        for x, y in zip(a, b):
+            assert (pd.isna(x) and pd.isna(y)) or x == y, (column, a, b)
+        if isinstance(b, np.ndarray):
+            assert a.dtype == b.dtype, (column, a.dtype, b.dtype)
+
+
+def test_get_two_valued_columns_edge_cases():
+    import numpy as np
+    import pandas as pd
+
+    from autogluon.common.utils.pandas_utils import get_two_valued_columns
+
+    df = pd.DataFrame(
+        {
+            "two": [1.0, 2.0, 1.0, 2.0],
+            "nan_value": [np.nan, 3.0, np.nan, 3.0],  # NaN first, kept in first-appearance order
+            "value_nan": [3.0, np.nan, 3.0, 3.0],
+            "signed_zero": [0.0, -0.0, 1.0, 0.0],  # -0.0 == 0.0, so two values
+            "inf": [np.inf, -np.inf, np.inf, np.inf],
+            "three": [1.0, 2.0, 3.0, 1.0],
+            "constant": [5.0, 5.0, 5.0, 5.0],
+            "all_nan": [np.nan] * 4,
+            "int": [2**53, 2**53 + 1, 2**53, 2**53],
+            "int_three": [1, 2, 3, 1],
+            "bool": [True, False, True, True],
+            "bool_const": [True] * 4,
+            "u8": np.array([0, 255, 0, 0], dtype=np.uint8),
+            "obj": ["y", "n", "y", "y"],
+            "obj_none": ["y", None, "y", "y"],
+            "cat": pd.Categorical(["a", "b", "a", "a"]),
+            "int64_na": pd.array([1, pd.NA, 1, 1], dtype="Int64"),
+            "string": pd.array(["a", "b", "a", "a"], dtype="string"),
+            "dt": pd.to_datetime(["2020-01-01", "2020-01-02", "2020-01-01", "2020-01-01"]),
+        }
+    )
+    _assert_same_two_valued(get_two_valued_columns(df), _two_valued_reference(df))
+    subset = ["bool", "three", "obj"]
+    _assert_same_two_valued(
+        get_two_valued_columns(df, columns=subset), {c: _two_valued_reference(df)[c] for c in ["bool", "obj"]}
+    )
+    assert get_two_valued_columns(df.iloc[:1]) == {}
+    assert get_two_valued_columns(df.iloc[:0]) == {}
+
+
+def test_get_two_valued_columns_matches_unique_on_random_frames():
+    import numpy as np
+    import pandas as pd
+
+    from autogluon.common.utils.pandas_utils import get_two_valued_columns
+
+    def random_column(rng, n):
+        kind = rng.integers(9)
+        pick = lambda pool: rng.choice(pool, size=n)  # noqa: E731
+        if kind == 0:
+            return pick(np.array([0.0, -0.0, np.nan, np.inf, 1.5]))
+        if kind == 1:
+            return pick(np.array([2**53, 2**53 + 1, -1])).astype(np.int64)
+        if kind == 2:
+            return pick(np.array([True, False]))
+        if kind == 3:
+            return pd.Series(pick(np.array(["a", "b", None], dtype=object)), dtype=object)
+        if kind == 4:
+            return pd.Categorical(pick(np.array(["a", "b", None], dtype=object)))
+        if kind == 5:
+            return pd.array(pick(np.array([1, 2, None], dtype=object)), dtype="Int64")
+        if kind == 6:
+            return pd.Series(pick(np.array(["2020-01-01", "2020-01-02", None], dtype=object))).astype("datetime64[ns]")
+        if kind == 7:
+            return pick(np.array([0.25, np.nan, 0.5], dtype=np.float32))
+        return pick(np.array([7, 8], dtype=np.uint8))
+
+    for seed in range(200):
+        rng = np.random.default_rng(seed)
+        n = int(rng.choice([1, 2, 3, 4, 30]))
+        df = pd.DataFrame({f"c{i}": random_column(rng, n) for i in range(int(rng.integers(1, 9)))})
+        _assert_same_two_valued(get_two_valued_columns(df), _two_valued_reference(df))
+
+
+def test_fillna_without_downcast_keeps_object_columns_object():
+    """An object column whose values are all numbers once filled stays object, as `downcast=False` did on pandas<3."""
+    from autogluon.common.utils.pandas_utils import fillna_without_downcast
+
+    df = pd.DataFrame({"obj": pd.Series([1, None, 3], dtype=object), "float": [1.0, np.nan, 3.0]})
+    fill = {"obj": 0, "float": 0.0}
+
+    out = fillna_without_downcast(df, fill)
+    assert out["obj"].dtype == object
+    assert list(out["obj"]) == [1, 0, 3]
+    assert list(out["float"]) == [1.0, 0.0, 3.0]
+    assert df["obj"].isna().sum() == 1  # not modified
+
+    assert fillna_without_downcast(df, fill, inplace=True) is None
+    assert df["obj"].dtype == object
+    assert list(df["obj"]) == [1, 0, 3]

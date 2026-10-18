@@ -14,6 +14,11 @@ logger = logging.getLogger(__name__)
 class GreedyWeightedEnsembleModel(AbstractModel):
     ag_key = "ENS_WEIGHTED"
     ag_name = "WeightedEnsemble"
+    _supported_problem_types = ["binary", "multiclass", "regression", "quantile", "softclass"]
+
+    _default_auxiliary_params_extra = dict(
+        drop_unique=False,
+    )
 
     def __init__(self, base_model_names=None, model_base=EnsembleSelection, **kwargs):
         super().__init__(**kwargs)
@@ -29,14 +34,6 @@ class GreedyWeightedEnsembleModel(AbstractModel):
         }
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
-
-    def _get_default_auxiliary_params(self) -> dict:
-        default_auxiliary_params = super()._get_default_auxiliary_params()
-        extra_auxiliary_params = dict(
-            drop_unique=False,
-        )
-        default_auxiliary_params.update(extra_auxiliary_params)
-        return default_auxiliary_params
 
     # TODO: Consider moving convert_pred_probas_df_to_list into inner model to ensure X remains a dataframe after preprocess is called
     def _preprocess_nonadaptive(self, X, **kwargs):
@@ -140,10 +137,6 @@ class GreedyWeightedEnsembleModel(AbstractModel):
         extra_ag_args = {"valid_base": False}
         default_ag_args.update(extra_ag_args)
         return default_ag_args
-
-    @classmethod
-    def supported_problem_types(cls) -> list[str] | None:
-        return ["binary", "multiclass", "regression", "quantile", "softclass"]
 
     def _get_default_stopping_metric(self):
         return self.eval_metric

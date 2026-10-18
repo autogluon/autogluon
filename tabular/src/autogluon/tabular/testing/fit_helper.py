@@ -14,9 +14,10 @@ import pandas as pd
 import pandas.testing as pdt
 
 from autogluon.common.utils.path_converter import PathConverter
-from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
+from autogluon.common.utils.utils import get_default_base_path
+from autogluon.core.constants import BINARY, MULTICLASS, QUANTILE, REGRESSION
 from autogluon.core.metrics import METRICS
-from autogluon.core.models import AbstractModel, BaggedEnsembleModel
+from autogluon.core.models import AbstractModel, AuxiliaryParams, BaggedEnsembleModel
 from autogluon.core.stacked_overfitting.utils import check_stacked_overfitting_from_leaderboard
 from autogluon.core.testing.global_context_snapshot import GlobalContextSnapshot
 from autogluon.core.utils import download, generate_train_test_split_combined, infer_problem_type, unzip
@@ -213,7 +214,7 @@ class FitHelper:
             _init_args.update(init_args)
             init_args = _init_args
         if "path" not in init_args:
-            init_args["path"] = os.path.join(directory_prefix, dataset_name, f"AutogluonOutput_{uuid.uuid4()}")
+            init_args["path"] = os.path.join(get_default_base_path(), dataset_name, f"AutogluonOutput_{uuid.uuid4()}")
         if path_as_absolute:
             init_args["path"] = PathConverter.to_absolute(path=init_args["path"])
             assert PathConverter._is_absolute(path=init_args["path"])
@@ -232,143 +233,189 @@ class FitHelper:
                 expected_model_count -= 1
             fit_args["fit_weighted_ensemble"] = fit_weighted_ensemble
 
-        ctx_before = GlobalContextSnapshot.capture()
+        try:
+            ctx_before = GlobalContextSnapshot.capture()
 
-        predictor: TabularPredictor = FitHelper.fit_dataset(
-            train_data=train_data,
-            init_args=init_args,
-            fit_args=fit_args,
-            sample_size=sample_size,
-            scikit_api=scikit_api,
-            min_cls_count_train=min_cls_count_train,
-        )
+            predictor: TabularPredictor = FitHelper.fit_dataset(
+                train_data=train_data,
+                init_args=init_args,
+                fit_args=fit_args,
+                sample_size=sample_size,
+                scikit_api=scikit_api,
+                min_cls_count_train=min_cls_count_train,
+            )
 
-        ctx_after_fit = GlobalContextSnapshot.capture()
-        ctx_before.assert_unchanged(ctx_after_fit)
+            ctx_after_fit = GlobalContextSnapshot.capture()
+            ctx_before.assert_unchanged(ctx_after_fit)
 
-        if compile:
-            predictor.compile(models="all", compiler_configs=compiler_configs)
-            predictor.persist(models="all")
+            if compile:
+                predictor.compile(models="all", compiler_configs=compiler_configs)
+                predictor.persist(models="all")
 
-        model_names = predictor.model_names()
-        model_name = model_names[0]
-        if expected_model_count is not None:
-            assert len(model_names) == expected_model_count
+            model_names = predictor.model_names()
+            model_name = model_names[0]
+            if expected_model_count is not None:
+                assert len(model_names) == expected_model_count
 
-        predictor.predict(test_data)
+            pred = predictor.predict(test_data)
+            _verify_pred_well_formed(predictor=predictor, pred=pred, index=test_data.index)
 
-        ctx_after_predict = GlobalContextSnapshot.capture()
-        ctx_after_fit.assert_unchanged(ctx_after_predict)
+            ctx_after_predict = GlobalContextSnapshot.capture()
+            ctx_after_fit.assert_unchanged(ctx_after_predict)
 
-        predictor.evaluate(test_data)
+            evaluate_result = predictor.evaluate(test_data)
 
-        test_data_transform = predictor.transform_features(data=test_data, model=model_name)
-        test_data_transform_before = test_data_transform.copy(deep=True)
-        model = predictor._trainer.load_model(model_name=model_name)
-        model.predict(X=test_data_transform)
-        pdt.assert_frame_equal(test_data_transform, test_data_transform_before, check_dtype=True)
+            test_data_transform = predictor.transform_features(data=test_data, model=model_name)
+            test_data_transform_before = test_data_transform.copy(deep=True)
+            model = predictor._trainer.load_model(model_name=model_name)
+            model.predict(X=test_data_transform)
+            pdt.assert_frame_equal(test_data_transform, test_data_transform_before, check_dtype=True)
 
-        if predictor.can_predict_proba:
-            pred_proba = predictor.predict_proba(test_data)
-            predictor.evaluate_predictions(y_true=test_data[label], y_pred=pred_proba)
-
-            pred_proba_repeat = predictor.predict_proba(test_data)
-            are_close = np.allclose(pred_proba, pred_proba_repeat, atol=1e-5)
-            if not are_close:
-                raise AssertionError(
-                    "Predictions differ when predicting on the same data multiple times\n"
-                    f"First Predict:\n{pred_proba}\n"
-                    f"Second Predict:\n{pred_proba_repeat}\n"
+            if predictor.can_predict_proba:
+                pred_proba = predictor.predict_proba(test_data)
+                evaluate_predictions_result = predictor.evaluate_predictions(
+                    y_true=test_data[label], y_pred=pred_proba
                 )
 
-            pred_proba_1 = predictor.predict_proba(test_data.head(1))  # Verify model can predict on a single sample
-            if verify_single_prediction_equivalent_to_multi:
-                pred_proba_1_from_multi = pred_proba.head(1)
-                are_close = np.allclose(pred_proba_1, pred_proba_1_from_multi, atol=1e-5)
+                _verify_pred_proba_well_formed(
+                    predictor=predictor, pred_proba=pred_proba, index=test_data.index, pred=pred
+                )
+                _verify_evaluate_equivalence(
+                    predictor=predictor,
+                    evaluate_result=evaluate_result,
+                    evaluate_predictions_result=evaluate_predictions_result,
+                )
+
+                if predictor.problem_type == BINARY:
+                    # The collapsed binary form must hold the same values as the positive-class column.
+                    # `check_dtype=False`: the binary -> multiclass conversion widens float32 to float64.
+                    pred_proba_pos = predictor.predict_proba(test_data, as_multiclass=False)
+                    pdt.assert_series_equal(
+                        pred_proba_pos,
+                        pred_proba[predictor.positive_class],
+                        check_names=False,
+                        check_dtype=False,
+                        obj="predict_proba(as_multiclass=False) vs positive class column",
+                    )
+
+                pred_proba_repeat = predictor.predict_proba(test_data)
+                are_close = np.allclose(pred_proba, pred_proba_repeat, atol=1e-5)
                 if not are_close:
                     raise AssertionError(
-                        "Predictions differ when predicting a single sample vs predicting multiple samples\n"
-                        f"Single Sample:\n{pred_proba_1}\n"
-                        f"Multi Sample:\n{pred_proba_1_from_multi}\n"
+                        "Predictions differ when predicting on the same data multiple times\n"
+                        f"First Predict:\n{pred_proba}\n"
+                        f"Second Predict:\n{pred_proba_repeat}\n"
                     )
-        else:
-            try:
-                predictor.predict_proba(test_data)
-            except AssertionError:
-                pass  # expected
+
+                pred_proba_1 = predictor.predict_proba(
+                    test_data.head(1)
+                )  # Verify model can predict on a single sample
+                if verify_single_prediction_equivalent_to_multi:
+                    pred_proba_1_from_multi = pred_proba.head(1)
+                    are_close = np.allclose(pred_proba_1, pred_proba_1_from_multi, atol=1e-5)
+                    if not are_close:
+                        raise AssertionError(
+                            "Predictions differ when predicting a single sample vs predicting multiple samples\n"
+                            f"Single Sample:\n{pred_proba_1}\n"
+                            f"Multi Sample:\n{pred_proba_1_from_multi}\n"
+                        )
             else:
-                raise AssertionError("Expected `predict_proba` to raise AssertionError, but it didn't!")
+                try:
+                    predictor.predict_proba(test_data)
+                except AssertionError:
+                    pass  # expected
+                else:
+                    raise AssertionError("Expected `predict_proba` to raise AssertionError, but it didn't!")
 
-        if refit_full:
-            refit_model_names = predictor.refit_full()
-            if expected_model_count is not None:
-                assert len(refit_model_names) == expected_model_count
-            refit_model_name = refit_model_names[model_name]
-            assert "_FULL" in refit_model_name
-            predictor.predict(test_data, model=refit_model_name)
-            if predictor.can_predict_proba:
-                predictor.predict_proba(test_data, model=refit_model_name)
-
-            # verify that val_in_fit is False if the model supports refit_full
-            model = predictor._trainer.load_model(refit_model_name)
-            if isinstance(model, BaggedEnsembleModel):
-                model = model.load_child(model.models[0])
-            model_info = model.get_info()
-            can_refit_full = model._get_tags()["can_refit_full"]
-            if can_refit_full:
-                assert not model_info["val_in_fit"], (
-                    f"val data must not be present in refit model if `can_refit_full=True`. Maybe an exception occurred?"
+                _verify_evaluate_equivalence(
+                    predictor=predictor,
+                    evaluate_result=evaluate_result,
+                    evaluate_predictions_result=predictor.evaluate_predictions(y_true=test_data[label], y_pred=pred),
                 )
-            else:
-                assert model_info["val_in_fit"], f"val data must be present in refit model if `can_refit_full=False`"
-        if verify_model_seed:
-            names = predictor.model_names()
-            for name in names:
-                model = predictor._trainer.load_model(name)
-                _verify_model_seed(model=model)
 
-        if predictor_info:
-            predictor.info()
-        lb_kwargs = {}
-        if extra_info:
-            lb_kwargs["extra_info"] = True
-        lb = predictor.leaderboard(test_data, extra_metrics=extra_metrics, **lb_kwargs)
-        stacked_overfitting_assert(
-            lb, predictor, expected_stacked_overfitting_at_val, expected_stacked_overfitting_at_test
-        )
+            if refit_full:
+                refit_model_names = predictor.refit_full()
+                if expected_model_count is not None:
+                    assert len(refit_model_names) == expected_model_count
+                refit_model_name = refit_model_names[model_name]
+                assert "_FULL" in refit_model_name
+                predictor.predict(test_data, model=refit_model_name)
+                if predictor.can_predict_proba:
+                    predictor.predict_proba(test_data, model=refit_model_name)
 
-        predictor_load = predictor.load(path=predictor.path)
-        predictor_load.predict(test_data)
+                # verify that val_in_fit is False if the model supports refit_full
+                model = predictor._trainer.load_model(refit_model_name)
+                if isinstance(model, BaggedEnsembleModel):
+                    model = model.load_child(model.models[0])
+                model_info = model.get_info()
+                can_refit_full = model._get_tags()["can_refit_full"]
+                if can_refit_full:
+                    assert not model_info["val_in_fit"], (
+                        f"val data must not be present in refit model if `can_refit_full=True`. Maybe an exception occurred?"
+                    )
+                else:
+                    assert model_info["val_in_fit"], (
+                        f"val data must be present in refit model if `can_refit_full=False`"
+                    )
+            if verify_model_seed:
+                names = predictor.model_names()
+                for name in names:
+                    model = predictor._trainer.load_model(name)
+                    _verify_model_seed(model=model)
 
-        # TODO: This is expensive, only do this sparingly.
-        if verify_load_wo_cuda:
-            import torch
+            if predictor_info:
+                predictor.info()
+            lb_kwargs = {}
+            if extra_info:
+                lb_kwargs["extra_info"] = True
+            lb = predictor.leaderboard(test_data, extra_metrics=extra_metrics, **lb_kwargs)
+            _verify_leaderboard_well_formed(predictor=predictor, leaderboard=lb)
+            stacked_overfitting_assert(
+                lb, predictor, expected_stacked_overfitting_at_val, expected_stacked_overfitting_at_test
+            )
 
-            if torch.cuda.is_available():
-                # Checks if the model is able to predict w/o CUDA.
-                # This verifies that a model artifact works on a CPU machine.
-                predictor_path = predictor.path
+            predictor_load = predictor.load(path=predictor.path)
+            # Compare against a fresh predict from the in-memory predictor rather than the `pred`
+            # computed earlier: `refit_full` above can change which model is used by default.
+            pred_before_load = predictor.predict(test_data)
+            pred_load = predictor_load.predict(test_data)
+            pdt.assert_frame_equal(
+                pd.DataFrame(pred_before_load),
+                pd.DataFrame(pred_load),
+                check_names=False,
+                obj="predictions before vs after save+load",
+            )
 
-                code = textwrap.dedent(f"""
-                        import os
-                        os.environ["CUDA_VISIBLE_DEVICES"] = ""
-                        from autogluon.tabular import TabularPredictor
+            # TODO: This is expensive, only do this sparingly.
+            if verify_load_wo_cuda:
+                import torch
 
-                        import torch
-                        assert torch.cuda.is_available() is False
-                        predictor = TabularPredictor.load(r"{predictor_path}")
-                        X, y = predictor.load_data_internal()
-                        predictor.persist("all")
-                        predictor.predict_multi(X, transform_features=False)
-                    """)
-                subprocess.run([sys.executable, "-c", code], check=True)
+                if torch.cuda.is_available():
+                    # Checks if the model is able to predict w/o CUDA.
+                    # This verifies that a model artifact works on a CPU machine.
+                    predictor_path = predictor.path
 
-        assert os.path.realpath(save_path) == os.path.realpath(predictor.path)
-        if delete_directory:
-            shutil.rmtree(
-                save_path, ignore_errors=True
-            )  # Delete AutoGluon output directory to ensure runs' information has been removed.
-        return predictor
+                    code = textwrap.dedent(f"""
+                            import os
+                            os.environ["CUDA_VISIBLE_DEVICES"] = ""
+                            from autogluon.tabular import TabularPredictor
+
+                            import torch
+                            assert torch.cuda.is_available() is False
+                            predictor = TabularPredictor.load(r"{predictor_path}")
+                            X, y = predictor.load_data_internal()
+                            predictor.persist("all")
+                            predictor.predict_multi(X, transform_features=False)
+                        """)
+                    subprocess.run([sys.executable, "-c", code], check=True)
+
+            assert os.path.realpath(save_path) == os.path.realpath(predictor.path)
+            return predictor
+        finally:
+            if delete_directory:
+                # Always remove the AutoGluon output directory, including when an assertion above
+                # fails -- otherwise failing tests are exactly the ones that leak artifacts.
+                shutil.rmtree(save_path, ignore_errors=True)
 
     @staticmethod
     def load_dataset(name: str, directory_prefix: str = "./datasets/") -> tuple[pd.DataFrame, pd.DataFrame, dict]:
@@ -412,6 +459,32 @@ class FitHelper:
                 return classifier.predictor_
         else:
             return TabularPredictor(**init_args).fit(train_data, **fit_args)
+
+    @staticmethod
+    def _verify_auxiliary_param_keys(model_cls: type[AbstractModel]) -> None:
+        """Fail if the model declares `_default_auxiliary_params_extra` keys that nothing consumes.
+
+        Known keys are the `AuxiliaryParams` schema fields plus the registered ag-params
+        (`_ag_params_common()` and the model's `_ag_params()`). An unknown key is either a typo
+        or a model-private param the wrapper reads without registering it — register such keys
+        in the model's `_ag_params()`.
+        """
+        known_keys = AuxiliaryParams.known_keys()
+        known_keys |= model_cls._ag_params_common()
+        # `_ag_params` implementations are constant per class, so calling on an
+        # uninitialized instance is safe.
+        known_keys |= model_cls._ag_params(object.__new__(model_cls))
+        declared_keys = set()
+        for klass in model_cls.__mro__:
+            declared_keys |= set(klass.__dict__.get("_default_auxiliary_params_extra") or {})
+        unknown_keys = declared_keys - known_keys
+        if unknown_keys:
+            raise AssertionError(
+                f"Model {model_cls.__name__} declares unknown auxiliary param key(s) in "
+                f"`_default_auxiliary_params_extra`: {sorted(unknown_keys)}"
+                f"\nEither fix the typo (known keys: {sorted(known_keys)}),"
+                f"\nor, if the model's wrapper code consumes the key, register it in the model's `_ag_params()`."
+            )
 
     @staticmethod
     def verify_model(
@@ -458,14 +531,21 @@ class FitHelper:
         fit_args = dict(
             hyperparameters={model_cls: model_hyperparameters},
         )
+        if model_cls.supported_problem_types.__func__ is not AbstractModel.supported_problem_types.__func__:
+            raise AssertionError(
+                f"Model {model_cls.__name__} overrides `supported_problem_types()`. "
+                f"Declare the `_supported_problem_types` class attribute instead of overriding the classmethod."
+                f"""\nExample code:
+    _supported_problem_types = ["binary", "multiclass", "regression", "quantile"]
+        """
+            )
+        FitHelper._verify_auxiliary_param_keys(model_cls=model_cls)
         supported_problem_types = model_cls.supported_problem_types()
         if supported_problem_types is None:
             raise AssertionError(
-                f"Model must specify `cls.supported_problem_types`"
+                f"Model must specify `cls._supported_problem_types`"
                 f"""\nExample code:
-    @classmethod
-    def supported_problem_types(cls) -> list[str] | None:
-        return ["binary", "multiclass", "regression", "quantile"]
+    _supported_problem_types = ["binary", "multiclass", "regression", "quantile"]
         """
             )
         assert isinstance(supported_problem_types, list)
@@ -586,6 +666,105 @@ def stacked_overfitting_assert(
         assert stacked_overfitting == expected_stacked_overfitting_at_test, (
             "Expected stacked overfitting at test mismatch!"
         )
+
+
+def _verify_pred_well_formed(predictor: TabularPredictor, pred, index) -> None:
+    """Cheap structural checks on `predict` output, reusing the already-computed predictions."""
+    assert pred.index.equals(index), "predict must preserve the index of the input data"
+    assert not np.asarray(pd.isna(pred)).any(), f"predict returned NaN values:\n{pred}"
+
+    if predictor.problem_type == QUANTILE:
+        assert list(pred.columns) == list(predictor.quantile_levels), (
+            f"predict columns must equal predictor.quantile_levels\n"
+            f"columns: {list(pred.columns)}\nquantile_levels: {list(predictor.quantile_levels)}"
+        )
+
+
+def _verify_pred_proba_well_formed(predictor: TabularPredictor, pred_proba, index, pred=None) -> None:
+    """Cheap structural checks on `predict_proba` output, reusing the already-computed predictions.
+
+    Catches class-count/ordering mistakes (a model inferring `num_classes` from the training split
+    rather than from `predictor.num_classes`), un-normalized probabilities, and index loss.
+    """
+    assert pred_proba.index.equals(index), "predict_proba must preserve the index of the input data"
+    assert not np.isnan(np.asarray(pred_proba, dtype=float)).any(), f"predict_proba returned NaN values:\n{pred_proba}"
+
+    class_labels = predictor.class_labels
+    assert list(pred_proba.columns) == list(class_labels), (
+        f"predict_proba columns must equal predictor.class_labels\n"
+        f"columns: {list(pred_proba.columns)}\nclass_labels: {list(class_labels)}"
+    )
+
+    proba_values = np.asarray(pred_proba, dtype=float)
+    # Small tolerance: compiled backends (e.g. ONNX) can emit values a few ULP outside [0, 1].
+    assert (proba_values >= -1e-6).all() and (proba_values <= 1 + 1e-6).all(), (
+        f"predict_proba values must lie in [0, 1]: min={proba_values.min()}, max={proba_values.max()}\n{pred_proba}"
+    )
+    assert np.allclose(proba_values.sum(axis=1), 1.0, atol=1e-5), f"predict_proba rows must sum to 1:\n{pred_proba}"
+
+    if pred is not None:
+        # `predict` must be derivable from `predict_proba` -- catches label/column misalignment.
+        pred_from_proba = predictor.predict_from_proba(y_pred_proba=pred_proba)
+        pdt.assert_series_equal(
+            pred,
+            pred_from_proba,
+            check_names=False,
+            obj="predict vs predict_from_proba(predict_proba)",
+        )
+
+
+def _verify_evaluate_equivalence(
+    predictor: TabularPredictor, evaluate_result: dict, evaluate_predictions_result: dict
+) -> None:
+    """`predictor.evaluate(data)` is documented as a shortcut for `evaluate_predictions(y, predict(_proba)(data))`."""
+    if predictor.sample_weight is not None:
+        return  # `evaluate` forwards sample weights that the direct `evaluate_predictions` call does not
+    assert set(evaluate_result.keys()) == set(evaluate_predictions_result.keys()), (
+        f"evaluate and evaluate_predictions returned different metrics\n"
+        f"evaluate: {sorted(evaluate_result.keys())}\n"
+        f"evaluate_predictions: {sorted(evaluate_predictions_result.keys())}"
+    )
+    for metric, value in evaluate_result.items():
+        other = evaluate_predictions_result[metric]
+        if isinstance(value, (int, float, np.integer, np.floating)) and isinstance(
+            other, (int, float, np.integer, np.floating)
+        ):
+            assert np.isclose(value, other, atol=1e-8, equal_nan=True), (
+                f"evaluate and evaluate_predictions disagree on '{metric}': {value} vs {other}"
+            )
+
+
+def _verify_leaderboard_well_formed(predictor: TabularPredictor, leaderboard: pd.DataFrame) -> None:
+    """The leaderboard must describe exactly the fitted models, with usable timings and val scores."""
+    model_names = predictor.model_names()
+    assert len(model_names) == len(set(model_names)), f"predictor.model_names() has duplicates: {model_names}"
+
+    graph_nodes = set(predictor._trainer.model_graph.nodes)
+    missing_from_graph = [m for m in model_names if m not in graph_nodes]
+    assert not missing_from_graph, f"models absent from trainer.model_graph: {missing_from_graph}"
+
+    lb_models = list(leaderboard["model"])
+    assert len(lb_models) == len(set(lb_models)), f"leaderboard has duplicate rows: {lb_models}"
+    assert set(lb_models) == set(model_names), (
+        f"leaderboard must have exactly one row per fitted model\n"
+        f"leaderboard: {sorted(lb_models)}\nmodel_names: {sorted(model_names)}"
+    )
+
+    fit_time = np.asarray(leaderboard["fit_time"], dtype=float)
+    assert np.isfinite(fit_time).all() and (fit_time >= 0).all(), (
+        f"leaderboard fit_time must be finite and non-negative:\n{leaderboard[['model', 'fit_time']]}"
+    )
+
+    # `_FULL` refit models are fit without validation data, so they legitimately have no val score.
+    val_rows = leaderboard[~leaderboard["model"].str.endswith("_FULL")]
+    score_val = np.asarray(val_rows["score_val"], dtype=float)
+    assert np.isfinite(score_val).all(), (
+        f"leaderboard score_val must be finite for non-refit models:\n{val_rows[['model', 'score_val']]}"
+    )
+    pred_time_val = np.asarray(val_rows["pred_time_val"], dtype=float)
+    assert np.isfinite(pred_time_val).all() and (pred_time_val >= 0).all(), (
+        f"leaderboard pred_time_val must be finite and non-negative:\n{val_rows[['model', 'pred_time_val']]}"
+    )
 
 
 def _verify_model_seed(model: AbstractModel):

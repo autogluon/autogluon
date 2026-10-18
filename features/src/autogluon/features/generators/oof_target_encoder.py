@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+from pandas.api.types import CategoricalDtype
 from sklearn.model_selection import KFold, StratifiedKFold
 
 from autogluon.common.features.types import (
@@ -96,8 +97,12 @@ class OOFTargetEncodingFeatureGenerator(AbstractFeatureGenerator):
             self.train_encoded_ = pd.DataFrame(index=original_index)
             return self
 
-        # Work only on the categorical part (for encoding), keep object dtype
-        X_cat = X[self.cols_].reset_index(drop=True).astype("object")
+        # Work only on the categorical part (for encoding). Category columns keep their dtype:
+        # casting them to object throws away the codes this method is about to recompute.
+        X_cat = X[self.cols_].reset_index(drop=True)
+        object_cols = [c for c in self.cols_ if not isinstance(X_cat[c].dtype, CategoricalDtype)]
+        if object_cols:
+            X_cat[object_cols] = X_cat[object_cols].astype("object")
         y = pd.Series(y).reset_index(drop=True)
 
         n = len(X_cat)
@@ -157,8 +162,22 @@ class OOFTargetEncodingFeatureGenerator(AbstractFeatureGenerator):
         for col in self.cols_:
             col_values = X_cat[col]
 
-            # Factorize categories once; sorted to mimic groupby index order
-            codes, uniques = pd.factorize(col_values, sort=True)
+            # Resolve each column to integer codes plus the categories they index.
+            #
+            # `sort=False`: the category order is never read. Codes only index `enc_matrix`, and
+            # `categories` is stored so `transform` reproduces the same codes, so sorting only
+            # relabels. It is not free -- it argsorts every column's uniques.
+            #
+            # A category column already carries its codes, so reuse them rather than factorizing
+            # the values again. Unused categories are dropped first: `factorize` only ever yields
+            # observed categories, and an unobserved one would get a zero count here and so a NaN
+            # encoding rather than the global mean.
+            if isinstance(col_values.dtype, CategoricalDtype):
+                col_values = col_values.cat.remove_unused_categories()
+                codes = col_values.cat.codes.to_numpy()
+                uniques = col_values.cat.categories
+            else:
+                codes, uniques = pd.factorize(col_values, sort=False)
             # codes == -1 corresponds to NaN / missing category
             mask_valid = codes >= 0
             codes_valid = codes[mask_valid]

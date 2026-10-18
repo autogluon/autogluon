@@ -22,5 +22,4 @@ export AWS_ECR_REPO=${your_repo}
 ./docker_deploy.sh cpu
 # For gpu
 ./docker_deploy.sh gpu
-
 ```

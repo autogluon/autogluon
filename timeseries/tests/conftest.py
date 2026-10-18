@@ -9,6 +9,7 @@ _HF_HUB_DEPENDENCIES = [
     "autogluon/chronos-bolt-tiny",
     "autogluon/chronos-2-small",
     "Datadog/Toto-Open-Base-1.0",
+    "Datadog/Toto-2.0-4m",
 ]
 
 
@@ -65,6 +66,24 @@ def pytest_sessionstart():
 def temp_model_path(tmp_path_factory):
     fn = tmp_path_factory.mktemp(str(uuid4())[:6])
     return str(fn)
+
+
+@pytest.fixture(autouse=True, scope="session")
+def _ag_default_base_path(tmp_path_factory):
+    """Redirect auto-generated predictor paths into pytest's temporary directory.
+
+    Without this, every `TimeSeriesPredictor(...)` created without an explicit `path` leaves an
+    `AutogluonModels/ag-<timestamp>` directory behind in the working directory. pytest reclaims
+    its own tmp dirs (keeping only the last few sessions), so nothing accumulates in the repo.
+    """
+    base_path = tmp_path_factory.mktemp("ag_models")
+    prev = os.environ.get("AG_DEFAULT_BASE_PATH")
+    os.environ["AG_DEFAULT_BASE_PATH"] = str(base_path)
+    yield str(base_path)
+    if prev is None:
+        os.environ.pop("AG_DEFAULT_BASE_PATH", None)
+    else:
+        os.environ["AG_DEFAULT_BASE_PATH"] = prev
 
 
 @pytest.fixture(scope="module")

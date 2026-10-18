@@ -25,6 +25,11 @@ uv sync --all-extras
 (`common`, `core`, `features`, `tabular`, `timeseries`, `multimodal`, and the meta `autogluon`),
 resolved deterministically from the committed `uv.lock`.
 
+To reproduce the exact locked environment (install from `uv.lock` as-is, without re-resolving):
+```bash
+uv sync --frozen --all-extras
+```
+
 Run code in the environment without activating it:
 ```bash
 uv run python -c "from autogluon.tabular import TabularPredictor; print('ok')"
@@ -101,10 +106,15 @@ Pick a specific interpreter with `uv sync -p 3.12` (or `uv python pin 3.12`).
 ## Keeping in sync
 
 `uv.lock` is committed, so installs are reproducible. After pulling changes, re-run
-`uv sync --all-extras`. If you **change a package's dependencies**, refresh and commit the lockfile:
+`uv sync --all-extras`. If you **change a package's dependencies** (e.g. a cap in
+`core/_setup_utils.py`), refresh and commit the lockfile — CI runs `uv lock --check` and fails if
+it's stale:
 ```bash
 uv lock
 ```
+Resolution is pinned to a fixed date via `exclude-newer` in the root `pyproject.toml`, so a newly
+released dependency won't change the lock (or turn CI red) until you bump that date alongside the
+`uv lock` refresh.
 
 ## Alternative: `uv pip install` / convenience script
 

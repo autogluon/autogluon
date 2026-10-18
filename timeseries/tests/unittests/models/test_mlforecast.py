@@ -1,6 +1,7 @@
 import os
 import shutil
 import tempfile
+import warnings
 from unittest import mock
 
 import numpy as np
@@ -67,6 +68,31 @@ def test_when_covariates_and_features_present_then_train_and_val_dfs_have_correc
     expected_num_val_rows = data.num_items * model.prediction_length
     assert train_df.shape == (expected_num_train_rows, expected_num_features)
     assert val_df.shape == (expected_num_val_rows, expected_num_features)
+
+
+def test_when_many_real_covariates_present_then_no_performance_warning_is_raised(
+    temp_model_path, mlforecast_model_class
+):
+    # every second covariate is categorical, so this gives 120 real-valued covariates
+    known_covariates_names = [f"known_{i}" for i in range(240)]
+    data = get_data_frame_with_variable_lengths({1: 30, 5: 40, 2: 25}, covariates_names=known_covariates_names)
+    feat_gen = TimeSeriesFeatureGenerator(target="target", known_covariates_names=known_covariates_names)
+    data = feat_gen.fit_transform(data)
+    model = mlforecast_model_class(
+        freq=data.freq,
+        path=temp_model_path,
+        prediction_length=2,
+        covariate_metadata=feat_gen.covariate_metadata,
+    )
+    model.fit(train_data=data, time_limit=10)
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", pd.errors.PerformanceWarning)
+        df = model._to_mlforecast_df(data, data.static_features)
+
+    real_covariates = model.covariate_metadata.known_covariates_real
+    assert len(real_covariates) == 120
+    assert all(f"__scaled_{col}" in df.columns for col in real_covariates)
 
 
 @pytest.mark.parametrize("prediction_length", [1, 5])
@@ -141,6 +167,33 @@ def test_when_covariates_and_features_present_then_model_can_predict(temp_model_
     assert len(predictions) == data.num_items * model.prediction_length
 
 
+def test_when_static_feature_columns_have_reserved_names_then_model_can_fit_and_predict(
+    temp_model_path, mlforecast_model_class
+):
+    # Static features with names reserved for internal use by MLForecast must be renamed by the model
+    prediction_length = 3
+    item_id_to_length = {1: 30, 5: 40, 2: 25}
+    data = get_data_frame_with_variable_lengths(item_id_to_length)
+    data.static_features = pd.DataFrame(
+        {name: np.random.normal(size=data.num_items) for name in ["unique_id", "ds", "y"]},
+        index=data.item_ids,
+    )
+
+    feat_gen = TimeSeriesFeatureGenerator(target="target", known_covariates_names=[])
+    data = feat_gen.fit_transform(data)
+
+    model = mlforecast_model_class(
+        path=temp_model_path,
+        prediction_length=prediction_length,
+        freq=data.freq,
+        covariate_metadata=feat_gen.covariate_metadata,
+    )
+    model.fit(train_data=data, time_limit=10)
+    predictions = model.predict(data)
+    assert isinstance(predictions, TimeSeriesDataFrame)
+    assert len(predictions) == data.num_items * model.prediction_length
+
+
 @pytest.mark.parametrize("eval_metric", ["RMSE", "WQL", "MAPE", None])
 def test_when_eval_metric_is_changed_then_model_can_predict(temp_model_path, mlforecast_model_class, eval_metric):
     data = DUMMY_VARIABLE_LENGTH_TS_DATAFRAME.copy()
@@ -148,6 +201,10 @@ def test_when_eval_metric_is_changed_then_model_can_predict(temp_model_path, mlf
     model.fit(train_data=data)
     predictions = model.predict(data)
     assert len(predictions) == data.num_items * model.prediction_length
+
+
+class _StopAfterPreprocess(Exception):
+    """Ends fit once `MLForecast.preprocess` has recorded its call."""
 
 
 @pytest.mark.parametrize("differences", [[], [14]])
@@ -163,12 +220,9 @@ def test_given_long_time_series_passed_to_model_then_preprocess_receives_shorten
         hyperparameters={"max_num_samples": max_num_samples, "differences": differences},
         prediction_length=prediction_length,
     )
-    with mock.patch("mlforecast.MLForecast.preprocess") as mock_preprocess:
-        try:
+    with mock.patch("mlforecast.MLForecast.preprocess", side_effect=_StopAfterPreprocess) as mock_preprocess:
+        with pytest.raises(_StopAfterPreprocess):
             model.fit(train_data=data)
-        # using mock leads to ZeroDivisionError
-        except ZeroDivisionError:
-            pass
         received_mlforecast_df = mock_preprocess.call_args[0][0]
         assert len(received_mlforecast_df) == max_num_samples + prediction_length + sum(differences)
 

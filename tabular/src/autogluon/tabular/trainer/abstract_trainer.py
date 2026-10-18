@@ -49,6 +49,7 @@ from autogluon.core.utils import (
     infer_eval_metric,
 )
 from autogluon.core.utils.exceptions import (
+    ConstraintViolationError,
     InsufficientTime,
     NoGPUError,
     NoStackFeatures,
@@ -62,7 +63,23 @@ from autogluon.core.utils.feature_selection import FeatureSelector
 from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.savers import save_pkl
 
+from .group_views import (
+    GROUP_COLLAPSED_SUFFIX,
+    GROUP_KEY_COLUMN,
+    GroupCollapsedModel,
+    GroupPooledWeightedEnsembleModel,
+    GroupPooling,
+)
+
 logger = logging.getLogger(__name__)
+
+
+class AmbiguousModelBestError(AssertionError):
+    """Several models are fit, none has a validation score, and no combination was given.
+
+    Subclasses AssertionError so existing `except AssertionError` handlers around model selection
+    keep working.
+    """
 
 
 class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
@@ -153,12 +170,32 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         random_state: int = 0,
         verbosity: int = 2,
         raise_on_model_failure: bool = False,
+        save_to_disk: bool = True,
+        group_views: list[str] | None = None,
+        group_pooling: str | GroupPooling | tuple[str | GroupPooling, ...] | None = None,
     ):
         super().__init__(
             path=path,
             low_memory=low_memory,
             save_data=save_data,
         )
+        #: The `group_on` columns when group views are on (see `group_views.py`): every bagged level-1 model then
+        #: gets a `GroupCollapsedModel` counterpart, and the weighted ensemble pools predictions within groups.
+        #: The data then carries the `GROUP_KEY_COLUMN` feature.
+        self.group_views: list[str] | None = group_views
+        #: How the weighted ensemble pools predictions within groups under group views (see `GroupViews.pooling`).
+        self.group_pooling: str | GroupPooling | tuple[str | GroupPooling, ...] | None = group_pooling
+        #: During a fit with `validation_folds` (see `TabularPredictor.fit`), the number of folds each bagged model
+        #: fits before the weighted ensemble; `complete_bags` fits the rest of the bags the best model uses.
+        self._validation_folds: int | None = None
+        #: When False, nothing is written to ``path`` during fit: the trainer keeps every model in memory (as
+        #: ``low_memory=False`` does) and skips its own pickle, so the fitted trainer lives only in this process.
+        self.save_to_disk: bool = save_to_disk
+        #: The training / validation data an in-memory trainer keeps instead of the ``X.pkl`` / ``y.pkl`` files
+        #: (``save_data`` with ``save_to_disk=False``), keyed like the data files (``X``, ``y``, ``X_val``, ...).
+        self._data_in_memory: dict[str, Any] = {}
+        #: The per-model validation predictions an in-memory trainer caches instead of the ``utils/attr`` pickles.
+        self._y_pred_proba_val_in_memory: dict[str, Any] = {}
         self._validate_num_classes(num_classes=num_classes, problem_type=problem_type)
         self._validate_quantile_levels(quantile_levels=quantile_levels, problem_type=problem_type)
         self.problem_type = problem_type
@@ -230,11 +267,21 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         #: custom split indices
         self._groups = None
 
+        #: Explicit (train_idx, val_idx) splits a `validation_structure` resolved for this
+        #: predictor, and the row count they address. Remembered so that models added later by
+        #: `fit_extra` are validated on the same partition as the models from the original `fit`.
+        self._custom_splits: list | None = None
+        self._custom_splits_num_rows: int | None = None
+
         #: whether to treat regression predictions as class-probabilities (during distillation)
         self._regress_preds_asprobas = False
 
         #: dict of model name -> model failure metadata
         self._models_failed_to_train_errors = dict()
+        #: dict of model name -> reason, for models skipped because a fit constraint was not
+        #: satisfied. Kept apart from `_models_failed_to_train_errors` because a constraint skip is
+        #: a configured outcome, not a failure, and callers read that dict to tell if a run broke.
+        self._models_skipped_by_constraint = dict()
 
         # self._exceptions_list = []  # TODO: Keep exceptions list for debugging during benchmarking.
 
@@ -284,24 +331,32 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         self.logger.log(level, msg, *args, **kwargs)
 
     def load_X(self):
+        if "X" in self._data_in_memory:
+            return self._data_in_memory["X"]
         if self._X_saved:
             path = os.path.join(self.path_data, "X.pkl")
             return load_pkl.load(path=path)
         return None
 
     def load_X_val(self):
+        if "X_val" in self._data_in_memory:
+            return self._data_in_memory["X_val"]
         if self._X_val_saved:
             path = os.path.join(self.path_data, "X_val.pkl")
             return load_pkl.load(path=path)
         return None
 
     def load_y(self):
+        if "y" in self._data_in_memory:
+            return self._data_in_memory["y"]
         if self._y_saved:
             path = os.path.join(self.path_data, "y.pkl")
             return load_pkl.load(path=path)
         return None
 
     def load_y_val(self):
+        if "y_val" in self._data_in_memory:
+            return self._data_in_memory["y_val"]
         if self._y_val_saved:
             path = os.path.join(self.path_data, "y_val.pkl")
             return load_pkl.load(path=path)
@@ -316,31 +371,55 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         return X, y, X_val, y_val
 
     def save_X(self, X, verbose=True):
+        if not self.save_to_disk:
+            self._data_in_memory["X"] = X
+            self._X_saved = True
+            return
         path = os.path.join(self.path_data, "X.pkl")
         save_pkl.save(path=path, object=X, verbose=verbose)
         self._X_saved = True
 
     def save_X_val(self, X, verbose=True):
+        if not self.save_to_disk:
+            self._data_in_memory["X_val"] = X
+            self._X_val_saved = True
+            return
         path = os.path.join(self.path_data, "X_val.pkl")
         save_pkl.save(path=path, object=X, verbose=verbose)
         self._X_val_saved = True
 
     def save_X_test(self, X, verbose=True):
+        if not self.save_to_disk:
+            self._data_in_memory["X_test"] = X
+            self._X_test_saved = True
+            return
         path = os.path.join(self.path_data, "X_test.pkl")
         save_pkl.save(path=path, object=X, verbose=verbose)
         self._X_test_saved = True
 
     def save_y(self, y, verbose=True):
+        if not self.save_to_disk:
+            self._data_in_memory["y"] = y
+            self._y_saved = True
+            return
         path = os.path.join(self.path_data, "y.pkl")
         save_pkl.save(path=path, object=y, verbose=verbose)
         self._y_saved = True
 
     def save_y_val(self, y, verbose=True):
+        if not self.save_to_disk:
+            self._data_in_memory["y_val"] = y
+            self._y_val_saved = True
+            return
         path = os.path.join(self.path_data, "y_val.pkl")
         save_pkl.save(path=path, object=y, verbose=verbose)
         self._y_val_saved = True
 
     def save_y_test(self, y, verbose=True):
+        if not self.save_to_disk:
+            self._data_in_memory["y_test"] = y
+            self._y_test_saved = True
+            return
         path = os.path.join(self.path_data, "y_test.pkl")
         save_pkl.save(path=path, object=y, verbose=verbose)
         self._y_test_saved = True
@@ -536,7 +615,12 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             )
             model_names_fit += base_model_names + aux_models
         if (self.model_best is None or infer_limit is not None) and len(model_names_fit) != 0:
-            self.model_best = self.get_model_best(infer_limit=infer_limit, infer_limit_as_child=True)
+            try:
+                self.model_best = self.get_model_best(infer_limit=infer_limit, infer_limit_as_child=True)
+            except AmbiguousModelBestError as err:
+                # The models are fit and usable; only the default for `predict` is undecidable.
+                # Leaving `model_best` unset defers the error to the call that actually needs it.
+                logger.log(30, f"\tWARNING: {err} Until then, `predict` requires an explicit `model`.")
         self._callbacks_conclude()
         self._fit_cleanup()
         self.save()
@@ -798,6 +882,42 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
 
         return core_models, aux_models
 
+    def _resolve_custom_splits(self, ag_args_ensemble: dict | None, X) -> dict | None:
+        """Keep every model in this predictor on the same validation partition.
+
+        A `validation_structure` is resolved once, in the learner, off the raw cleaned frame -- the
+        structure columns can be transformed or dropped by feature generation, so they cannot be
+        re-read later. The resolved splits arrive here as `ag_args_ensemble["custom_splits"]`, but
+        only on the call that came through the learner: `fit_extra` builds its own `core_kwargs` and
+        so used to fall back to plain k-fold. That silently mixed group-disjoint models (from `fit`)
+        with leaky ones (from `fit_extra`) in the same predictor, and compared their `score_val`s
+        against each other.
+
+        Remembering the splits on the trainer fixes that, because both paths funnel through
+        `stack_new_level_core`. The row count is remembered with them: the splits are positional
+        indices into the training frame, so a later call that changed the row set (`fit_extra` with
+        `pseudo_data`) must not reuse them.
+        """
+        splits = None if ag_args_ensemble is None else ag_args_ensemble.get("custom_splits")
+        if splits is not None:
+            self._custom_splits = splits
+            self._custom_splits_num_rows = len(X)
+            return ag_args_ensemble
+        if self._custom_splits is None:
+            return ag_args_ensemble
+        if len(X) != self._custom_splits_num_rows:
+            logger.log(
+                30,
+                f"Warning: cannot reuse the validation splits resolved during `fit` because the "
+                f"training data now has {len(X)} rows rather than {self._custom_splits_num_rows}. "
+                f"Models fit in this call will use the default splits, so their validation scores "
+                f"are not comparable with the models fit earlier.",
+            )
+            return ag_args_ensemble
+        ag_args_ensemble = {} if ag_args_ensemble is None else ag_args_ensemble.copy()
+        ag_args_ensemble.setdefault("custom_splits", self._custom_splits)
+        return ag_args_ensemble
+
     def stack_new_level_core(
         self,
         X,
@@ -852,6 +972,8 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         if infer_limit_batch_size is not None:
             ag_args_fit["predict_1_batch_size"] = infer_limit_batch_size
 
+        ag_args_ensemble = self._resolve_custom_splits(ag_args_ensemble=ag_args_ensemble, X=X)
+
         if isinstance(models, dict):
             get_models_kwargs = dict(
                 level=level,
@@ -895,6 +1017,8 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                     )
                 )
             models, model_args_fit = get_models_func(hyperparameters=models, **get_models_kwargs)
+            if self.group_views and self.bagged_mode and level == 1:
+                models, model_args_fit = self._with_group_collapsed_models(models, model_args_fit)
             if model_args_fit:
                 hyperparameter_tune_kwargs = {
                     model_name: model_args_fit[model_name]["hyperparameter_tune_kwargs"]
@@ -946,6 +1070,37 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             **kwargs,
         )
 
+    def _with_group_collapsed_models(
+        self, models: list[AbstractModel], model_args_fit: dict | None
+    ) -> tuple[list[AbstractModel], dict | None]:
+        """`models` with each bagged model followed by its `GroupCollapsedModel` counterpart.
+
+        The counterpart bags the same configuration fit on the collapsed table, under the base model's name with
+        `GROUP_COLLAPSED_SUFFIX` (e.g. `LightGBM_GroupCollapsed_BAG_L1`), and shares its fit arguments.
+        """
+        out = []
+        model_args_fit = dict(model_args_fit) if model_args_fit else model_args_fit
+        for model in models:
+            out.append(model)
+            if not isinstance(model, BaggedEnsembleModel):
+                continue
+            params = copy.deepcopy(model.get_params())
+            inner = params["model_base"]
+            collapsed = GroupCollapsedModel(
+                path=inner.path_root,
+                name=f"{inner.name}{GROUP_COLLAPSED_SUFFIX}",
+                problem_type=inner.problem_type,
+                eval_metric=inner.eval_metric,
+                model_base=inner,
+                group_columns=self.group_views,
+            )
+            params["model_base"] = collapsed
+            params["name"] = model.name.replace(inner.name, collapsed.name, 1)
+            out.append(type(model)(**params))
+            if model_args_fit and model.name in model_args_fit:
+                model_args_fit[params["name"]] = copy.deepcopy(model_args_fit[model.name])
+        return out, model_args_fit
+
     def _stack_new_level_aux(
         self, X_val, y_val, X, y, core_models, level, infer_limit, infer_limit_batch_size, **kwargs
     ):
@@ -975,6 +1130,75 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
     # TODO: Consider making level be auto-determined based off of max(base_model_levels)+1
     # TODO: Remove name_suffix, hacked in
     # TODO: X can be optional because it isn't needed if fit=True
+    def _reconcile_fixed_ensemble_weights(
+        self, ensemble_weights: dict, base_model_names: list[str], on_missing: str = "error"
+    ) -> tuple[dict, list[str]]:
+        """Drop weights for models that did not fit, when the caller allows it.
+
+        Under ``on_missing="renormalize"`` a model that was named but never produced -- it failed
+        to fit, or the name was wrong -- is dropped and the remaining weights are rescaled over
+        what survived, so the surviving models keep their relative proportions. Losing every named
+        model is still an error: there would be nothing to ensemble.
+
+        Returns the weights and base models to actually use, both narrowed to their intersection.
+        """
+        if on_missing != "renormalize":
+            return ensemble_weights, base_model_names
+        present = [name for name in ensemble_weights if name in base_model_names]
+        missing = [name for name in ensemble_weights if name not in base_model_names]
+        if not present:
+            raise ValueError(
+                f"None of the models named in ensemble_weights were fit: {sorted(ensemble_weights)}. "
+                f"Fitted models: {sorted(base_model_names)}."
+            )
+        if missing:
+            kept = {name: ensemble_weights[name] for name in present}
+            logger.log(
+                30,
+                f"\tWARNING: ensemble_weights named {sorted(missing)}, which "
+                f"{'was' if len(missing) == 1 else 'were'} not fit. Rescaling the remaining weights "
+                f"over {sorted(present)}: {kept}.",
+            )
+        # Narrow the base models too: a fitted model with no weight is still an error, and should
+        # stay one even here -- this option is about named models that are absent, not the reverse.
+        return (
+            {name: ensemble_weights[name] for name in present},
+            [name for name in base_model_names if name in ensemble_weights],
+        )
+
+    def _resolve_fixed_ensemble_weights(self, ensemble_weights: dict, base_model_names: list[str]) -> list[float]:
+        """Order user-supplied weights to match `base_model_names`, rejecting any mismatch.
+
+        Names are the fitted model names as they appear in the leaderboard. A silent mismatch would
+        assign a model someone else's weight, so an unknown or missing name is an error rather than
+        a default of zero.
+        """
+        unknown = set(ensemble_weights) - set(base_model_names)
+        if unknown:
+            raise ValueError(
+                f"ensemble_weights names {sorted(unknown)} are not fitted models. "
+                f"Available: {sorted(base_model_names)}."
+            )
+        missing = set(base_model_names) - set(ensemble_weights)
+        if missing:
+            raise ValueError(
+                f"ensemble_weights is missing a weight for {sorted(missing)}. "
+                "Give every base model a weight (use 0 to exclude one)."
+            )
+        total = sum(ensemble_weights.values())
+        if total <= 0:
+            raise ValueError(f"ensemble_weights must sum to a positive value, got {total}.")
+        return [ensemble_weights[name] / total for name in base_model_names]
+
+    def _empty_stack_frame(self, base_model_names: list[str]) -> pd.DataFrame:
+        """A zero-row frame with the stack columns the weighted ensemble expects.
+
+        `SimpleWeightedEnsembleModel` installs its weights without reading the data, so the frame
+        only has to carry the right columns.
+        """
+        columns = self.get_feature_metadata(use_orig_features=False, base_models=base_model_names).get_features()
+        return pd.DataFrame({c: pd.Series(dtype="float64") for c in columns})
+
     def stack_new_level_aux(
         self,
         X,
@@ -1000,7 +1224,8 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         """
         Trains auxiliary models (currently a single weighted ensemble) using the provided base models.
         Level must be greater than the level of any of the base models.
-        Auxiliary models never use the original features and only train with the predictions of other models as features.
+        Auxiliary models train on the predictions of the base models. They use the original features only when the
+        model of `ensemble_hyperparameters` asks for them via `ag_args_ensemble={"use_orig_features": True}`.
         """
         if self._callback_early_stop:
             return []
@@ -1031,9 +1256,95 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
 
         if infer_limit_batch_size is not None:
             ag_args_fit["predict_1_batch_size"] = infer_limit_batch_size
+
+        ensemble_weights = kwargs.pop("ensemble_weights", None)
+        ensemble_weights_missing = kwargs.pop("ensemble_weights_missing", "error")
+        ensemble_hyperparameters = kwargs.pop("ensemble_hyperparameters", None)
+        if ensemble_weights is not None and ensemble_hyperparameters is not None:
+            raise ValueError("`ensemble_weights` and `ensemble_hyperparameters` cannot be combined.")
+        if ensemble_weights is not None:
+            # Fixed weights are not learned from anything, so the base models' validation or
+            # out-of-fold predictions are never needed -- which is what makes this reachable with
+            # `validation_mode="none"`, where neither exists.
+            ensemble_weights, base_model_names = self._reconcile_fixed_ensemble_weights(
+                ensemble_weights, base_model_names, on_missing=ensemble_weights_missing
+            )
+            weights = self._resolve_fixed_ensemble_weights(ensemble_weights, base_model_names)
+            child_hyperparameters = dict(child_hyperparameters or {})
+            child_hyperparameters["weights"] = weights
+            # The caller named exactly which models to combine, so the stacker must not prune the
+            # base set: dropping one would hand the survivors weights meant for other models. The
+            # pruning also ranks by validation score, which is None for every model here -- with
+            # two models of the same type that comparison raises rather than pruning.
+            ag_args_ensemble = dict(kwargs.pop("ag_args_ensemble", None) or {})
+            ag_args_ensemble["max_base_models"] = 0
+            ag_args_ensemble["max_base_models_per_type"] = 0
+            kwargs["ag_args_ensemble"] = ag_args_ensemble
+            return self.generate_weighted_ensemble(
+                X=self._empty_stack_frame(base_model_names),
+                y=y.iloc[:0],
+                covered_rows=None,
+                level=level,
+                base_model_names=base_model_names,
+                k_fold=1,
+                n_repeats=1,
+                ag_args_fit=ag_args_fit,
+                stack_name=stack_name,
+                time_limit=time_limit,
+                name_suffix=name_suffix,
+                get_models_func=get_models_func,
+                check_if_best=check_if_best,
+                child_cls="SIMPLE_ENS_WEIGHTED",
+                child_hyperparameters=child_hyperparameters,
+                total_resources=total_resources,
+                # Nothing to score against: the frame is empty by construction, and with fixed
+                # weights a validation score would not have informed anything anyway.
+                compute_score=False,
+                **kwargs,
+            )
+
+        child_cls = "ENS_WEIGHTED"
+        use_orig_features = False
+        if ensemble_hyperparameters is not None:
+            ((child_cls, model_hyperparameters),) = ensemble_hyperparameters.items()
+            # The caller's hyperparameters first, then what this call adds (e.g. the name suffix).
+            child_hyperparameters = {
+                **copy.deepcopy(model_hyperparameters or {}),
+                **copy.deepcopy(child_hyperparameters or {}),
+            }
+            child_ag_args = dict(child_hyperparameters.get("ag_args", None) or {})
+            # The ensemble keeps the weighted ensemble's name, which callers and the stacked-overfitting
+            # check identify it by, and is never a base model for a later stack level.
+            child_ag_args.setdefault("name_main", GreedyWeightedEnsembleModel.ag_name)
+            child_ag_args.setdefault("valid_base", False)
+            child_hyperparameters["ag_args"] = child_ag_args
+            use_orig_features = self._ensemble_model_uses_orig_features(child_hyperparameters)
+
         X_stack_preds = self.get_inputs_to_stacker(
-            X, base_models=base_model_names, fit=fit, use_orig_features=False, use_val_cache=use_val_cache
+            X, base_models=base_model_names, fit=fit, use_orig_features=use_orig_features, use_val_cache=use_val_cache
         )
+        # Rows no base model validated have NaN out-of-fold predictions (see
+        # `BaggedEnsembleModel._predict_proba_oof`). The ensemble cannot optimize weights against
+        # them, so they are excluded from its fit -- but only from the fit: `generate_weighted
+        # _ensemble` restores full-length, row-aligned out-of-fold predictions afterwards, marking
+        # those rows uncovered. Anything else would leave the ensemble's OOF a different length
+        # from every other model's and so not addressable by training-frame row. Only the stack
+        # columns decide this: a missing value in an original feature is ordinary data.
+        if fit:
+            stack_column_names, _ = self._get_stack_column_names(models=base_model_names)
+            covered_rows = X_stack_preds[stack_column_names].notna().all(axis=1)
+        else:
+            covered_rows = None
+        if covered_rows is not None and covered_rows.all():
+            covered_rows = None
+        if self.group_views:
+            # The ensemble pools its inputs within groups, so the group of each row travels with them.
+            X_stack_preds[GROUP_KEY_COLUMN] = X[GROUP_KEY_COLUMN].to_numpy()
+            kwargs.setdefault("ensemble_type", GroupPooledWeightedEnsembleModel)
+            kwargs["ag_args_ensemble"] = {
+                **(kwargs.get("ag_args_ensemble") or {}),
+                "group_pooling": self.group_pooling,
+            }
         if self.weight_evaluation:
             X, w = extract_column(
                 X, self.sample_weight
@@ -1050,6 +1361,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         return self.generate_weighted_ensemble(
             X=X_stack_preds,
             y=y,
+            covered_rows=covered_rows,
             level=level,
             base_model_names=base_model_names,
             k_fold=1,
@@ -1060,10 +1372,23 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             name_suffix=name_suffix,
             get_models_func=get_models_func,
             check_if_best=check_if_best,
+            child_cls=child_cls,
             child_hyperparameters=child_hyperparameters,
             total_resources=total_resources,
+            use_orig_features=use_orig_features,
             **kwargs,
         )
+
+    @staticmethod
+    def _ensemble_model_uses_orig_features(child_hyperparameters: dict) -> bool:
+        """Whether the hyperparameters of the `ensemble_hyperparameters` model ask for the original features too.
+
+        Read from `ag_args_ensemble` or the equivalent `ag.ens.` prefix, the two ways a model's hyperparameters set its
+        ensemble wrapper's parameters.
+        """
+        ag_args_ensemble = child_hyperparameters.get("ag_args_ensemble", None) or {}
+        value = ag_args_ensemble.get("use_orig_features", child_hyperparameters.get("ag.ens.use_orig_features", False))
+        return value is True
 
     def predict(self, X: pd.DataFrame, model: str | None = None) -> np.ndarray:
         if model is None:
@@ -1213,8 +1538,6 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         -------
         Returns list of models in inference call order, including dependency models of those specified in the input.
         """
-        import networkx as nx
-
         model_set = set()
         model_order = []
         for model in models:
@@ -1222,8 +1545,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                 continue
             min_models_set = set(self.get_minimum_model_set(model))
             models_to_load = list(min_models_set.difference(model_set))
-            subgraph = nx.subgraph(self.model_graph, models_to_load)
-            model_pred_order = list(nx.lexicographical_topological_sort(subgraph))
+            model_pred_order = self.model_graph.subgraph(models_to_load).lexicographical_topological_sort()
             model_order += [m for m in model_pred_order if m not in model_set]
             model_set = set(model_order)
         return model_order
@@ -1248,8 +1570,6 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         -------
         Returns list of models in inference call order, including dependency models of those specified in the input.
         """
-        import networkx as nx
-
         model_set = set()
         for model in models:
             if model in model_set:
@@ -1259,7 +1579,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         if models_to_ignore is not None:
             model_set = model_set.difference(set(models_to_ignore))
         models_to_load = list(model_set)
-        subgraph = nx.DiGraph(nx.subgraph(self.model_graph, models_to_load))  # Wrap subgraph in DiGraph to unfreeze it
+        subgraph = self.model_graph.subgraph(models_to_load)
         # For model in models_to_ignore, remove model node from graph and all ancestors that have no remaining descendants and are not in `models`
         models_to_ignore = [
             model for model in models_to_load if (model not in models) and (not list(subgraph.successors(model)))
@@ -1278,13 +1598,11 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                     models_to_ignore.append(predecessor)
 
         # Get model prediction order
-        return list(nx.lexicographical_topological_sort(subgraph))
+        return subgraph.lexicographical_topological_sort()
 
     def get_models_attribute_dict(self, attribute: str, models: list | None = None) -> dict[str, Any]:
         """Returns dictionary of model name -> attribute value for the provided attribute."""
-        import networkx as nx
-
-        models_attribute_dict = nx.get_node_attributes(self.model_graph, attribute)
+        models_attribute_dict = self.model_graph.get_node_attributes(attribute)
         if models is not None:
             model_names = []
             for model in models:
@@ -1459,6 +1777,8 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             model = self.get_model_attribute(model=model, attribute="refit_full_parent")
         model_type = self.get_model_attribute(model=model, attribute="type")
         if issubclass(model_type, BaggedEnsembleModel):
+            if not self.save_to_disk:  # an in-memory bag never saved (and so never dropped) its OOF predictions
+                return self.models[model].predict_proba_oof()
             model_path = self.get_model_attribute(model=model, attribute="path")
             return model_type.load_oof(path=os.path.join(self.path, model_path))
         else:
@@ -1635,11 +1955,6 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         fit_strategy: Literal["sequential", "parallel"] = "sequential",
         **kwargs,
     ) -> list[str]:
-        if fit_strategy == "parallel":
-            logger.log(
-                30, f"Note: refit_full does not yet support fit_strategy='parallel', switching to 'sequential'..."
-            )
-            fit_strategy = "sequential"
         if X is None:
             X = self.load_X()
         if X_val is None:
@@ -1669,6 +1984,28 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         levels = sorted(model_levels.keys())
         models_trained_full = []
         model_refit_map = {}  # FIXME: is this even used, remove?
+
+        if fit_strategy == "parallel":
+            # Parallel refit requires a per-child memory estimate to schedule the refit jobs.
+            # The estimate is recorded on the model graph during the original parallel fit, so it is
+            # only available if the models themselves were fit with `fit_strategy="parallel"`.
+            # Only models in the "core" stack are actually retrained during refit; aux models
+            # (e.g. WeightedEnsemble) are refit by cloning the parent and need no memory estimate.
+            models_missing_mem_estimate = [
+                model
+                for model in models
+                if self.get_model_attribute(model, "stack_name", default=None) == "core"
+                and self.get_model_attribute(model, "fit_child_mem_estimate", default=None) is None
+            ]
+            if models_missing_mem_estimate:
+                logger.log(
+                    30,
+                    "Note: refit_full does not support fit_strategy='parallel' for models fit without it "
+                    f"(missing memory estimates for {len(models_missing_mem_estimate)}/{len(models)} models), "
+                    "switching to 'sequential'...",
+                )
+                logger.log(15, f"\tModels missing a memory estimate: {models_missing_mem_estimate}")
+                fit_strategy = "sequential"
 
         if fit_strategy == "sequential":
             for level in levels:
@@ -1737,6 +2074,9 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
 
                 while unfinished_job_refs:
                     finished, unfinished_job_refs = ray.wait(unfinished_job_refs, num_returns=1)
+                    # Free the resources held by the finished job, otherwise the remaining models
+                    # can never be scheduled and would be silently dropped.
+                    distributed_manager.deallocate_resources(job_ref=finished[0])
                     refit_full_parent, model_trained, model_path, model_type = ray.get(finished[0])
 
                     self._add_model(
@@ -1757,6 +2097,13 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                     logger.log(20, f"Finished refit model for {refit_full_parent}")
                     unfinished_job_refs += distributed_manager.schedule_jobs()
 
+                if distributed_manager.models_to_schedule:
+                    logger.log(
+                        30,
+                        f"WARNING: Failed to refit {len(distributed_manager.models_to_schedule)} L{level} models, "
+                        f"they could never be scheduled with the available resources: "
+                        f"{distributed_manager.models_to_schedule}",
+                    )
                 logger.log(20, f"Finished distributed refitting for {len(models_trained_full_level)} L{level} models.")
                 models_trained_full += models_trained_full_level
                 distributed_manager.clean_job_state(unfinished_job_refs=unfinished_job_refs)
@@ -1816,7 +2163,9 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
 
                     model_loaded.base_model_paths_dict[new_base_model] = new_base_model_path
                     model_loaded.base_model_types_dict[new_base_model] = new_base_model_type
-                    model_loaded.base_model_names.append(new_base_model)
+                    # Several prefixes can read one base model (e.g. the pooled views of `group_views`).
+                    if new_base_model not in model_loaded.base_model_names:
+                        model_loaded.base_model_names.append(new_base_model)
                     model_loaded.stack_column_prefix_to_model_map[stack_column_prefix] = new_base_model
 
             model_loaded.save()  # TODO: Avoid this!
@@ -1914,12 +2263,26 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             (m, model_performances[m], models_predict_time[m]) for m in models if model_performances[m] is not None
         ]
         if not perfs:
+            models_scoreless = models
             models = [m for m in models if m in models_full]
             perfs = [
                 (m, self.get_model_attribute(model=m, attribute="refit_full_parent_val_score"), models_predict_time[m])
                 for m in models
             ]
             if not perfs:
+                # Nothing has a score to rank by -- the `validation_mode="none"` case. One
+                # candidate is unambiguous, so use it. Several are not: picking one would be an
+                # arbitrary choice made on DAG order, and silently answering `predict` from a model
+                # the caller never chose is worse than saying so.
+                if len(models_scoreless) == 1:
+                    return models_scoreless[0]
+                if models_scoreless:
+                    raise AmbiguousModelBestError(
+                        f"No model has a validation score, so there is no basis to choose between "
+                        f"{sorted(models_scoreless)}. Combine them with "
+                        f"`fit(..., ensemble_weights={{...}})`, or name one per call with "
+                        f"`predict(..., model=...)`."
+                    )
                 raise AssertionError(
                     "No fit models that can infer exist with a validation score to choose the best model."
                 )
@@ -1927,18 +2290,22 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                 raise AssertionError(
                     "No fit models that can infer exist with a validation score to choose the best model, but refit_full models exist. Set `allow_full=True` to get the best refit_full model."
                 )
+        # refit_full models have val_score=None and often predict_time=None
+        perfs = [(m, -np.inf if s is None else s, np.inf if t is None else t) for m, s, t in perfs]
         return max(perfs, key=lambda i: (i[1], -i[2]))[0]
 
     def save_model(self, model, reduce_memory=True):
         # TODO: In future perhaps give option for the reduce_memory_size arguments, perhaps trainer level variables specified by user?
         if reduce_memory:
             model.reduce_memory_size(remove_fit=True, remove_info=False, requires_save=True)
-        if self.low_memory:
+        if self.low_memory and self.save_to_disk:
             model.save()
         else:
             self.models[model.name] = model
 
     def save(self) -> None:
+        if not self.save_to_disk:
+            return
         models = self.models
         if self.low_memory:
             self.models = {}
@@ -2051,53 +2418,76 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                 f"No valid unpersisted models were specified to be persisted, so no change in model persistence was performed.",
             )
             return []
-        if max_memory is not None:
 
-            def _check_memory():
-                info = self.get_models_info(model_names)
-                model_mem_size_map = {model: info[model]["memory_size"] for model in model_names}
-                for model in model_mem_size_map:
-                    if "children_info" in info[model]:
-                        for child in info[model]["children_info"].values():
-                            model_mem_size_map[model] += child["memory_size"]
-                total_mem_required = sum(model_mem_size_map.values())
-                available_mem = ResourceManager.get_available_virtual_mem()
-                memory_proportion = total_mem_required / available_mem
-                if memory_proportion > max_memory:
-                    logger.log(
-                        30,
-                        f"Models will not be persisted in memory as they are expected to require {round(memory_proportion * 100, 2)}% of memory, which is greater than the specified max_memory limit of {round(max_memory * 100, 2)}%.",
-                    )
-                    logger.log(
-                        30,
-                        f"\tModels will be loaded on-demand from disk to maintain safe memory usage, increasing inference latency. If inference latency is a concern, try to use smaller models or increase the value of max_memory.",
-                    )
-                    return False
-                else:
-                    logger.log(
-                        20,
-                        f"Persisting {len(model_names)} models in memory. Models will require {round(memory_proportion * 100, 2)}% of memory.",
-                    )
-                return True
-
-            if not _check_memory():
-                return []
-
-        models = []
-        for model_name in model_names:
+        def load_with_children(model_name: str) -> AbstractModel:
             model = self.load_model(model_name)
-            self.models[model.name] = model
-            models.append(model)
-
-        for model in models:
             # TODO: Move this to model code
             if isinstance(model, BaggedEnsembleModel):
                 for fold, fold_model in enumerate(model.models):
                     if isinstance(fold_model, str):
                         model.models[fold] = model.load_child(fold_model)
+            return model
+
+        if max_memory is None:
+            models = [load_with_children(model_name) for model_name in model_names]
+        else:
+            # Measured before any model is loaded, so the guard compares their size against the memory that is
+            # free without them.
+            available_mem = ResourceManager.get_available_virtual_mem()
+            # Each model, and each bagged child, is loaded once: the loaded objects are sized here and, when the
+            # guard passes, they are the objects persisted. Once the running total is over the limit the models
+            # kept so far are dropped and the rest are sized one at a time, so a rejected persist never holds much
+            # more than the limit while its message still reports the full requirement.
+            models = []
+            total_mem_required = 0
+            for model_name in model_names:
+                model = load_with_children(model_name)
+                info = model.get_info()
+                total_mem_required += info["memory_size"]
+                for child in info.get("children_info", {}).values():
+                    total_mem_required += child["memory_size"]
+                if models is not None:
+                    models.append(model)
+                    if total_mem_required / available_mem > max_memory:
+                        models = None
+            memory_proportion = total_mem_required / available_mem
+            if memory_proportion > max_memory:
+                logger.log(
+                    30,
+                    f"Models will not be persisted in memory as they are expected to require {round(memory_proportion * 100, 2)}% of memory, which is greater than the specified max_memory limit of {round(max_memory * 100, 2)}%.",
+                )
+                logger.log(
+                    30,
+                    f"\tModels will be loaded on-demand from disk to maintain safe memory usage, increasing inference latency. If inference latency is a concern, try to use smaller models or increase the value of max_memory.",
+                )
+                return []
+            logger.log(
+                20,
+                f"Persisting {len(model_names)} models in memory. Models will require {round(memory_proportion * 100, 2)}% of memory.",
+            )
+
+        for model in models:
+            self._prepare_persisted_model(model)
+            self.models[model.name] = model
         return model_names
 
+    @staticmethod
+    def _prepare_persisted_model(model: AbstractModel) -> None:
+        """Run the model's untimed ``prepare_for_inference`` before it is held for serving; a failure is logged, not raised.
+
+        A bag dispatches to its loaded children itself, so every persisted model object is prepared
+        once.
+        """
+        try:
+            model.prepare_for_inference()
+        except Exception as exc:
+            logger.log(30, f"\tprepare_for_inference failed for {model.name} ({type(exc).__name__}: {exc}); skipping.")
+
     def unpersist(self, model_names="all") -> list:
+        if not self.save_to_disk:
+            # In-memory trainer: the models exist nowhere else, so unpersisting would delete them.
+            logger.log(15, "Models of an in-memory trainer (save_to_disk=False) stay persisted; nothing to unpersist.")
+            return []
         if model_names == "all":
             model_names = list(self.models.keys())
         if not isinstance(model_names, list):
@@ -2122,6 +2512,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         y,
         level,
         base_model_names,
+        covered_rows: pd.Series | None = None,
         k_fold=1,
         n_repeats=1,
         stack_name=None,
@@ -2137,6 +2528,8 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         child_hyperparameters=None,
         get_models_func=None,
         total_resources: dict | None = None,
+        compute_score: bool = True,
+        use_orig_features: bool = False,
     ) -> list[str]:
         if get_models_func is None:
             get_models_func = self.construct_model_templates
@@ -2160,7 +2553,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
 
         ag_args_ensemble.setdefault("save_bag_folds", save_bag_folds)
 
-        feature_metadata = self.get_feature_metadata(use_orig_features=False, base_models=base_model_names)
+        feature_metadata = self.get_feature_metadata(use_orig_features=use_orig_features, base_models=base_model_names)
 
         base_model_paths_dict = self.get_models_attribute_dict(attribute="path", models=base_model_names)
         base_model_paths_dict = {key: os.path.join(self.path, val) for key, val in base_model_paths_dict.items()}
@@ -2194,6 +2587,17 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         w = None
         if self.weight_evaluation:
             X, w = extract_column(X, self.sample_weight)
+        if covered_rows is not None:
+            # Fit on the rows the base models actually validated; alignment is restored below.
+            logger.log(
+                20,
+                f"\tWeighted ensemble: fitting on {int(covered_rows.sum())} of {len(covered_rows)} rows "
+                f"({int((~covered_rows).sum())} have no out-of-fold predictions from the base models).",
+            )
+            X = X[covered_rows]
+            y = y[covered_rows]
+            if w is not None:
+                w = w[covered_rows]
         models = self._train_multi(
             X=X,
             y=y,
@@ -2211,7 +2615,11 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                 feature_metadata=feature_metadata, num_classes=self.num_classes, groups=None
             ),  # FIXME: Is this the right way to do this?
             total_resources=total_resources,
+            compute_score=compute_score,
         )
+        if covered_rows is not None:
+            for weighted_ensemble_model_name in models:
+                self._restore_oof_alignment(weighted_ensemble_model_name, covered_rows=covered_rows)
         for weighted_ensemble_model_name in models:
             if check_if_best and weighted_ensemble_model_name in self.get_model_names():
                 if self.model_best is None:
@@ -2223,6 +2631,35 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                         # new best model
                         self.model_best = weighted_ensemble_model_name
         return models
+
+    def _restore_oof_alignment(self, model_name: str, covered_rows: pd.Series) -> None:
+        """Re-index a model's out-of-fold predictions onto the full training frame.
+
+        A model fit on a subset of rows holds out-of-fold predictions for only those rows, so its
+        array is a different length from every other model's and cannot be addressed by
+        training-frame row -- anything pairing it with ``y`` breaks (temperature scaling was the
+        first such consumer found). This scatters the predictions back to full length and marks the
+        remaining rows uncovered by leaving their fold count at zero, which is the same
+        representation a bagged model uses for rows no fold validated: ``predict_proba_oof``
+        returns NaN there and ``score_with_oof`` masks them out.
+        """
+        model = self.load_model(model_name=model_name)
+        if not isinstance(model, BaggedEnsembleModel):
+            return
+        model._load_oof()
+        oof, repeats = model._oof_pred_proba, model._oof_pred_model_repeats
+        if oof is None or len(oof) == len(covered_rows):
+            return  # nothing to restore
+
+        covered_idx = np.flatnonzero(covered_rows.to_numpy())
+        full_oof = np.zeros((len(covered_rows), *oof.shape[1:]), dtype=oof.dtype)
+        full_oof[covered_idx] = oof
+        full_repeats = np.zeros(len(covered_rows), dtype=repeats.dtype)
+        full_repeats[covered_idx] = repeats
+        model._oof_pred_proba = full_oof
+        model._oof_pred_model_repeats = full_repeats
+        if self.save_to_disk:
+            model.save()
 
     def _train_single(
         self,
@@ -2301,6 +2738,8 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         y_pred_proba_val = None
 
         is_distributed_mode = DistributedContext.is_distributed_mode() or is_ray_worker
+        if not self.save_to_disk and isinstance(model, BaggedEnsembleModel):
+            model.low_memory = False  # the bag keeps its fold models and template in memory instead of under its path
 
         fit_log_message = f"Fitting model: {model.name} ..."
         if time_limit is not None:
@@ -2407,6 +2846,17 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             model.val_score = score
             # TODO: Add recursive=True to avoid repeatedly loading models each time this is called for bagged ensembles (especially during repeated bagging)
             self.save_model(model=model)
+        except ConstraintViolationError as exc:
+            # Not a failure: the model is configured not to run on data like this, so it is skipped
+            # without a traceback, without counting as a failed model, and without tripping
+            # `raise_on_model_failure` -- that flag exists to surface real breakage during
+            # development, and a sweep in which some models legitimately do not apply to some
+            # datasets should still be runnable under it. A run where *every* model is skipped
+            # still raises, via `raise_on_no_models_fitted`.
+            logger.log(20, f"\tSkipping {model.name} because a fit constraint is not satisfied: {exc.reason}.")
+            self._models_skipped_by_constraint[model.name] = str(exc)
+            del model
+            return model_names_trained
         except Exception as exc:
             if self.raise_on_model_failure:
                 # immediately raise instead of skipping to next model, useful for debugging during development
@@ -2510,6 +2960,14 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             can_infer=model.can_infer(),
             can_fit=model.can_fit(),
             is_valid=model.is_valid(),
+            refit_folds_pending=isinstance(model, BaggedEnsembleModel) and model._refit_folds_pending,
+            # Fit on part of its folds and predicts from them (an all-rows refit, pending or done, predicts instead).
+            folds_pending=(
+                isinstance(model, BaggedEnsembleModel)
+                and model._folds_pending
+                and not model._refit_folds_pending
+                and model.save_bag_folds
+            ),
             stack_name=stack_name,
             level=level,
             num_children=num_children,
@@ -2612,12 +3070,17 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
 
     def _save_model_y_pred_proba_val(self, model: str, y_pred_proba_val):
         """Cache y_pred_proba_val for later reuse to avoid redundant predict calls"""
+        if not self.save_to_disk:
+            self._y_pred_proba_val_in_memory[model] = y_pred_proba_val
+            return
         save_pkl.save(
             path=self._path_to_model_attr(model=model, attribute="y_pred_proba_val"), object=y_pred_proba_val
         )
 
     def _load_model_y_pred_proba_val(self, model: str):
         """Load cached y_pred_proba_val for a given model"""
+        if model in self._y_pred_proba_val_in_memory:
+            return self._y_pred_proba_val_in_memory[model]
         return load_pkl.load(path=self._path_to_model_attr(model=model, attribute="y_pred_proba_val"))
 
     # TODO: Once Python min-version is 3.8, can refactor to use positional-only argument for model
@@ -3138,7 +3601,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                 models=models,
                 hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
                 k_fold_start=0,
-                k_fold_end=k_fold,
+                k_fold_end=self._planned_k_fold_end(k_fold),
                 n_repeats=n_repeats,
                 n_repeat_start=0,
                 time_limit=time_limit,
@@ -3428,7 +3891,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                 logger.log(20, "Ran into timeout while waiting for model training to finish. Stopping now.")
                 break
 
-            distributed_manager.deallocate_resources(job_ref=finished[0])
+            model_child_mem_estimate = distributed_manager.deallocate_resources(job_ref=finished[0])
             model_name, model_path, model_type, exc, model_failure_info = ray.get(finished[0])
             assert model_name in expected_model_names, (
                 f"Unexpected model name outputted during parallel fit: {model_name}\n"
@@ -3475,6 +3938,14 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                     stack_name=kwargs["stack_name"],
                     level=kwargs["level"],
                 ):
+                    # Persist the memory estimate on the model graph so that `refit_full` can
+                    # schedule this model with fit_strategy="parallel" without recomputing it.
+                    # Stored per-model (rather than in a single trainer-level dict) so that it is
+                    # not overwritten by subsequent stacking layers.
+                    # FIXME: The estimate is slightly off for refit, since refit trains on more rows
+                    #  than the bagged child models did (depending on the validation method).
+                    if model_child_mem_estimate is not None:
+                        self._update_model_attr(model_name, fit_child_mem_estimate=model_child_mem_estimate)
                     jobs_running = len(unfinished_job_refs)
                     if can_schedule_jobs:
                         remaining_task_word = "pending"
@@ -3617,7 +4088,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         X_unlabeled=None,
         num_stack_levels=0,
         time_limit=None,
-        groups=None,
+        groups=None,  # deprecated with `TabularPredictor(groups=...)`; unused by the tabular path
         **kwargs,
     ) -> list[str]:
         """Identical to self.train_multi_levels, but also saves the data to disk. This should only ever be called once."""
@@ -3638,6 +4109,9 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                     self.save_y_test(y_test)
             self.is_data_saved = True
         if self._groups is None:
+            # Only a direct trainer caller can set this now. The tabular path routes grouped
+            # validation through `validation_structure`, which reaches bagging as explicit
+            # `custom_splits` instead of a per-row group vector.
             self._groups = groups
         self._num_rows_train = len(X)
         if X_val is not None:
@@ -3645,6 +4119,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         if X_test is not None:
             self._num_rows_test = len(X_test)
         self._num_cols_train = len(list(X.columns))
+        time_start = time.time()
         model_names_fit = self.train_multi_levels(
             X,
             y,
@@ -3659,6 +4134,18 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             time_limit=time_limit,
             **kwargs,
         )
+        if self._validation_folds is not None:
+            # The ensemble chose its weights on the validation folds' rows; the bags it uses now fit the rest.
+            core_kwargs = kwargs.get("core_kwargs") or {}
+            self.complete_bags(
+                X=X,
+                y=y,
+                time_limit=None if time_limit is None else time_limit - (time.time() - time_start),
+                total_resources=core_kwargs.get("total_resources"),
+                label_cleaner=core_kwargs.get("label_cleaner"),
+            )
+            self._validation_folds = None
+            self.save()
         if len(self.get_model_names()) == 0:
             # TODO v1.0: Add toggle to raise exception if no models trained
             logger.log(30, "Warning: AutoGluon did not successfully train any models")
@@ -3958,6 +4445,81 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         base_model_set = list(self.model_graph.predecessors(model))
         return base_model_set
 
+    def _planned_k_fold_end(self, k_fold: int) -> int:
+        """How many of a bag's `k_fold` folds a first fit fits: all, or `validation_folds` during a fit with it."""
+        if self._validation_folds is None or k_fold <= 1:
+            return k_fold
+        return min(self._validation_folds, k_fold)
+
+    def models_with_folds_pending(self) -> list[str]:
+        """Bagged models fit on only their first folds (`validation_folds`) that predict from those folds;
+        `complete_bags` fits the rest."""
+        return [m for m in self.get_model_names() if self.get_model_attribute(m, "folds_pending", default=False)]
+
+    def complete_bags(
+        self,
+        X: pd.DataFrame,
+        y: pd.Series,
+        models: list[str] | None = None,
+        time_limit: float | None = None,
+        **kwargs,
+    ) -> list[str]:
+        """Fit the remaining folds of the bags in `models` that a `validation_folds` fit left at their first folds.
+
+        `models` defaults to the models the best model depends on. Each bag continues with the same splits, so the
+        out-of-fold predictions then cover every row and its predictions average every fold. Its validation score stays
+        the one on the rows of the folds it fit first, so it stays comparable with the bags that keep only those folds
+        and with the weighted ensemble, whose weights were chosen on the same rows and are kept. `kwargs` go to
+        `_train_single_full` (e.g. `total_resources`, `label_cleaner`). Returns the completed models.
+        """
+        if models is None:
+            if self.model_best is None:
+                return []
+            models = self.get_minimum_model_set(self.model_best)
+        pending = [m for m in models if self.get_model_attribute(m, "folds_pending", default=False)]
+        if not pending:
+            return []
+        logger.log(20, f"Fitting the remaining folds of the {len(pending)} bagged model(s) the best model uses ...")
+        time_start = time.time()
+        completed = []
+        for name in pending:
+            time_left = None if time_limit is None else time_limit - (time.time() - time_start)
+            if time_left is not None and time_left <= 0:
+                logger.log(20, f"\tNo time left to complete {name}: it keeps the folds it has.")
+                continue
+            model = self.load_model(name)
+            base_models = self.get_base_model_names(name)
+            val_score = model.val_score
+            completed += self._train_single_full(
+                X=self.get_inputs_to_stacker(X, base_models=base_models, fit=True),
+                y=y,
+                model=model,
+                k_fold=model._k,
+                k_fold_start=model._k_fold_end,
+                k_fold_end=model._k,
+                n_repeats=1,
+                n_repeat_start=0,
+                level=self.get_model_attribute(name, "level"),
+                stack_name=self.get_model_attribute(name, "stack_name"),
+                time_limit=time_left,
+                fit_kwargs=dict(
+                    num_classes=self.num_classes,
+                    feature_metadata=self.get_feature_metadata(use_orig_features=True, base_models=base_models),
+                ),
+                **kwargs,
+            )
+            if name in completed:
+                model = self.load_model(name)
+                model.val_score = val_score
+                self.save_model(model=model)
+                self._update_model_attr(name, val_score=val_score)
+        return completed
+
+    def models_with_refit_pending(self) -> list[str]:
+        """Bagged models fit with `refit_folds="after_ensemble"`: their folds are gone and they
+        cannot infer until refit, which `refit_ensemble_full` does for the ones the ensemble uses."""
+        return [m for m in self.get_model_names() if self.get_model_attribute(m, "refit_folds_pending", default=False)]
+
     def model_refit_map(self, inverse=False) -> dict[str, str]:
         """
         Returns dict of parent model -> refit model
@@ -4073,8 +4635,6 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         model_info_dict = defaultdict(list)
         extra_info_dict = dict()
         if extra_info:
-            import networkx as nx
-
             # TODO: feature_metadata
             # TODO: disk size
             # TODO: load time
@@ -4143,8 +4703,8 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                             for model_name in model_names
                         ]
 
-            ancestors = [list(nx.dag.ancestors(self.model_graph, model_name)) for model_name in model_names]
-            descendants = [list(nx.dag.descendants(self.model_graph, model_name)) for model_name in model_names]
+            ancestors = [list(self.model_graph.ancestors(model_name)) for model_name in model_names]
+            descendants = [list(self.model_graph.descendants(model_name)) for model_name in model_names]
 
             model_info_dict["num_ancestors"] = [len(ancestor_lst) for ancestor_lst in ancestors]
             model_info_dict["num_descendants"] = [len(descendant_lst) for descendant_lst in descendants]
@@ -4387,6 +4947,15 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                 os.rmdir(self.path_utils)
             except OSError:
                 pass
+            # Fit-only state, and specifically state that indexes the data just deleted:
+            # `_custom_splits` holds positional (train_idx, val_idx) pairs into the training frame
+            # and `_groups` a per-row group vector. Neither is read during inference, and without
+            # the data neither can be reused for another fit, so they are dead weight in a
+            # deployment artifact -- roughly `2 * n_rows * num_repeats` int64s, e.g. ~64 MB at 1M
+            # rows with 8 repeats.
+            self._custom_splits = None
+            self._custom_splits_num_rows = None
+            self._groups = None
         if remove_info and requires_save:
             # Remove model failure info artifacts
             self._models_failed_to_train_errors = dict()
@@ -4417,8 +4986,6 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         delete_from_disk=True,
         dry_run=True,
     ):
-        import networkx as nx
-
         if models_to_keep is not None and models_to_delete is not None:
             raise ValueError("Exactly one of [models_to_keep, models_to_delete] must be set.")
         if models_to_keep is not None:
@@ -4435,7 +5002,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             minimum_model_set = set(models_to_delete)
             minimum_model_set_orig = copy.deepcopy(minimum_model_set)
             for model in models_to_delete:
-                minimum_model_set.update(nx.algorithms.dag.descendants(self.model_graph, model))
+                minimum_model_set.update(self.model_graph.descendants(model))
             if not allow_delete_cascade:
                 if minimum_model_set != minimum_model_set_orig:
                     raise AssertionError(
@@ -4478,6 +5045,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         self.model_graph.remove_node(model)
         if model in self.models:
             self.models.pop(model)
+        self._y_pred_proba_val_in_memory.pop(model, None)
         path_attr_model = Path(self._path_attr_model(model))
         shutil.rmtree(path=path_attr_model, ignore_errors=True)
 
@@ -4538,10 +5106,6 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         if augmentation_data is not None and teacher_preds is None:
             raise ValueError("augmentation_data must be None if teacher_preds is None")
 
-        logger.log(
-            20,
-            f"Distilling with teacher='{teacher}', teacher_preds={str(teacher_preds)}, augment_method={str(augment_method)} ...",
-        )
         if teacher not in self.get_model_names(can_infer=True):
             raise AssertionError(
                 f"Teacher model '{teacher}' is not a valid teacher model! Either it does not exist or it cannot infer on new data.\n"
@@ -4575,12 +5139,22 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         if self.sample_weight is not None:
             X, w = extract_column(X, self.sample_weight)
 
+        # augment_method is forced to None when teacher_preds disables augmentation or when augmentation_data is provided.
         if teacher_preds is None or teacher_preds == "onehot":
             augment_method = None
             logger.log(
                 20,
                 "Training students without a teacher model. Set teacher_preds = 'soft' or 'hard' to distill using the best AutoGluon predictor as teacher.",
             )
+
+        if augmentation_data is not None:
+            augment_method_log = "None (augmentation_data provided)"
+        else:
+            augment_method_log = str(augment_method)
+        logger.log(
+            20,
+            f"Distilling with teacher='{teacher}', teacher_preds={str(teacher_preds)}, augment_method={augment_method_log} ...",
+        )
 
         if teacher_preds in ["onehot", "soft"]:
             y = format_distillation_labels(y, self.problem_type, self.num_classes)
@@ -4811,20 +5385,31 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         return self.load_model(best_candidate_model_rows.loc[best_candidate_model_rows["fit_time"].idxmin()]["model"])
 
     def calibrate_model(
-        self, model_name: str | None = None, lr: float = 0.1, max_iter: int = 200, init_val: float = 1.0
+        self,
+        model_name: str | None = None,
+        lr: float = 0.1,
+        max_iter: int = 200,
+        init_val: float = 1.0,
+        method: str = "temperature",
     ):
         """
-        Applies temperature scaling to a model.
-        Applies inverse softmax to predicted probs then trains temperature scalar
-        on validation data to maximize negative log likelihood.
-        Inversed softmaxes are divided by temperature scalar
-        then softmaxed to return predicted probs.
+        Calibrates a model's predicted probabilities (classification) or quantiles (quantile regression).
+
+        With `method="temperature"`, applies inverse softmax to predicted probs then trains a temperature
+        scalar on validation data to maximize negative log likelihood. Inversed softmaxes are divided by
+        the temperature scalar then softmaxed to return predicted probs.
+        With `method="logistic"`, fits a `LogisticCalibrator` (Platt scaling for binary, structured matrix
+        scaling for multiclass) on the validation data and keeps it when its 10-fold out-of-fold calibrated
+        probabilities score better than the uncalibrated ones.
+        Quantile regression is always calibrated by conformalization.
 
         Parameters:
         -----------
         model_name: str: default = None
-            model name to tune temperature scaling on.
-            If None, will tune best model only. Best model chosen by validation score
+            model name to calibrate.
+            If None, will calibrate best model only. Best model chosen by validation score
+        method: str: default = "temperature"
+            The classification calibration method, one of ["temperature", "logistic"].
         lr: float: default = 0.1
             The learning rate for temperature scaling algorithm
         max_iter: int: default = 200
@@ -4834,12 +5419,16 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             The initial value for temperature scalar term
         """
         # TODO: Note that temperature scaling is known to worsen calibration in the face of shifted test data.
-        try:
-            # FIXME: Avoid depending on torch for temp scaling
-            try_import_torch()
-        except ImportError:
-            logger.log(30, "Warning: Torch is not installed, skipping calibration step...")
-            return
+        valid_methods = ["temperature", "logistic"]
+        if method not in valid_methods:
+            raise ValueError(f"Calibration `method` must be one of {valid_methods}, but is: {method!r}")
+        if method == "temperature":
+            try:
+                # FIXME: Avoid depending on torch for temp scaling
+                try_import_torch()
+            except ImportError:
+                logger.log(30, "Warning: Torch is not installed, skipping calibration step...")
+                return
 
         if model_name is None:
             if self.has_val:
@@ -4866,6 +5455,20 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         else:  # bagged mode
             y_val_probs = self.get_model_oof(model_name_og)
             y_val = self.load_y().to_numpy()
+            # Rows no fold validated carry NaN (see `BaggedEnsembleModel._predict_proba_oof`), and
+            # temperature scaling would return NaN if they were included. Scoring masks the same
+            # rows out (`score_with_oof`), so calibrating on the covered rows keeps the two
+            # consistent. Only reachable when the validation scheme leaves rows unvalidated, as
+            # forward-chaining temporal splits do with the earliest time block.
+            covered = ~np.isnan(np.asarray(y_val_probs, dtype=float)).reshape(len(y_val_probs), -1).any(axis=1)
+            if not covered.all():
+                logger.log(
+                    15,
+                    f"Calibration: using {int(covered.sum())} of {len(covered)} rows for {model_name} "
+                    f"({int((~covered).sum())} have no out-of-fold prediction).",
+                )
+                y_val_probs = y_val_probs[covered]
+                y_val = y_val[covered]
 
         y_val_probs_og = y_val_probs
         if self.problem_type == BINARY:
@@ -4880,6 +5483,8 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             )
             model.conformalize = conformalize
             model.save()
+        elif method == "logistic":
+            self._calibrate_model_logistic(model=model, y_val_probs=y_val_probs_og, y_val=y_val)
         else:
             logger.log(15, f"Temperature scaling term being tuned for model: {model_name}")
             temp_scalar = tune_temperature_scaling(
@@ -4906,10 +5511,36 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
 
                 if score_with_temp > score_without_temp:
                     logger.log(15, f"Temperature term found is: {temp_scalar}")
-                    model.params_aux["temperature_scalar"] = temp_scalar
+                    model.temperature_scalar = temp_scalar
                     model.save()
                 else:
                     logger.log(15, "Temperature did not improve performance, skipping calibration.")
+
+    def _calibrate_model_logistic(self, model: AbstractModel, y_val_probs: np.ndarray, y_val: np.ndarray):
+        """Fit a `LogisticCalibrator` on `model`'s validation predictions and keep it if it improves the score.
+
+        The calibrator is judged on 10-fold out-of-fold calibrated probabilities: evaluated on the rows
+        it was fit on, a calibrator with one weight per class pair nearly always looks better.
+        """
+        from autogluon.core.calibrate.logistic_calibration import LogisticCalibrator, cross_val_calibrated_proba
+
+        if len(np.unique(y_val)) < 2:
+            logger.log(15, f"Only one class in the calibration data, skipping calibration on {model.name}.")
+            return
+        logger.log(15, f"Logistic calibration being fit for model: {model.name}")
+        y_val_probs_oof = cross_val_calibrated_proba(y_val_probs, y_val, problem_type=self.problem_type)
+        score_without = self.score_with_y_pred_proba(y=y_val, y_pred_proba=y_val_probs, weights=None)
+        score_with = self.score_with_y_pred_proba(y=y_val, y_pred_proba=y_val_probs_oof, weights=None)
+        if score_with > score_without:
+            logger.log(
+                15,
+                f"Logistic calibration improves the out-of-fold {self.eval_metric.name} "
+                f"({score_without:.4f} -> {score_with:.4f}), keeping it.",
+            )
+            model.calibrator = LogisticCalibrator(problem_type=self.problem_type).fit(y_val_probs, y_val)
+            model.save()
+        else:
+            logger.log(15, "Logistic calibration did not improve performance, skipping calibration.")
 
     def calibrate_decision_threshold(
         self,
@@ -5169,7 +5800,14 @@ def _detached_refit_single_full(
     if not reuse_first_fold:
         model_full = model.convert_to_refit_full_template()
         # Mitigates situation where bagged models barely had enough memory and refit requires more. Worst case results in OOM, but this lowers chance of failure.
-        model_full._user_params_aux["max_memory_usage_ratio"] = model.params_aux["max_memory_usage_ratio"] * 1.15
+        # Skipped only when `ag.refit_hyperparameters` named this ratio: an explicit request for
+        # the refit is a decision, and replacing it with the heuristic bump would make this the one
+        # auxiliary parameter the option cannot set. Checked against what the user declared, not
+        # against the template -- the template always carries this key, so testing it there would
+        # disable the bump for every refit.
+        declared_refit = model.declared_refit_hyperparameters()
+        if not any(key in ("max_memory_usage_ratio", "ag.max_memory_usage_ratio") for key in declared_refit):
+            model_full._user_params_aux["max_memory_usage_ratio"] = model.params_aux["max_memory_usage_ratio"] * 1.15
         # Re-set user specified training resources.
         # FIXME: this is technically also a bug for non-distributed mode, but there it is good to use more/all resources per refit.
         # FIXME: Unsure if it is better to do model.fit_num_cpus or model.fit_num_cpus_child,
@@ -5215,7 +5853,7 @@ def _detached_refit_single_full(
                 f"\n\tThis is likely due to an out-of-memory error or other memory related issue. "
                 f"\n\tPlease create a GitHub issue if this was triggered from a non-memory related problem.",
             )
-            if not model.params.get("save_bag_folds", True):
+            if not model.save_bag_folds:
                 raise AssertionError(
                     f"Cannot avoid training failure during refit for '{model_name}' by falling back to "
                     f"copying the first fold because it does not exist! (save_bag_folds=False)"

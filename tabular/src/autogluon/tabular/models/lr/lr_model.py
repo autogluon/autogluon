@@ -8,6 +8,8 @@ from collections import defaultdict
 
 import numpy as np
 import pandas as pd
+import sklearn
+from packaging.version import parse as parse_version
 from sklearn.compose import ColumnTransformer
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.impute import SimpleImputer
@@ -21,7 +23,15 @@ from autogluon.core.constants import BINARY, REGRESSION
 from autogluon.core.models import AbstractModel
 from autogluon.core.utils.exceptions import TimeLimitExceeded
 
-from .hyperparameters.parameters import IGNORE, INCLUDE, ONLY, _get_solver, get_param_baseline, preprocess_params_set
+from .hyperparameters.parameters import (
+    IGNORE,
+    INCLUDE,
+    ONLY,
+    _get_solver,
+    get_param_baseline,
+    get_penalty,
+    preprocess_params_set,
+)
 from .hyperparameters.searchspaces import get_default_searchspace
 from .lr_preprocessing_utils import NlpDataPreprocessor, OheFeaturesGenerator
 
@@ -45,6 +55,12 @@ class LinearModel(AbstractModel):
     ag_name = "LinearModel"
     ag_priority = 30
     seed_name = "random_state"
+    _supported_problem_types = ["binary", "multiclass", "regression"]
+
+    _default_auxiliary_params_extra = dict(
+        valid_raw_types=[R_BOOL, R_INT, R_FLOAT, R_CATEGORY],
+        ignored_type_group_special=[S_TEXT_AS_CATEGORY],
+    )
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -52,7 +68,7 @@ class LinearModel(AbstractModel):
 
     # noinspection PyUnresolvedReferences
     def _get_model_type(self):
-        penalty = self.params.get("penalty", "L2")
+        penalty = get_penalty(self.params)
         # FIXME: False by default because AdultIncome dataset shows worse results with use_daal=True.
         #  Version: scikit-learn-intelex-2024.4.0
         #                     model  score_test  score_val eval_metric
@@ -71,12 +87,7 @@ class LinearModel(AbstractModel):
         else:
             from sklearn.linear_model import Lasso, LogisticRegression, Ridge
         if self.problem_type == REGRESSION:
-            if penalty == "L2":
-                model_type = Ridge
-            elif penalty == "L1":
-                model_type = Lasso
-            else:
-                raise AssertionError(f'Unknown value for penalty "{penalty}" - supported types are ["L1", "L2"]')
+            model_type = Lasso if penalty == "L1" else Ridge
         else:
             model_type = LogisticRegression
         return model_type
@@ -172,7 +183,9 @@ class LinearModel(AbstractModel):
     def _set_default_params(self):
         default_params = {"fit_intercept": True}
         if self.problem_type != REGRESSION:
-            default_params.update({"solver": _get_solver(self.problem_type)})
+            default_params.update(
+                {"solver": _get_solver(self.problem_type, penalty=self._user_params.get("penalty", "L2"))}
+            )
         default_params.update(get_param_baseline())
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
@@ -187,6 +200,13 @@ class LinearModel(AbstractModel):
             y = y.astype(int).values
 
         params = {k: v for k, v in self.params.items() if k not in preprocess_params_set}
+        if self.problem_type != REGRESSION:
+            penalty = get_penalty(self.params)
+            if parse_version(sklearn.__version__).release >= (1, 8):
+                # sklearn 1.8 replaced penalty with l1_ratio for logistic regression.
+                params["l1_ratio"] = 1.0 if penalty == "L1" else 0.0
+            else:
+                params["penalty"] = penalty.lower()
         if "n_jobs" not in params:
             if self.problem_type != REGRESSION:
                 params["n_jobs"] = num_cpus
@@ -322,25 +342,6 @@ class LinearModel(AbstractModel):
     def _select_bool(self, df, features):
         return dict(bool=features)
 
-    def _get_default_auxiliary_params(self) -> dict:
-        default_auxiliary_params = super()._get_default_auxiliary_params()
-        extra_auxiliary_params = dict(
-            valid_raw_types=[R_BOOL, R_INT, R_FLOAT, R_CATEGORY],
-            ignored_type_group_special=[S_TEXT_AS_CATEGORY],
-        )
-        default_auxiliary_params.update(extra_auxiliary_params)
-        return default_auxiliary_params
-
-    def _estimate_memory_usage(self, X: pd.DataFrame, **kwargs) -> int:
-        hyperparameters = self._get_model_params()
-        return self.estimate_memory_usage_static(
-            X=X,
-            problem_type=self.problem_type,
-            num_classes=self.num_classes,
-            hyperparameters=hyperparameters,
-            **kwargs,
-        )
-
     @classmethod
     def _estimate_memory_usage_static(
         cls,
@@ -357,14 +358,6 @@ class LinearModel(AbstractModel):
     def _get_maximum_resources(self) -> dict[str, int | float]:
         # no GPU support
         return {"num_gpus": 0}
-
-    @classmethod
-    def supported_problem_types(cls) -> list[str] | None:
-        return ["binary", "multiclass", "regression"]
-
-    @classmethod
-    def _class_tags(cls):
-        return {"can_estimate_memory_usage_static": True}
 
     def _more_tags(self):
         # `can_refit_full=True` because validation data isn't used during fit.

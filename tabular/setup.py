@@ -26,20 +26,36 @@ install_requires = [
     "scipy",
     "pandas",
     "scikit-learn",
-    "networkx",
     f"autogluon.core=={version}",
     f"autogluon.features=={version}",
 ]
 
 extras_require = {
     "lightgbm": [
-        "lightgbm>=4.0,<4.7",  # <{N+1} upper cap, where N is the latest released minor version
+        "lightgbm>=4.0,<4.8",  # <{N+1} upper cap, where N is the latest released minor version
     ],
     "catboost": [
         "catboost>=1.2,<1.3",
     ],
     "xgboost": [
-        "xgboost>=2.0,<3.2",  # <{N+1} upper cap, where N is the latest released minor version
+        # The CPU-only build. The default `xgboost` wheel depends on `nvidia-nccl-cu12` while
+        # torch depends on `nvidia-nccl-cu13`, and both wheels ship
+        # `nvidia/nccl/lib/libnccl.so.2`. With both installed, the NCCL that torch loads is
+        # whichever wheel wrote that path last rather than the one torch pins, and uninstalling
+        # either wheel deletes the file the other still needs. Observed on a fresh
+        # `[tabarena]` install: nccl-cu12 2.27.5 landed last and torch 2.13 then failed to
+        # import with `undefined symbol: ncclCommResume`. `xgboost-cpu` has no NCCL dependency,
+        # which removes the overlap. Trade-off: it is built without CUDA, so XGBoost trains on
+        # CPU even when GPUs are allocated (it warns and falls back); no GPU-targeted portfolio
+        # contains an XGB config. Revisit if xgboost ships a cu13 wheel or makes NCCL optional
+        # (https://github.com/dmlc/xgboost/issues/10729).
+        #
+        # `xgboost-cpu` has never published a macOS wheel (CUDA is why the extra package
+        # exists, and there is no CUDA XGBoost on Darwin). The ordinary macOS `xgboost`
+        # wheel is already CPU-only and has no NCCL pin, so use that there.
+        # https://github.com/autogluon/autogluon/issues/5881
+        "xgboost-cpu>=2.1.1,<3.4; platform_system != 'Darwin'",  # >=2.1.1 is the earliest xgboost-cpu release; <{N+1} upper cap
+        "xgboost>=2.1.1,<3.4; platform_system == 'Darwin'",
     ],
     "realmlp": [
         "pytabkit>=1.7.2,<1.8",
@@ -50,16 +66,31 @@ extras_require = {
     "fastai": [
         "spacy<3.9",
         "torch",  # version range defined in `core/_setup_utils.py`
-        "fastai>=2.3.1,<2.8.6",  # Cap due to dependency conflict in fastai-2.8.6 https://github.com/autogluon/autogluon/issues/5521
+        # Held below 2.8.8: that release requires fastcore>=1.14.6, but the highest fastcore 1.x
+        # is 1.14.5, so it is unreachable under the fastcore<2 cap below. Lifting that cap needs
+        # the removed L.starmap usage replaced first.
+        "fastai>=2.3.1,<2.8.8",  # Cap for major version
+        "fastcore<2",  # Breaking change in v2: removed L.starmap, which breaks fastai models
+        # plum-dispatch 2.10.0 ships mypyc-compiled wheels whose `Function.__doc__` is read-only, so
+        # fastcore's `@docs` raises AttributeError while importing fastai. fastai 2.8.10 pins
+        # `plum-dispatch<2.10` for this, but that release requires fastcore>=2, which we cap above.
+        "plum-dispatch<2.10",
     ],
     "tabm": [
         "torch",  # version range defined in `core/_setup_utils.py`
     ],
     "tabpfn": [
-        "tabpfn>=7.0,<7.2",  # <{N+1} upper cap, where N is the latest released minor version
+        "tabpfn>=9.0,<9.1",  # <{N+1} upper cap, where N is the latest released minor version; >=9.0 for the TabPFN-3.5 checkpoint
     ],
     "tabdpt": [
-        "tabdpt>=1.1.11,<1.2",
+        "tabdpt>=1.2,<1.3",  # >=1.2 for TabDPT-Turbo; v1.1 weights stay pinned per model class
+    ],
+    "causilo": [
+        # causilo requires torch>=2.13 (macOS is capped at torch<2.11) and Python<3.13.
+        "causilo>=1.0.2,<1.1; python_version < '3.13' and platform_system != 'Darwin'",
+    ],
+    "tabfm": [
+        "tabfm[pytorch]>=1.0.1,<1.1; python_version >= '3.11'",  # tabfm requires Python>=3.11
     ],
     "tabpfnmix": [
         "torch",  # version range defined in `core/_setup_utils.py`
@@ -76,22 +107,24 @@ extras_require = {
         "einops>=0.7,<0.9",
     ],
     "tabicl": [
-        "tabicl>=2.0,<2.1",
+        "tabicl>=2.0,<2.2",  # <{N+1} upper cap, where N is the latest released minor version
+    ],
+    "nori": [
+        "synthefy-nori>=0.13,<0.15",  # <{N+1} upper cap, where N is the latest released minor version
     ],
     "ray": [
         f"autogluon.core[all]=={version}",
     ],
     "skex": [
-        "scikit-learn-intelex>=2025.0,<2025.10",  # <{N+1} upper cap, where N is the latest released minor version
+        "scikit-learn-intelex>=2025.0,<2026.2",  # <{N+1} upper cap, where N is the latest released minor version
     ],
     "imodels": [
         "imodels>=1.3.10,<2.1.0",  # 1.3.8/1.3.9 either remove/renamed attribute `complexity_` causing failures. https://github.com/csinva/imodels/issues/147
     ],
     "skl2onnx": [
-        "skl2onnx>=1.15.0,<1.21.0",
+        "skl2onnx>=1.20.0,<1.21.0",
         # Sync ONNX requirements with multimodal/setup.py
-        "onnx>=1.13.0,!=1.16.2,<1.21.0;platform_system=='Windows'",  # exclude 1.16.2 for issue https://github.com/onnx/onnx/issues/6267
-        "onnx>=1.13.0,<1.21.0;platform_system!='Windows'",
+        "onnx>=1.21.0,<1.23.0",
         # For macOS, there isn't a onnxruntime-gpu package installed with skl2onnx.
         # Therefore, we install onnxruntime explicitly here just for macOS.
         "onnxruntime>=1.17.0,<1.24.0",
@@ -116,11 +149,11 @@ extras_require["all"] = all_requires
 
 tabarena_requires = list(all_requires)
 for extra_package in [
-    "interpret",
     "tabdpt",
     "tabicl",
     "tabpfn",
     "realmlp",
+    "nori",
 ]:
     tabarena_requires += extras_require[extra_package]
 tabarena_requires = list(set(tabarena_requires))
@@ -134,6 +167,9 @@ for test_package in [
     "tabpfn",
     "realmlp",  # Will consider to put as part of `all_requires` once part of a portfolio
     "tabpfnmix",  # Refer to `mitra`, which is an improved version of `tabpfnmix`
+    "nori",
+    "causilo",
+    "tabfm",
     "imodels",
     "skl2onnx",
 ]:

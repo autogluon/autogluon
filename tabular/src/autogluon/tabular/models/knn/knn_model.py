@@ -10,7 +10,6 @@ import pandas as pd
 
 from autogluon.common.features.types import R_FLOAT, R_INT, S_BOOL
 from autogluon.common.utils.log_utils import fix_sklearnex_logging_if_kaggle
-from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
 from autogluon.core.models import AbstractModel
 from autogluon.core.utils.exceptions import NotEnoughMemoryError
@@ -28,6 +27,13 @@ class KNNModel(AbstractModel):
     ag_key = "KNN"
     ag_name = "KNeighbors"
     ag_priority = 100
+    _supported_problem_types = ["binary", "multiclass", "regression"]
+
+    _default_auxiliary_params_extra = dict(
+        valid_raw_types=[R_INT, R_FLOAT],  # TODO: Eventually use category features
+        ignored_type_group_special=[S_BOOL],
+    )
+    _default_ag_args_ensemble_extra = {"use_child_oof": True}
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -63,15 +69,6 @@ class KNNModel(AbstractModel):
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
 
-    def _get_default_auxiliary_params(self) -> dict:
-        default_auxiliary_params = super()._get_default_auxiliary_params()
-        extra_auxiliary_params = dict(
-            valid_raw_types=[R_INT, R_FLOAT],  # TODO: Eventually use category features
-            ignored_type_group_special=[S_BOOL],
-        )
-        default_auxiliary_params.update(extra_auxiliary_params)
-        return default_auxiliary_params
-
     @classmethod
     def _get_default_ag_args(cls) -> dict:
         default_ag_args = super()._get_default_ag_args()
@@ -80,13 +77,6 @@ class KNNModel(AbstractModel):
         }
         default_ag_args.update(extra_ag_args)
         return default_ag_args
-
-    @classmethod
-    def _get_default_ag_args_ensemble(cls, **kwargs) -> dict:
-        default_ag_args_ensemble = super()._get_default_ag_args_ensemble(**kwargs)
-        extra_ag_args_ensemble = {"use_child_oof": True}
-        default_ag_args_ensemble.update(extra_ag_args_ensemble)
-        return default_ag_args_ensemble
 
     # TODO: Enable HPO for KNN
     def _get_default_searchspace(self):
@@ -110,16 +100,6 @@ class KNNModel(AbstractModel):
             self.model = self._fit_with_samples(
                 X=X, y=y, model_params=params, time_limit=time_limit - (time.time() - time_start)
             )
-
-    def _estimate_memory_usage(self, X: pd.DataFrame, **kwargs) -> int:
-        hyperparameters = self._get_model_params()
-        return self.estimate_memory_usage_static(
-            X=X,
-            problem_type=self.problem_type,
-            num_classes=self.num_classes,
-            hyperparameters=hyperparameters,
-            **kwargs,
-        )
 
     @classmethod
     def _estimate_memory_usage_static(
@@ -296,22 +276,6 @@ class KNNModel(AbstractModel):
             "num_gpus": 0,
         }
 
-    def _get_default_resources(self):
-        # use at most 32 cpus to avoid OpenBLAS error: https://github.com/autogluon/autogluon/issues/1020
-        num_cpus = ResourceManager.get_cpu_count()
-        num_gpus = 0
-        return num_cpus, num_gpus
-
-    @classmethod
-    def supported_problem_types(cls) -> list[str] | None:
-        return ["binary", "multiclass", "regression"]
-
-    @classmethod
-    def _class_tags(cls):
-        return {
-            "can_estimate_memory_usage_static": True,
-        }
-
     def _more_tags(self):
         return {
             "valid_oof": True,
@@ -320,6 +284,8 @@ class KNNModel(AbstractModel):
 
 
 class FAISSModel(KNNModel):
+    _default_ag_args_ensemble_extra = {"use_child_oof": False}
+
     def _get_model_type(self):
         from .knn_utils import FAISSNeighborsClassifier, FAISSNeighborsRegressor
 
@@ -335,13 +301,6 @@ class FAISSModel(KNNModel):
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
         super()._set_default_params()
-
-    @classmethod
-    def _get_default_ag_args_ensemble(cls, **kwargs) -> dict:
-        default_ag_args_ensemble = super()._get_default_ag_args_ensemble(**kwargs)
-        extra_ag_args_ensemble = {"use_child_oof": False}
-        default_ag_args_ensemble.update(extra_ag_args_ensemble)
-        return default_ag_args_ensemble
 
     def _more_tags(self):
         return {"valid_oof": False}

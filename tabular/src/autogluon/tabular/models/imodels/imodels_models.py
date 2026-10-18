@@ -11,9 +11,16 @@ from autogluon.core.models import AbstractModel
 
 
 class _IModelsModel(AbstractModel):
+    _supported_problem_types = ["binary", "multiclass", "regression"]
+
+    _default_auxiliary_params_extra = dict(
+        get_features_kwargs=dict(
+            valid_raw_types=["int", "float", "category"],
+        ),
+    )
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self._feature_generator = None
         self._ohe = None
         self._ohe_columns = None
         self._categorical_featnames = None
@@ -64,20 +71,6 @@ class _IModelsModel(AbstractModel):
         }
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
-
-    @classmethod
-    def supported_problem_types(cls) -> list[str] | None:
-        return ["binary", "multiclass", "regression"]
-
-    def _get_default_auxiliary_params(self) -> dict:
-        default_auxiliary_params = super()._get_default_auxiliary_params()
-        extra_auxiliary_params = dict(
-            get_features_kwargs=dict(
-                valid_raw_types=["int", "float", "category"],
-            ),
-        )
-        default_auxiliary_params.update(extra_auxiliary_params)
-        return default_auxiliary_params
 
 
 class RuleFitModel(_IModelsModel):

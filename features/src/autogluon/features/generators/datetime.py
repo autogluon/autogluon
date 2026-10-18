@@ -5,11 +5,16 @@ import pandas as pd
 from pandas import DataFrame
 
 from autogluon.common.features.types import R_DATETIME, S_DATETIME_AS_OBJECT
-from autogluon.common.utils.pandas_utils import PANDAS_V3_OR_NEWER
 
 from .abstract import AbstractFeatureGenerator
 
 logger = logging.getLogger(__name__)
+
+
+def _as_nanoseconds(series: pd.Series) -> pd.Series:
+    """A UTC datetime series at nanosecond resolution, with the dates outside of its range set to NaT."""
+    in_range = (series >= pd.Timestamp.min.tz_localize("UTC")) & (series <= pd.Timestamp.max.tz_localize("UTC"))
+    return series.where(in_range).dt.as_unit("ns")
 
 
 class DatetimeFeatureGenerator(AbstractFeatureGenerator):
@@ -56,19 +61,26 @@ class DatetimeFeatureGenerator(AbstractFeatureGenerator):
         #   Alternatives like Polars do not offer the same datetime conversion logic, and thus aren't valid to use.
         #   The runtime is approximately 0.08 seconds per 1000 rows in worst case.
         series = pd.to_datetime(X[feature].copy(), utc=True, errors="coerce", format="mixed")
-        if PANDAS_V3_OR_NEWER:
-            # Force ns resolution to match legacy behavior (coerce out-of-bounds to NaT)
-            # Year 2700 is valid in 'us' but not in 'ns'.
-            min_ts = pd.Timestamp.min.tz_localize("UTC")
-            max_ts = pd.Timestamp.max.tz_localize("UTC")
-            series = series.where((series >= min_ts) & (series <= max_ts), pd.NaT)
-        broken_idx = series[(series == "NaT") | series.isna() | series.isnull()].index
-        bad_rows = series.iloc[broken_idx]
+        # pandas>=3 infers the resolution (microseconds when parsing strings), where pandas<3 always used nanoseconds.
+        # Keep nanoseconds: the features are int64 timestamps, whose scale must not depend on the pandas version, as a
+        # model can be fit with one version and predict with another. Dates outside the nanosecond range (e.g. year 2700),
+        # which pandas<3 parsed to NaT and pandas>=3 parses, become NaT again and are filled below.
+        series = _as_nanoseconds(series)
+        # A boolean mask rather than an index of labels. The invalid rows were only ever needed to
+        # exclude them from the mean, which `isin` did by *value* -- so neither label nor positional
+        # indexing was required, and mixing the two is what broke here: `broken_idx` holds labels,
+        # and indexing with them positionally either raises (labels beyond the row count) or picks
+        # the wrong rows, which silently poisons the fill value because `NaT.astype(np.int64)` is a
+        # large negative sentinel. A mask is correct for any index, including a duplicated one,
+        # where the label-based assignment below used to raise `InvalidIndexError`.
+        # `isna()` alone matches what the previous `(series == "NaT") | isna() | isnull()` matched:
+        # `isnull` is an alias of `isna`, and comparing a tz-aware datetime64 series to the string
+        # "NaT" is always False.
+        bad_mask = series.isna()
         if is_fit:
-            good_rows = series[~series.isin(bad_rows)].astype(np.int64)
-            unit = "ns" if "ns" in str(series.dtype) else "us"
-            self._fillna_map[feature] = pd.to_datetime(int(good_rows.mean()), utc=True, unit=unit)
-        series[broken_idx] = self._fillna_map[feature]
+            good_rows = series[~bad_mask].astype(np.int64)
+            self._fillna_map[feature] = pd.to_datetime(int(good_rows.mean()), utc=True, format="mixed")
+        series[bad_mask] = self._fillna_map[feature]
         return series
 
     # TODO: Improve handling of missing datetimes
@@ -80,8 +92,6 @@ class DatetimeFeatureGenerator(AbstractFeatureGenerator):
                 X_datetime[datetime_feature + "." + feature] = getattr(
                     X_datetime[datetime_feature].dt, feature
                 ).astype(np.int64)
-            if PANDAS_V3_OR_NEWER:
-                X_datetime[datetime_feature] = X_datetime[datetime_feature].dt.as_unit("ns")
             X_datetime[datetime_feature] = pd.to_numeric(X_datetime[datetime_feature])
         return X_datetime
 

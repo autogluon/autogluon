@@ -8,7 +8,7 @@ from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.timeseries.models.chronos import Chronos2Model
 
 from ...common import DATAFRAME_WITH_COVARIATES, DUMMY_TS_DATAFRAME, get_data_frame_with_item_index
-from ..common import CHRONOS2_MODEL_PATH
+from ..common import CHRONOS2_MODEL_PATH, DEVICE_TEST_CASES
 
 
 class TestChronos2Inference:
@@ -121,6 +121,21 @@ class TestChronos2Inference:
 
         mock_from_pretrained.assert_called_once()
         assert mock_from_pretrained.call_args.kwargs.get("revision") == model_revision
+
+    @pytest.mark.parametrize("device_arg, cuda_available, expected_device", DEVICE_TEST_CASES)
+    def test_when_device_provided_then_from_pretrained_is_called_with_device(
+        self, device_arg, cuda_available, expected_device
+    ):
+        model = Chronos2Model(
+            hyperparameters={"model_path": CHRONOS2_MODEL_PATH, "device": device_arg},
+        )
+        with mock.patch("chronos.chronos2.pipeline.Chronos2Pipeline.from_pretrained") as mock_from_pretrained:
+            mock_from_pretrained.return_value = mock.MagicMock()
+            with mock.patch("torch.cuda.is_available", return_value=cuda_available):
+                model.load_model_pipeline()
+
+        mock_from_pretrained.assert_called_once()
+        assert mock_from_pretrained.call_args.kwargs.get("device_map") == expected_device
 
     def test_when_chronos2_scores_oof_and_time_limit_is_exceeded_then_exception_is_raised(self, chronos2_model):
         data = get_data_frame_with_item_index(item_list=list(range(1000)), data_length=50)
@@ -253,8 +268,8 @@ class TestChronos2FineTuning:
         data, covariate_metadata = df_with_covariates
         past_data = data.slice_by_timestep(None, -5)
 
-        expected_past_covariates = set(covariate_metadata.covariates)
-        expected_future_covariates = set(covariate_metadata.known_covariates)
+        expected_n_covariates = len(covariate_metadata.covariates)
+        expected_n_future_covariates = len(covariate_metadata.known_covariates)
 
         tmp_dir = tmp_path / "mocked_chronos2"
         tmp_dir.mkdir()
@@ -276,11 +291,8 @@ class TestChronos2FineTuning:
             inputs = mocked_pipeline_fit.call_args.kwargs["inputs"]
 
             for input_dict in inputs:
-                past_covariates = set(input_dict["past_covariates"].keys())
-                future_covariates = set(input_dict["future_covariates"].keys())
-
-                assert past_covariates == expected_past_covariates
-                assert future_covariates == expected_future_covariates
+                assert input_dict["n_covariates"] == expected_n_covariates
+                assert input_dict["n_future_covariates"] == expected_n_future_covariates
 
     @pytest.mark.parametrize(
         "disable_past,disable_known",
@@ -311,12 +323,16 @@ class TestChronos2FineTuning:
             model.fit(data)
             inputs = mocked_pipeline_fit.call_args.kwargs["inputs"]
 
+            expected_n_covariates = len(covariate_metadata.covariates)
+            if disable_past:
+                expected_n_covariates -= len(covariate_metadata.past_covariates)
+            if disable_known:
+                expected_n_covariates -= len(covariate_metadata.known_covariates)
+            expected_n_future_covariates = 0 if disable_known else len(covariate_metadata.known_covariates)
+
             for input_dict in inputs:
-                if disable_past:
-                    for col in covariate_metadata.past_covariates:
-                        assert col not in input_dict.get("past_covariates", {})
-                if disable_known:
-                    assert "future_covariates" not in input_dict
+                assert input_dict["n_covariates"] == expected_n_covariates
+                assert input_dict["n_future_covariates"] == expected_n_future_covariates
 
     @pytest.mark.parametrize(
         "disable_past,disable_known",

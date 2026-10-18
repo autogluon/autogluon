@@ -623,7 +623,8 @@ def rmse_func(y_true, y_pred, **kwargs):
     if kwargs:
         return sklearn.metrics.root_mean_squared_error(y_true, y_pred, **kwargs)
     else:
-        return np.sqrt(((y_true - y_pred) ** 2).mean())
+        # as arrays: a pandas mean skips NaN, which would score only the finite predictions
+        return np.sqrt(((np.asarray(y_true) - np.asarray(y_pred)) ** 2).mean())
 
 
 root_mean_squared_error = make_scorer("root_mean_squared_error", rmse_func, optimum=0, greater_is_better=False)
@@ -680,9 +681,11 @@ def customized_log_loss(y_true, y_pred, eps=1e-15):
     """
     assert y_true.ndim == 1
     if y_pred.ndim == 1:
+        # as arrays: a pandas mean skips NaN, which would score only the finite predictions
+        y_true = np.asarray(y_true)
         # First clip the y_pred which is also used in sklearn
         # Convert to float64 to avoid rounding error on the clip operation with epsilon
-        y_pred = np.clip(y_pred.astype(float), eps, 1 - eps)
+        y_pred = np.clip(np.asarray(y_pred, dtype=float), eps, 1 - eps)
         return -(y_true * np.log(y_pred) + (1 - y_true) * np.log(1 - y_pred)).mean()
     else:
         assert y_pred.ndim == 2, "Only ndim=2 is supported"
@@ -800,7 +803,9 @@ def _get_valid_metric_problem_types(metric: str):
 
 def get_metric(metric, problem_type: str = None, metric_type: str = None) -> Scorer:
     """Returns metric function by using its name if the metric is str.
-    Performs basic check for metric compatibility with given problem type."""
+    Performs basic check for metric compatibility with given problem type.
+    Raises a ValueError if the metric is neither None, a str, nor a Scorer,
+    as an unwrapped metric function has to be wrapped via `make_scorer` first."""
     if metric_type is None:
         metric_type = "metric"
 
@@ -842,4 +847,13 @@ def get_metric(metric, problem_type: str = None, metric_type: str = None) -> Sco
             f"autogluon.core.metrics to see how to define your own {metric_type} function"
         )
     else:
+        if metric is not None and not isinstance(metric, Scorer):
+            raise ValueError(
+                f"Invalid {metric_type} of type '{type(metric).__name__}': {metric_type} must be a str or a Scorer.\n"
+                f"If you are passing a custom metric function, wrap it with `autogluon.core.metrics.make_scorer` first, "
+                f"setting `optimum` and `greater_is_better` to match your metric:\n"
+                f"\tfrom autogluon.core.metrics import make_scorer\n"
+                f"\t{metric_type} = make_scorer(name='my_metric', score_func=my_func, optimum=..., greater_is_better=...)\n"
+                f"Refer to autogluon.core.metrics.make_scorer for the full list of arguments."
+            )
         return metric

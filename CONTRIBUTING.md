@@ -63,19 +63,23 @@ GitHub provides additional documentation on [forking a repository](https://help.
     pytest timeseries/tests
     ```
 
-- Set up pre-commit hooks for automatic code formatting:
+- Set up pre-commit hooks for automatic code formatting and lockfile maintenance:
     ```bash
-    pre-commit install
+    uv run pre-commit install
     ```
 
-    The pre-commit hooks will automatically run formatting checks before each commit. You can also run them manually:
+    The hooks run before each commit: `ruff` formatting/lint, and `uv-lock` (keeps `uv.lock` in sync
+    with the dependencies — CI runs `uv lock --check` and fails if it's stale). When adding a dependency
+    or refreshing the lockfile, also bump `exclude-newer` in the root `pyproject.toml` (otherwise `uv`
+    won't see versions released after that date); see [Installing from source](./docs/install-from-source.md).
+    Run the hooks manually with:
     ```bash
     # Check all files
-    pre-commit run
+    uv run pre-commit run --all-files
 
     # Or run formatting manually if the previous check fails
-    ruff format multimodal/ timeseries/ common/ core/ features/ tabular/
-    ruff check --fix --select I common/ core/ features/ multimodal/ tabular/ timeseries/
+    uv run ruff format multimodal/ timeseries/ common/ core/ features/ tabular/
+    uv run ruff check --fix --select I common/ core/ features/ multimodal/ tabular/ timeseries/
     ```
 
 - After linting, make sure to commit the linting changes, so it appears in your pull request.
@@ -94,7 +98,7 @@ GitHub provides additional documentation on [forking a repository](https://help.
     python3 -m pytest path_to_file
     ```
 
-- If using PyCharm, we highly recommend `pip install pytest-pycharm` to [improve ease of debugging inside unit tests](https://stackoverflow.com/questions/14086067/debugging-pytest-post-mortem-exceptions-in-pycharm-pydev).
+- If using PyCharm, we highly recommend navigating to `Settings/Preferences` | `Build, Execution, Deployment` | `Python Debugger` and enabling `Drop into debugger on failed tests` for simplified test debugging.
 
 - To otherwise test your code changes, we recommend running AutoGluon on multiple datasets and verifying the code runs correctly and the resulting accuracy of the trained models is not harmed by your change.  One easy way to test is to simply modify the scripts in [`examples/`](https://github.com/autogluon/autogluon/tree/master/examples), or the [tutorial notebooks](https://github.com/autogluon/autogluon/tree/master/docs/tutorials), which already provide datasets.
 

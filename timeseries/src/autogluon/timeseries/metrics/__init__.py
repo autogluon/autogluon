@@ -6,22 +6,26 @@ from typing import Any, Sequence, Type
 import numpy as np
 
 from .abstract import TimeSeriesScorer
-from .point import MAE, MAPE, MASE, MSE, RMSE, RMSLE, RMSSE, SMAPE, WAPE, WCD
-from .quantile import SQL, WQL
+from .point import BIAS, MAE, MAEB, MAPE, MASE, MSE, RMSE, RMSLE, RMSSE, SMAPE, WAPE, WAPEB, WCD
+from .quantile import MQL, SQL, WQL
 
 __all__ = [
     "TimeSeriesScorer",
     "check_get_evaluation_metric",
+    "BIAS",
     "MAE",
+    "MAEB",
     "MAPE",
     "MASE",
     "SMAPE",
     "MSE",
+    "MQL",
     "RMSE",
     "RMSLE",
     "RMSSE",
     "SQL",
     "WAPE",
+    "WAPEB",
     "WCD",
     "WQL",
     "AVAILABLE_METRICS",
@@ -38,10 +42,14 @@ AVAILABLE_METRICS: dict[str, Type[TimeSeriesScorer]] = {
     "RMSLE": RMSLE,
     "RMSSE": RMSSE,
     "WAPE": WAPE,
+    "WAPEB": WAPEB,
     "SQL": SQL,
     "WQL": WQL,
+    "MQL": MQL,
     "MSE": MSE,
     "MAE": MAE,
+    "MAEB": MAEB,
+    "BIAS": BIAS,
 }
 
 # Provide lowercase aliases for metrics for consistency with autogluon.tabular
@@ -57,6 +65,9 @@ METRIC_ALIASES: dict[str, str] = {
     "weighted_absolute_percentage_error": "WAPE",
     "weighted_quantile_loss": "WQL",
     "scaled_quantile_loss": "SQL",
+    "mean_quantile_loss": "MQL",
+    "mean_absolute_error_with_bias": "MAEB",
+    "weighted_absolute_percentage_error_with_bias": "WAPEB",
 }
 
 # For backward compatibility

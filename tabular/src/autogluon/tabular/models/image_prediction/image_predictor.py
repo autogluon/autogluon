@@ -27,6 +27,14 @@ class ImagePredictorModel(MultiModalPredictorModel):
 
     ag_key = "AG_IMAGE_NN"
     ag_name = "ImagePredictor"
+    _supported_problem_types = ["binary", "multiclass", "regression"]
+
+    _default_auxiliary_params_extra = dict(
+        get_features_kwargs=dict(
+            valid_raw_types=[R_OBJECT],
+            required_special_types=[S_IMAGE_PATH],
+        ),
+    )
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -36,17 +44,6 @@ class ImagePredictorModel(MultiModalPredictorModel):
     @property
     def _has_predict_proba(self):
         return self.problem_type in [BINARY, MULTICLASS, SOFTCLASS]
-
-    def _get_default_auxiliary_params(self) -> dict:
-        default_auxiliary_params = super()._get_default_auxiliary_params()
-        extra_auxiliary_params = dict(
-            get_features_kwargs=dict(
-                valid_raw_types=[R_OBJECT],
-                required_special_types=[S_IMAGE_PATH],
-            ),
-        )
-        default_auxiliary_params.update(extra_auxiliary_params)
-        return default_auxiliary_params
 
     @classmethod
     def _get_default_ag_args(cls) -> dict:
@@ -130,7 +127,3 @@ class ImagePredictorModel(MultiModalPredictorModel):
         else:
             raise NotImplementedError(f"Computing dummy pred_proba is not implemented for {self.problem_type}.")
         return pred_proba_mean
-
-    @classmethod
-    def supported_problem_types(cls) -> list[str] | None:
-        return ["binary", "multiclass", "regression"]

@@ -5,12 +5,10 @@ import math
 import os
 import time
 
-import numpy as np
 import pandas as pd
 
 from autogluon.common.features.types import R_BOOL, R_CATEGORY, R_FLOAT, R_INT
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
-from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.common.utils.try_import import try_import_xgboost
 from autogluon.core.constants import MULTICLASS, PROBLEM_TYPES_CLASSIFICATION, REGRESSION, SOFTCLASS
 from autogluon.core.models import AbstractModel
@@ -34,6 +32,13 @@ class XGBoostModel(AbstractModel):
     ag_name = "XGBoost"
     ag_priority = 40
     seed_name = "seed"
+    _supported_problem_types = ["binary", "multiclass", "regression", "softclass"]
+
+    _default_auxiliary_params_extra = dict(
+        valid_raw_types=[R_BOOL, R_INT, R_FLOAT, R_CATEGORY],
+    )
+    minimum_num_gpus = 0.5
+    default_resources_physical_cores_only = True
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -50,14 +55,6 @@ class XGBoostModel(AbstractModel):
 
     def _get_default_searchspace(self):
         return get_default_searchspace(problem_type=self.problem_type, num_classes=self.num_classes)
-
-    def _get_default_auxiliary_params(self) -> dict:
-        default_auxiliary_params = super()._get_default_auxiliary_params()
-        extra_auxiliary_params = dict(
-            valid_raw_types=[R_BOOL, R_INT, R_FLOAT, R_CATEGORY],
-        )
-        default_auxiliary_params.update(extra_auxiliary_params)
-        return default_auxiliary_params
 
     # Use specialized XGBoost metric if available (fast), otherwise use custom func generator
     def get_eval_metric(self):
@@ -87,16 +84,20 @@ class XGBoostModel(AbstractModel):
         if self._ohe:
             X = self._ohe_generator.transform(X)
         else:
-            # FIXME: same code as in RealMLP, make it a general function in the future.
-            # Avoid bad dtype for cat categories in later ordinal encoding.
-            # Maps unseen categories to a new high integer.
+            # Ordinal-encode categoricals into a code space shared by fit and predict: every
+            # column is declared with the full code range of the fit-time category mapping,
+            # so train and predict frames carry identical category sets. Required by
+            # xgboost >= 3.3, which records the fit-time categories and rejects predict-time
+            # values outside them (per-frame category sets only contain the values a frame
+            # happens to observe, so predict-time codes for levels unobserved at fit would be
+            # rejected). Categories unseen at fit and missing values become NaN (missing).
             if self._category_mapping is not None:
                 for col in self._cat_col_names:
                     mapping = self._category_mapping[col]
-                    X[col] = X[col].astype(object).map(mapping)
-                    nan_mask = X[col].isna()
-                    X[col] = X[col].fillna(-1).astype(int).astype("category")
-                    X.loc[nan_mask, col] = np.nan
+                    # unseen categories and NaN map to -1, which the declared range excludes,
+                    # so pandas turns them into NaN
+                    codes = X[col].astype(object).map(mapping).fillna(-1).astype(int)
+                    X[col] = pd.Categorical(codes, categories=range(len(mapping)))
 
         return X
 
@@ -300,16 +301,6 @@ class XGBoostModel(AbstractModel):
     def _ag_params(self) -> set:
         return {"early_stop", "generate_curves", "curve_metrics", "use_error_for_curve_metrics"}
 
-    def _estimate_memory_usage(self, X: pd.DataFrame, **kwargs) -> int:
-        hyperparameters = self._get_model_params()
-        return self.estimate_memory_usage_static(
-            X=X,
-            problem_type=self.problem_type,
-            num_classes=self.num_classes,
-            hyperparameters=hyperparameters,
-            **kwargs,
-        )
-
     @classmethod
     def _estimate_memory_usage_static(
         cls,
@@ -378,20 +369,6 @@ class XGBoostModel(AbstractModel):
             **kwargs,
         )
 
-    def get_minimum_resources(self, is_gpu_available=False):
-        minimum_resources = {
-            "num_cpus": 1,
-        }
-        if is_gpu_available:
-            minimum_resources["num_gpus"] = 0.5
-        return minimum_resources
-
-    def _get_default_resources(self):
-        # only_physical_cores=True is faster in training
-        num_cpus = ResourceManager.get_cpu_count(only_physical_cores=True)
-        num_gpus = 0
-        return num_cpus, num_gpus
-
     def save(self, path: str = None, verbose=True) -> str:
         _model = self.model
         self.model = None
@@ -415,13 +392,8 @@ class XGBoostModel(AbstractModel):
         return model
 
     @classmethod
-    def supported_problem_types(cls) -> list[str] | None:
-        return ["binary", "multiclass", "regression", "softclass"]
-
-    @classmethod
     def _class_tags(cls):
         return {
-            "can_estimate_memory_usage_static": True,
             "supports_learning_curves": True,
         }
 

@@ -275,8 +275,9 @@ def protected_zip_extraction(zipfile_path, sha1_hash, folder):
 
     # Extract the file
     logging.info("Extract files...")
-    with zipfile.ZipFile(zipfile_path, "r") as zip_ref:
-        zip_ref.extractall(folder)
+    from .load_archive import safe_unpack_archive
+
+    safe_unpack_archive(zipfile_path, folder)
 
     if signature:
         # Create the signature

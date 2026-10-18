@@ -8,6 +8,7 @@ import time
 
 import numpy as np
 import pandas as pd
+from packaging.version import parse as parse_version
 
 from autogluon.common.features.types import R_BOOL, R_CATEGORY, R_FLOAT, R_INT
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
@@ -16,7 +17,6 @@ from autogluon.core.constants import MULTICLASS, QUANTILE, REGRESSION, SOFTCLASS
 from autogluon.core.models import AbstractModel
 from autogluon.core.utils.exceptions import NotEnoughMemoryError, TimeLimitExceeded
 from autogluon.core.utils.utils import normalize_pred_probas
-from autogluon.features.generators import LabelEncoderFeatureGenerator
 
 from .compilers.native import RFNativeCompiler
 from .compilers.onnx import RFOnnxCompiler
@@ -33,10 +33,14 @@ class RFModel(AbstractModel):
     ag_name = "RandomForest"
     ag_priority = 80
     seed_name = "random_state"
+    _supported_problem_types = ["binary", "multiclass", "regression", "quantile", "softclass"]
+
+    _default_auxiliary_params_extra = dict(
+        valid_raw_types=[R_BOOL, R_INT, R_FLOAT, R_CATEGORY],
+    )
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self._feature_generator = None
         self._daal = False  # Whether daal4py backend is being used
         self._num_features_post_process = None
 
@@ -77,12 +81,7 @@ class RFModel(AbstractModel):
     # TODO: X.fillna -inf? Add extra is_missing column?
     def _preprocess(self, X, **kwargs):
         X = super()._preprocess(X, **kwargs)
-        if self._feature_generator is None:
-            self._feature_generator = LabelEncoderFeatureGenerator(verbosity=0)
-            self._feature_generator.fit(X=X)
-        if self._feature_generator.features_in:
-            X = X.copy()
-            X[self._feature_generator.features_in] = self._feature_generator.transform(X=X)
+        X = self._label_encode_categoricals(X)
         X = X.fillna(0).to_numpy(dtype=np.float32)
         return X
 
@@ -134,16 +133,6 @@ class RFModel(AbstractModel):
         else:
             num_trees_per_estimator = 1
         return num_trees_per_estimator
-
-    def _estimate_memory_usage(self, X: pd.DataFrame, **kwargs) -> int:
-        hyperparameters = self._get_model_params()
-        return self.estimate_memory_usage_static(
-            X=X,
-            problem_type=self.problem_type,
-            num_classes=self.num_classes,
-            hyperparameters=hyperparameters,
-            **kwargs,
-        )
 
     @classmethod
     def _estimate_memory_usage_static(
@@ -346,16 +335,17 @@ class RFModel(AbstractModel):
             if getattr(self.model, "n_classes_", None) is not None:
                 if self.model.n_outputs_ == 1:
                     self.model.n_classes_ = [self.model.n_classes_]
-            from sklearn.tree._tree import DOUBLE, DTYPE
             from sklearn.utils.validation import check_X_y
 
-            X, y = check_X_y(X, y, multi_output=True, accept_sparse="csc", dtype=DTYPE)
+            # np.float32/np.float64 are what sklearn's trees expect internally
+            # (`sklearn.tree._tree.DTYPE`/`DOUBLE`, removed in sklearn>=1.9).
+            X, y = check_X_y(X, y, multi_output=True, accept_sparse="csc", dtype=np.float32)
             if y.ndim == 1:
                 # reshape is necessary to preserve the data contiguity against vs
                 # [:, np.newaxis] that does not.
                 y = np.reshape(y, (-1, 1))
-            if getattr(y, "dtype", None) != DOUBLE or not y.flags.contiguous:
-                y = np.ascontiguousarray(y, dtype=DOUBLE)
+            if getattr(y, "dtype", None) != np.float64 or not y.flags.contiguous:
+                y = np.ascontiguousarray(y, dtype=np.float64)
             if self._is_sklearn_1():
                 # sklearn >= 1.0
                 # TODO: Can instead do `_compute_oob_predictions` but requires post-processing. Skips scoring func.
@@ -382,14 +372,20 @@ class RFModel(AbstractModel):
         # Don't bother if >60 trees, near impossible to have missing
         # If using 68% of data for training, chance of missing for each row is 1 in 11 billion.
         if self.problem_type == REGRESSION and self.model.n_estimators <= 60:
+            import sklearn
             from sklearn.ensemble._forest import _generate_unsampled_indices, _get_n_samples_bootstrap
 
             n_samples = len(y)
 
+            # sklearn>=1.9 requires an explicit `sample_weight`; the bootstrap here is unweighted.
+            weight_args = (None,) if parse_version(sklearn.__version__).release >= (1, 9) else ()
+
             n_predictions = np.zeros(n_samples)
-            n_samples_bootstrap = _get_n_samples_bootstrap(n_samples, self.model.max_samples)
+            n_samples_bootstrap = _get_n_samples_bootstrap(n_samples, self.model.max_samples, *weight_args)
             for estimator in self.model.estimators_:
-                unsampled_indices = _generate_unsampled_indices(estimator.random_state, n_samples, n_samples_bootstrap)
+                unsampled_indices = _generate_unsampled_indices(
+                    estimator.random_state, n_samples, n_samples_bootstrap, *weight_args
+                )
                 n_predictions[unsampled_indices] += 1
             missing_row_mask = n_predictions == 0
             y_oof_pred_proba[missing_row_mask] = np.nan
@@ -410,14 +406,6 @@ class RFModel(AbstractModel):
         # no GPU support
         return {"num_gpus": 0}
 
-    def _get_default_auxiliary_params(self) -> dict:
-        default_auxiliary_params = super()._get_default_auxiliary_params()
-        extra_auxiliary_params = dict(
-            valid_raw_types=[R_BOOL, R_INT, R_FLOAT, R_CATEGORY],
-        )
-        default_auxiliary_params.update(extra_auxiliary_params)
-        return default_auxiliary_params
-
     @classmethod
     def _get_default_ag_args_ensemble(cls, problem_type=None, **kwargs) -> dict:
         default_ag_args_ensemble = super()._get_default_ag_args_ensemble(problem_type=problem_type, **kwargs)
@@ -425,14 +413,6 @@ class RFModel(AbstractModel):
             extra_ag_args_ensemble = {"use_child_oof": True}
             default_ag_args_ensemble.update(extra_ag_args_ensemble)
         return default_ag_args_ensemble
-
-    @classmethod
-    def supported_problem_types(cls) -> list[str] | None:
-        return ["binary", "multiclass", "regression", "quantile", "softclass"]
-
-    @classmethod
-    def _class_tags(cls):
-        return {"can_estimate_memory_usage_static": True}
 
     def _more_tags(self):
         # `can_refit_full=True` because final n_estimators is communicated at end of `_fit`:

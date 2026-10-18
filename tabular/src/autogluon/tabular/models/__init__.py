@@ -3,6 +3,7 @@ from autogluon.core.models.abstract.abstract_model import AbstractModel
 from .automm.automm_model import MultiModalPredictorModel
 from .automm.ft_transformer import FTTransformerModel
 from .catboost.catboost_model import CatBoostModel
+from .causilo.causilo_model import CausiloModel
 from .ebm.ebm_model import EBMModel
 from .fastainn.tabular_nn_fastai import NNFastAiTabularModel
 from .image_prediction.image_predictor import ImagePredictorModel
@@ -18,12 +19,17 @@ from .knn.knn_model import KNNModel
 from .lgb.lgb_model import LGBModel
 from .lr.lr_model import LinearModel
 from .mitra.mitra_model import MitraModel
+from .nori.nori_model import NoriModel
 from .realmlp.realmlp_model import RealMLPModel
 from .rf.rf_model import RFModel
 from .tabdpt.tabdpt_model import TabDPTModel
+from .tabdpt.tabdpt_turbo_model import TabDPTTurboModel
+from .tabfm.tabfm_model import TabFMModel
 from .tabicl.tabicl_model import TabICLModel
 from .tabm.tabm_model import TabMModel
 from .tabpfnmix.tabpfnmix_model import TabPFNMixModel
+from .tabpfnv2.tabpfn3_5_model import TabPFN35Model
+from .tabpfnv2.tabpfn3_model import TabPFN3Model
 from .tabpfnv2.tabpfnv2_5_model import RealTabPFNv2Model, RealTabPFNv25Model
 from .tabpfnv2.tabpfnv2_6_model import TabPFNv26Model
 from .tabprep.prep_lgb_model import PrepLGBModel

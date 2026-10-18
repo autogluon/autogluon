@@ -30,18 +30,19 @@ install_requires = [
     "lightning",
     "transformers[sentencepiece]",
     "accelerate",
-    "gluonts>=0.15.0,<0.17",
-    "networkx",
-    "statsforecast>=1.7.0,<2.0.2",
+    "huggingface_hub[torch]",  # version range defined in `core/_setup_utils.py`
+    "safetensors>=0.4,<1",  # used to load the Toto 2.0 checkpoints. Major version cap
+    "gluonts>=0.17.0,<0.18.0",
+    "statsforecast>=1.7.0,<2.1.2",
     "mlforecast>=0.14.0,<0.15.0",  # cannot upgrade since v0.15.0 introduced a breaking change to DirectTabular
     "utilsforecast>=0.2.3,<0.2.12",  # to prevent breaking changes that propagate through mlforecast's dependency
-    "coreforecast>=0.0.12,<0.0.17",  # to prevent breaking changes that propagate through mlforecast's dependency
+    "coreforecast>=0.0.12,<0.0.19",  # >=0.0.17 required by statsforecast 2.1.x
     "fugue>=0.9.0",  # prevent dependency clash with omegaconf
     "tqdm",
     "orjson~=3.9",  # use faster JSON implementation in GluonTS
     "einops>=0.7,<1",  # required by Chronos-2 and Toto
-    "chronos-forecasting>=2.2.2,<2.4",
-    "peft>=0.13.0,<0.18",  # version range same as in chronos-forecasting[extras]
+    "chronos-forecasting>=2.3.1,<2.4",
+    "peft>=0.18.1,<0.20",  # >=0.18.1 is compatible with transformers>=5.3
     "tensorboard>=2.9,<3",  # fixes https://github.com/autogluon/autogluon/issues/3612
     f"autogluon.core=={version}",
     f"autogluon.common=={version}",
@@ -61,7 +62,7 @@ extras_require = {
     ],
 }
 
-extras_require["all"] = list(set.union(*(set(extras_require[extra]) for extra in ["ray"])))
+extras_require["all"] = list(extras_require["ray"])
 
 install_requires = ag.get_dependency_version_ranges(install_requires)
 

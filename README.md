@@ -19,7 +19,9 @@
 
 </div>
 
-AutoGluon, developed by AWS AI, automates machine learning tasks enabling you to easily achieve strong predictive performance in your applications.  With just a few lines of code, you can train and deploy high-accuracy machine learning and deep learning models on image, text, time series, and tabular data.
+AutoGluon automates machine learning on data such as tables and time series, helping you achieve strong predictive performance with just a few lines of code.
+
+From classic ML algorithms to foundation models, the options keep multiplying — but which one should you use? AutoGluon takes care of that: it finds the combination of models that works best for your use case.
 
 
 ## 💾 Installation

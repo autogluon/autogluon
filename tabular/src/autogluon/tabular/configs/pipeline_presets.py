@@ -1,31 +1,548 @@
 from __future__ import annotations
 
-import math
+import numbers
 import warnings
+from dataclasses import dataclass, fields
 
 from autogluon.core.constants import BINARY, PROBLEM_TYPES
 from autogluon.core.utils.utils import default_holdout_frac
 
 USE_BAG_HOLDOUT_AUTO_THRESHOLD = 1_000_000
 
+#: [EXPERIMENTAL] A validation knob as a function of training-set size: either a fixed value, or a
+#: *size curve* -- ``[[rows, value], ..., fallback]`` -- read as "use ``value`` at or below
+#: ``rows``", with the trailing entry applying above every anchor. Anchors must ascend by
+#: ``rows``. This is the same declarative shape used for count-based fit callbacks, and it
+#: replaces arithmetic like ``min(8, max(5, rows / 10))``: the thresholds become data that can
+#: be inspected, overridden, and tested rather than an expression to re-derive.
+#:
+#: Examples::
+#:
+#:     8                            # always 8
+#:     [[1_000, 5], 8]              # 5 folds up to 1k rows, 8 above
+#:     [[2_000, 5], [10_000, 2], 1] # 5 repeats up to 2k rows, 2 up to 10k, 1 above
+#:     [[1_000, 0.2], 0.1]          # hold out 20% up to 1k rows, 10% above
+SizeCurve = "int | float | bool | None | list"
 
-def _get_validation_preset(num_train_rows: int, hpo_enabled: bool) -> dict[str, int | float]:
-    """Recommended validation preset manually defined by the AutoGluon developers."""
-    # -- Default recommendation
-    #  max 8 due to 8 cores per CPU being very common.
-    #  down to 5 folds for small datasets to have enough samples for a representative validation set.
-    num_bag_folds = min(8, max(5, math.floor(num_train_rows / 10)))
+#: Marks "this curve supplied no trailing fallback", which `None` cannot: `None` is itself a
+#: legal curve value.
+_NO_FALLBACK = object()
 
-    num_bag_sets = 1  # More repeats do not seem to help due to overfitting on val data.
-    use_bag_holdout = num_train_rows >= USE_BAG_HOLDOUT_AUTO_THRESHOLD
-    holdout_frac = round(default_holdout_frac(num_train_rows=num_train_rows, hyperparameter_tune=hpo_enabled), 4)
+#: Defaults for the auto-selected validation method. Numerically identical to the arithmetic
+#: they replaced, so behavior is unchanged until a curve is overridden.
+#:
+#: These curves are *policy*: what to ask for at a given data size. Feasibility is settled
+#: separately and afterwards -- ``ValidationStructure.custom_splits`` reduces the fold and
+#: repeat counts when the data cannot support what was asked (fewer groups than folds, a
+#: stratification value rarer than the fold count, a deterministic temporal partition) and
+#: returns what it used, which the caller adopts. So policy proposes and feasibility
+#: reduces; neither needs to know the other's rules.
+#:  - folds: max 8 because 8 cores per CPU is very common; down to 5 on small data so each
+#:    validation set stays large enough to be representative.
+#:  - repeats: 1. More repeats have not been observed to help, appearing to overfit the
+#:    validation data; a curve is exposed so that can be revisited per size regime without
+#:    editing this module.
+#:  - holdout: an extra holdout only once the data is large enough that spending rows on it
+#:    is cheap.
+DEFAULT_VALIDATION_SIZE_CURVES: dict[str, SizeCurve] = {
+    "num_bag_folds": [[59, 5], [69, 6], [79, 7], 8],
+    "num_bag_sets": 1,
+    "use_bag_holdout": [[USE_BAG_HOLDOUT_AUTO_THRESHOLD - 1, False], True],
+    # Stack levels the data size permits. Whether stacking is used at all is a separate,
+    # qualitative decision (see `get_validation_and_stacking_method`); this only says how deep
+    # the size allows, so raising it to e.g. [[749, 0], [100_000, 1], 2] asks for a second
+    # layer on large data without touching that decision.
+    "num_stack_levels": [[749, 0], 1],
+}
 
-    return dict(
-        num_bag_sets=num_bag_sets,
-        num_bag_folds=num_bag_folds,
-        use_bag_holdout=use_bag_holdout,
-        holdout_frac=holdout_frac,
+
+@dataclass(frozen=True)
+class ValidationSizeCurves:
+    """[EXPERIMENTAL] How the auto-selected validation method scales with data size.
+
+    One :data:`SizeCurve` per knob; ``None`` leaves that knob at its default (see
+    :data:`DEFAULT_VALIDATION_SIZE_CURVES`). Construct directly or from a dict via
+    :meth:`from_input`, which rejects unknown knob names -- a typo would otherwise be
+    silently ignored.
+
+        ValidationSizeCurves(num_bag_sets=[[2_000, 5], 1])
+        ValidationSizeCurves.from_input({"num_bag_sets": [[2_000, 5], 1]})  # equivalent
+
+    ``holdout_frac``, ``dynamic_stacking`` and ``refit_full`` have no default curve, because no
+    built-in policy for them is a step function of size: ``holdout_frac`` is a continuous function
+    of the row count, ``dynamic_stacking`` is derived from another knob (it defaults to ``not
+    use_bag_holdout``), and ``refit_full`` is a fixed ``False``. A curve given here replaces that
+    policy, which is how refitting can be asked for only above the size where bagging stops --
+    ``{"num_bag_folds": [[50_000, 8], 0], "refit_full": [[50_000, False], True]}``.
+
+    ``validation_mode`` and ``ensemble_weights`` have no default curve either, and are the one
+    place where curves must agree with each other: ``validation_mode="none"`` is only valid with
+    no bagging and no stacking, so a curve that switches it must switch those at the same
+    threshold. :func:`get_validation_and_stacking_method` checks the resolved combination and
+    names the knobs that disagree, rather than letting the contradiction surface as a fit-time
+    error at only some data sizes::
+
+        {
+            "validation_mode": [[100, "none"], "auto"],
+            "num_bag_folds": [[100, 0], 8],
+            "num_stack_levels": [[100, 0], 1],
+            "ensemble_weights": [[100, {"TabPFN-3": 0.5, "TabICL": 0.5}], None],
+            "hyperparameters": [[100, {"TABPFN-3": {}, "TABICL": {}}], "default"],
+        }
+
+    ``hyperparameters`` is a curve for the same reason: ``ensemble_weights`` must name exactly the
+    models that were fit, so the two have to switch together or the weights are unusable below the
+    threshold and fine above it. It is resolved earlier than the rest -- the model portfolio decides
+    whether raw text features are enabled, and so shapes the feature generator -- which means it is
+    always read at the row count, never at the group count.
+
+    ``ensemble_hyperparameters`` sets the model that combines the base models' predictions, for
+    example a learned combiner up to a size and greedy ensemble selection above it::
+
+        {"ensemble_hyperparameters": [[100_000, {MyEnsembleModel: {}}], None]}
+
+    It has no default curve; ``None`` means greedy ensemble selection.
+
+    ``group_views`` (any value ``fit`` takes for it, e.g. ``"auto"`` or ``{"pooling": "median"}``)
+    has no default curve either; see :func:`resolve_group_views`.
+
+    ``validation_folds`` (no default curve) lets the bags fit only some of their folds before the weighted
+    ensemble on large data, e.g. ``{"validation_folds": [[100_000, None], 1]}`` fits every fold up to 100,000 rows
+    and one fold above; see :func:`resolve_validation_folds`.
+    """
+
+    num_bag_folds: SizeCurve = None
+    num_bag_sets: SizeCurve = None
+    use_bag_holdout: SizeCurve = None
+    num_stack_levels: SizeCurve = None
+    holdout_frac: SizeCurve = None
+    dynamic_stacking: SizeCurve = None
+    refit_full: SizeCurve = None
+    validation_mode: SizeCurve = None
+    ensemble_weights: SizeCurve = None
+    ensemble_hyperparameters: SizeCurve = None
+    hyperparameters: SizeCurve = None
+    group_views: SizeCurve = None
+    validation_folds: SizeCurve = None
+
+    @classmethod
+    def from_input(cls, value: ValidationSizeCurves | dict | None) -> ValidationSizeCurves | None:
+        if value is None or isinstance(value, ValidationSizeCurves):
+            return value
+        if isinstance(value, dict):
+            valid = {f.name for f in fields(cls)}
+            invalid = set(value) - valid
+            if invalid:
+                raise ValueError(
+                    f"Invalid `validation_size_curves` keys: {sorted(invalid)}. Valid keys: {sorted(valid)}"
+                )
+            return cls(**value)
+        raise ValueError(f"`validation_size_curves` must be a dict or ValidationSizeCurves, got: {type(value)}")
+
+    def as_overrides(self) -> dict[str, SizeCurve]:
+        """The knobs actually set, as a ``{knob: curve}`` dict; unset knobs are omitted."""
+        return {f.name: getattr(self, f.name) for f in fields(self) if getattr(self, f.name) is not None}
+
+
+def resolve_size_curve(curve: SizeCurve, num_train_rows: int) -> int | float | bool | None:
+    """Read a :data:`SizeCurve` at ``num_train_rows``.
+
+    A non-list ``curve`` is a fixed value. Otherwise the first ``[rows, value]`` anchor whose
+    ``rows`` is >= ``num_train_rows`` wins, else the trailing fallback. A bare (non-pair)
+    trailing entry is that fallback; a curve made only of anchors returns the last anchor's
+    value above the final threshold.
+    """
+    if not isinstance(curve, list):
+        return curve
+    if not curve:
+        raise ValueError("A size curve must not be empty.")
+
+    fallback = _NO_FALLBACK
+    anchors: list[tuple[int, object]] = []
+    for entry in curve:
+        if isinstance(entry, (list, tuple)):
+            if len(entry) != 2:
+                raise ValueError(f"Size-curve anchors must be [rows, value] pairs, got: {entry!r}")
+            anchors.append((entry[0], entry[1]))
+        else:
+            fallback = entry
+    thresholds = [rows for rows, _ in anchors]
+    if thresholds != sorted(thresholds):
+        raise ValueError(f"Size-curve anchors must ascend by rows, got thresholds: {thresholds}")
+
+    for rows, value in anchors:
+        if num_train_rows <= rows:
+            return value
+    if fallback is not _NO_FALLBACK:
+        return fallback
+    # No trailing value: clamp to the top rung of the ladder. A sentinel rather than `None`
+    # distinguishes this from a curve that ends in an explicit `None`, which is a real value for
+    # several knobs ("no fixed weights", "use the built-in default") and is the natural way to
+    # write "on below X, off above X".
+    return anchors[-1][1] if anchors else None
+
+
+def resolve_effective_sample_size(
+    num_train_rows: int,
+    num_group_instances: int | None = None,
+    size_on_groups: bool = False,
+) -> int:
+    """The size the validation curves are read at.
+
+    Rows by default. With ``size_on_groups`` and a known ``num_group_instances``, the group
+    count is used instead: when rows within a group are not independent, the number of groups
+    is the sample size that governs how many folds the data can support and how noisy each
+    validation estimate is. The two can disagree sharply -- a benchmark task with 4,672 rows
+    across 68 groups looks large by rows and small by groups -- so which is right is a
+    judgement about the data, and this stays opt-in rather than inferred from the presence of
+    a grouping.
+    """
+    if size_on_groups and num_group_instances is not None:
+        return num_group_instances
+    return num_train_rows
+
+
+def _get_validation_preset(
+    num_train_rows: int,
+    hpo_enabled: bool,
+    validation_size_curves: dict[str, SizeCurve] | None = None,
+    num_group_instances: int | None = None,
+    size_on_groups: bool = False,
+) -> dict[str, int | float]:
+    """Recommended validation preset, resolved from size curves at the effective sample size.
+
+    ``validation_size_curves`` (EXPERIMENTAL: format subject to change) overrides individual entries
+    of :data:`DEFAULT_VALIDATION_SIZE_CURVES`,
+    so a caller can retune one knob (e.g. repeats on small data) without restating the rest.
+    ``size_on_groups`` reads the curves at the group count instead of the row count -- see
+    :func:`resolve_effective_sample_size`. The *built-in* ``holdout_frac`` policy is always sized
+    on rows, since it is a fraction of the rows actually held out; a caller-supplied
+    ``holdout_frac`` curve is read at the effective size like every other curve, so under
+    ``size_on_groups`` it is read at the group count.
+    """
+    overrides = ValidationSizeCurves.from_input(validation_size_curves)
+    curves = {**DEFAULT_VALIDATION_SIZE_CURVES, **(overrides.as_overrides() if overrides is not None else {})}
+    effective_size = resolve_effective_sample_size(
+        num_train_rows=num_train_rows,
+        num_group_instances=num_group_instances,
+        size_on_groups=size_on_groups,
     )
+    resolved = {key: resolve_size_curve(curve, effective_size) for key, curve in curves.items()}
+    if "holdout_frac" not in curves:
+        # Not a default curve: the built-in policy is a continuous function of the row count
+        # rather than a step curve, and a curve cannot reproduce it. A caller-supplied
+        # `holdout_frac` curve replaces it, and is read at the effective size like the others.
+        resolved["holdout_frac"] = round(
+            default_holdout_frac(num_train_rows=num_train_rows, hyperparameter_tune=hpo_enabled), 4
+        )
+    return resolved
+
+
+def resolve_hyperparameters_curve(
+    hyperparameters,
+    num_train_rows: int,
+    validation_size_curves: ValidationSizeCurves | dict[str, SizeCurve] | None = None,
+):
+    """Resolve a ``hyperparameters`` size curve, if one was given.
+
+    Read at the row count rather than the effective size: this runs before ``validation_structure``
+    is resolved, so the group count is not yet known. The built-in ``holdout_frac`` policy is sized
+    on rows for its own reasons, so this is not a new exception in kind.
+
+    A caller-supplied ``hyperparameters`` wins over the curve, matching every other knob.
+    """
+    if hyperparameters is not None:
+        return hyperparameters
+    overrides = ValidationSizeCurves.from_input(validation_size_curves)
+    if overrides is None or overrides.hyperparameters is None:
+        return hyperparameters
+    return resolve_size_curve(overrides.hyperparameters, num_train_rows)
+
+
+def resolve_group_views(
+    group_views: bool | str | dict | None,
+    num_train_rows: int,
+    validation_size_curves: ValidationSizeCurves | dict[str, SizeCurve] | None = None,
+    num_group_instances: int | None = None,
+    size_on_groups: bool = False,
+) -> bool | str | dict:
+    """Resolve ``group_views`` (a bool, ``"auto"``, or a dict or ``GroupViews``) at the effective sample size.
+
+    A caller-supplied value wins over its curve, as everywhere else; with neither, group views are off.
+    """
+    if group_views is not None:
+        return group_views
+    overrides = ValidationSizeCurves.from_input(validation_size_curves)
+    if overrides is None or overrides.group_views is None:
+        return False
+    effective_size = resolve_effective_sample_size(
+        num_train_rows=num_train_rows,
+        num_group_instances=num_group_instances,
+        size_on_groups=size_on_groups,
+    )
+    value = resolve_size_curve(overrides.group_views, effective_size)
+    return False if value is None else value
+
+
+def resolve_validation_folds(
+    validation_folds: int | None,
+    num_train_rows: int,
+    validation_size_curves: ValidationSizeCurves | dict[str, SizeCurve] | None = None,
+    num_group_instances: int | None = None,
+    size_on_groups: bool = False,
+) -> tuple[int | None, bool]:
+    """Resolve ``validation_folds`` at the effective sample size; returns ``(value, from_curve)``.
+
+    A caller-supplied value wins over its curve, as everywhere else; ``None`` means every fold.
+    """
+    if validation_folds is not None:
+        return validation_folds, False
+    overrides = ValidationSizeCurves.from_input(validation_size_curves)
+    if overrides is None or overrides.validation_folds is None:
+        return None, False
+    effective_size = resolve_effective_sample_size(
+        num_train_rows=num_train_rows,
+        num_group_instances=num_group_instances,
+        size_on_groups=size_on_groups,
+    )
+    return resolve_size_curve(overrides.validation_folds, effective_size), True
+
+
+def validate_validation_folds(
+    validation_folds: int | None,
+    *,
+    num_bag_folds: int,
+    num_bag_sets: int,
+    num_stack_levels: int,
+    dynamic_stacking: bool,
+    no_validation: bool,
+    ensemble_weights: dict | None,
+    fit_weighted_ensemble: bool,
+    from_curve: bool = False,
+) -> int | None:
+    """Check ``validation_folds`` against the resolved fit; returns it, or ``None`` when every fold is fit anyway.
+
+    Checked before any model is fit, at the size a curve resolved it to.
+    """
+    if validation_folds is None:
+        return None
+    if isinstance(validation_folds, bool) or not isinstance(validation_folds, int) or validation_folds < 1:
+        raise ValueError(f"validation_folds must be a positive int or None, got {validation_folds!r}.")
+    if no_validation:
+        conflicts = ["validation_mode='none'"]
+    else:
+        conflicts = []
+        if num_bag_folds < 2:
+            conflicts.append(f"num_bag_folds={num_bag_folds} (it needs bagging)")
+        if num_bag_sets != 1:
+            conflicts.append(f"num_bag_sets={num_bag_sets}")
+        if num_stack_levels:
+            conflicts.append(f"num_stack_levels={num_stack_levels}")
+        if dynamic_stacking:
+            conflicts.append("dynamic_stacking=True")
+        if ensemble_weights is not None:
+            conflicts.append("ensemble_weights")
+        if not fit_weighted_ensemble:
+            conflicts.append("fit_weighted_ensemble=False")
+    if conflicts:
+        source = (
+            " The size curves resolved to this combination at this data size; check that the curves switch at the "
+            "same threshold."
+            if from_curve
+            else ""
+        )
+        raise ValueError(
+            f"validation_folds={validation_folds} chooses the weighted ensemble on some of one bagging set's folds and "
+            f"then completes the bags it uses, so it cannot be combined with {', '.join(conflicts)}.{source}"
+        )
+    if validation_folds >= num_bag_folds:
+        return None
+    return validation_folds
+
+
+def resolve_validation_mode(
+    validation_mode: str | None,
+    ensemble_weights: dict | None,
+    num_bag_folds: int,
+    num_stack_levels: int,
+    num_train_rows: int,
+    validation_size_curves: ValidationSizeCurves | dict[str, SizeCurve] | None = None,
+    num_group_instances: int | None = None,
+    size_on_groups: bool = False,
+) -> tuple[str, dict | None]:
+    """Resolve ``validation_mode`` and ``ensemble_weights``, then check the combination.
+
+    Separate from :func:`get_validation_and_stacking_method` because the check needs that
+    function's *output*: whether ``validation_mode="none"`` is legal depends on the bagging and
+    stacking counts it settled. A caller-supplied value wins over its curve, as everywhere else.
+    """
+    overrides = ValidationSizeCurves.from_input(validation_size_curves)
+    specified = set(overrides.as_overrides()) if overrides is not None else set()
+    effective_size = resolve_effective_sample_size(
+        num_train_rows=num_train_rows,
+        num_group_instances=num_group_instances,
+        size_on_groups=size_on_groups,
+    )
+    if validation_mode is None:
+        validation_mode = (
+            resolve_size_curve(overrides.validation_mode, effective_size) if "validation_mode" in specified else "auto"
+        )
+        if validation_mode is None:
+            validation_mode = "auto"
+    if ensemble_weights is None and "ensemble_weights" in specified:
+        ensemble_weights = resolve_size_curve(overrides.ensemble_weights, effective_size)
+
+    if validation_mode not in ("auto", "none"):
+        raise ValueError(f"validation_mode must be 'auto' or 'none', got {validation_mode!r}.")
+
+    _validate_validation_mode_bundle(
+        validation_mode=validation_mode,
+        num_bag_folds=num_bag_folds,
+        num_stack_levels=num_stack_levels,
+        from_curves=specified,
+    )
+    return validation_mode, ensemble_weights
+
+
+def resolve_ensemble_hyperparameters(
+    ensemble_hyperparameters: dict | None,
+    num_train_rows: int,
+    validation_size_curves: ValidationSizeCurves | dict[str, SizeCurve] | None = None,
+    num_group_instances: int | None = None,
+    size_on_groups: bool = False,
+) -> dict | None:
+    """Resolve ``ensemble_hyperparameters`` from its curve, if one was given, and check its form.
+
+    Read at the effective sample size, like ``ensemble_weights``. A caller-supplied value wins over
+    the curve, as for every other knob. ``None`` means greedy ensemble selection.
+    """
+    if ensemble_hyperparameters is None:
+        overrides = ValidationSizeCurves.from_input(validation_size_curves)
+        if overrides is not None and overrides.ensemble_hyperparameters is not None:
+            effective_size = resolve_effective_sample_size(
+                num_train_rows=num_train_rows,
+                num_group_instances=num_group_instances,
+                size_on_groups=size_on_groups,
+            )
+            ensemble_hyperparameters = resolve_size_curve(overrides.ensemble_hyperparameters, effective_size)
+    if ensemble_hyperparameters is not None:
+        validate_ensemble_hyperparameters(ensemble_hyperparameters)
+    return ensemble_hyperparameters
+
+
+def validate_ensemble_hyperparameters(ensemble_hyperparameters: dict) -> None:
+    """Check that ``ensemble_hyperparameters`` is a one-entry ``{model: hyperparameters}`` dict.
+
+    The model is a registered model key or an ``AbstractModel`` subclass, as in ``hyperparameters``.
+    Checked before anything is fit, so a typo does not cost the whole fit.
+    """
+    from autogluon.core.models import AbstractModel
+
+    from ..registry import ag_model_registry
+
+    if not isinstance(ensemble_hyperparameters, dict) or len(ensemble_hyperparameters) != 1:
+        raise ValueError(
+            "`ensemble_hyperparameters` must be a dict with exactly one entry, `{model: hyperparameters}`, "
+            f"e.g. `{{MyEnsembleModel: {{}}}}`. Got: {ensemble_hyperparameters!r}"
+        )
+    ((model, hyperparameters),) = ensemble_hyperparameters.items()
+    if isinstance(model, str):
+        if model not in ag_model_registry.keys:
+            raise ValueError(
+                f"`ensemble_hyperparameters` names {model!r}, which is not a registered model key. "
+                "Pass the model class, or register it with `ag_model_registry.add`."
+            )
+    elif not (isinstance(model, type) and issubclass(model, AbstractModel)):
+        raise ValueError(
+            "The model in `ensemble_hyperparameters` must be a registered model key or an AbstractModel subclass, "
+            f"got: {model!r}"
+        )
+    if hyperparameters is not None and not isinstance(hyperparameters, dict):
+        raise ValueError(
+            "The value in `ensemble_hyperparameters` must be the model's hyperparameters as a dict, "
+            f"got: {hyperparameters!r}"
+        )
+
+
+def _validate_validation_mode_bundle(
+    validation_mode: str,
+    num_bag_folds: int,
+    num_stack_levels: int,
+    from_curves: set[str],
+) -> None:
+    """Reject a resolved combination that `validation_mode="none"` cannot support.
+
+    Curves resolve one knob at a time, so a threshold written into three of them and mistyped in
+    the fourth produces a band of data sizes where the knobs disagree -- and only that band fails.
+    Checking the resolved set turns that into one error naming the knobs, at the size where they
+    actually conflict.
+    """
+    if validation_mode != "none":
+        return
+    conflicts = []
+    if num_bag_folds:
+        conflicts.append(f"num_bag_folds={num_bag_folds}")
+    if num_stack_levels:
+        conflicts.append(f"num_stack_levels={num_stack_levels}")
+    if not conflicts:
+        return
+    source = (
+        "The size curves resolved to this combination at this data size; check that every curve "
+        "switches at the same threshold."
+        if "validation_mode" in from_curves
+        else "Set them to 0, or drop validation_mode='none'."
+    )
+    raise ValueError(
+        f"validation_mode='none' holds nothing out, so it cannot be combined with "
+        f"{' and '.join(conflicts)}. Both are defined by out-of-fold predictions. {source}"
+    )
+
+
+def _validate_holdout_frac(holdout_frac: float | int | None, num_train_rows: int, is_used: bool) -> None:
+    """Reject a `holdout_frac` that cannot produce a usable train/validation split.
+
+    An int is an absolute row count and a float is a fraction of the rows, matching
+    `sklearn.model_selection.train_test_split`'s `test_size`. The form is always checked; the
+    row arithmetic only when the value will actually be used, so a size that a bagged fit
+    ignores stays as harmless as it is today. Called only for a caller-supplied value.
+    """
+    if holdout_frac is None:
+        return
+    if isinstance(holdout_frac, bool):
+        raise ValueError(
+            f"`holdout_frac={holdout_frac}` is a bool, which is not a holdout size. Pass an int "
+            "for a number of rows, or a float between 0 and 1 for a fraction of them."
+        )
+    if isinstance(holdout_frac, numbers.Integral):
+        holdout_rows = int(holdout_frac)
+        reading = f"read as {holdout_rows} validation rows"
+        if holdout_rows < 1:
+            raise ValueError(
+                f"`holdout_frac={holdout_frac}` is an int, read as a number of validation rows, "
+                "so it must be at least 1. Pass a float between 0 and 1 for a fraction instead."
+            )
+    elif isinstance(holdout_frac, numbers.Real):
+        if not 0 < float(holdout_frac) < 1:
+            raise ValueError(
+                f"`holdout_frac={holdout_frac}` is a float, read as the fraction of rows to hold "
+                "out, so it must be between 0 and 1 (exclusive). Pass an int for an absolute "
+                "number of validation rows instead."
+            )
+        holdout_rows = int(num_train_rows * float(holdout_frac))
+        reading = f"a fraction of {num_train_rows} rows, read as {holdout_rows} validation rows"
+    else:
+        raise ValueError(
+            f"`holdout_frac` must be an int (rows) or a float between 0 and 1 (fraction), got: {holdout_frac!r}"
+        )
+
+    if not is_used:
+        return
+    train_rows = num_train_rows - holdout_rows
+    if holdout_rows < 1 or train_rows < 1:
+        raise ValueError(
+            f"`holdout_frac={holdout_frac}` is {reading}, leaving {train_rows} to train on out of "
+            f"{num_train_rows}; both sides of the split need at least 1 row."
+        )
 
 
 # TODO(refactor): use a data class for the config of the validation method.
@@ -42,7 +559,7 @@ def get_validation_and_stacking_method(
     num_bag_folds: int | None,
     num_bag_sets: int | None,
     use_bag_holdout: bool | None,
-    holdout_frac: float | None,
+    holdout_frac: float | int | None,
     # Stacking/Pipeline parameters
     auto_stack: bool,
     num_stack_levels: int | None,
@@ -53,6 +570,9 @@ def get_validation_and_stacking_method(
     problem_type: PROBLEM_TYPES,
     hpo_enabled: bool,
     n_samples_minority_class: int | None,
+    num_group_instances: int | None = None,
+    size_on_groups: bool = False,
+    validation_size_curves: ValidationSizeCurves | dict[str, SizeCurve] | None = None,
 ) -> tuple[int, int, int, bool, bool, float, bool]:
     """Get the validation method for AutoGluon via a heuristic.
 
@@ -66,8 +586,9 @@ def get_validation_and_stacking_method(
         The number of repeats for cross-validation.
     use_bag_holdout: bool | None
         Whether to use (additional) holdout validation.
-    holdout_frac: float | None
-        The fraction of data to holdout for validation.
+    holdout_frac: float | int | None
+        How much data to hold out for validation: an int is a number of rows, a float between 0
+        and 1 is a fraction of them.
     auto_stack: bool
         Whether to automatically determine the stacking method.
     num_stack_levels: int | None
@@ -85,12 +606,34 @@ def get_validation_and_stacking_method(
     n_samples_minority_class: int | None
         The number of samples in the minority class for classification problems.
         None for regression problems.
+    num_group_instances: int | None
+        The number of independent groups, when the data declares a grouping. None otherwise.
+    size_on_groups: bool
+        If True, size-dependent choices read `num_group_instances` instead of `num_train_rows`.
+    validation_size_curves: ValidationSizeCurves | dict[str, SizeCurve] | None
+        Per-knob overrides of `DEFAULT_VALIDATION_SIZE_CURVES`; only the knobs set are overridden.
+        A dict is accepted and normalized via `ValidationSizeCurves.from_input`.
 
     Returns:
     --------
     Returns all variables needed to define the validation method.
     """
-    cv_preset = _get_validation_preset(num_train_rows=num_train_rows, hpo_enabled=hpo_enabled)
+    cv_preset = _get_validation_preset(
+        num_train_rows=num_train_rows,
+        hpo_enabled=hpo_enabled,
+        num_group_instances=num_group_instances,
+        size_on_groups=size_on_groups,
+        validation_size_curves=validation_size_curves,
+    )
+
+    # Which knobs the caller gave a curve for. Supplying one is itself a request for size-driven
+    # selection of that knob, so it is honored wherever a knob would otherwise be decided by
+    # `auto_stack` or derived from another knob.
+    curve_overrides = ValidationSizeCurves.from_input(validation_size_curves)
+    specified = set(curve_overrides.as_overrides()) if curve_overrides is not None else set()
+    # Only a caller-supplied value is validated below; the built-in policy is AutoGluon's own
+    # and must keep resolving for any size, however small.
+    holdout_frac_from_caller = holdout_frac is not None
 
     # Independent of `auto_stack`
     if use_bag_holdout is None:
@@ -98,29 +641,40 @@ def get_validation_and_stacking_method(
     if holdout_frac is None:
         holdout_frac = cv_preset["holdout_frac"]
     if dynamic_stacking is None:
-        dynamic_stacking = not use_bag_holdout
+        # Without a curve, DyStack follows from whether a bag-holdout is used; a curve replaces
+        # that derivation, so it can be sized independently.
+        dynamic_stacking = cv_preset["dynamic_stacking"] if "dynamic_stacking" in specified else not use_bag_holdout
     if refit_full is None:
-        refit_full = False
+        # Like `dynamic_stacking`, `refit_full` has no size-based default; a curve replaces the
+        # fixed `False`, so refitting can be asked for only in the size regime that needs it.
+        refit_full = cv_preset["refit_full"] if "refit_full" in specified else False
 
-    # Changed by `auto_stack`
+    # Changed by `auto_stack` -- except where the caller gave a curve for the knob. Supplying a
+    # curve is itself a request for size-driven selection of that knob, so `auto_stack` does not
+    # get to overrule it: without this, `auto_stack=False` (the default) silently replaced an
+    # explicit `num_bag_folds` curve with 0, i.e. no bagging and no out-of-fold predictions at all.
+    # Knobs the caller left out still follow `auto_stack` exactly as before.
     if num_bag_folds is None:
         # `num_bag_folds == 0` -> only use holdout validation
-        num_bag_folds = cv_preset["num_bag_folds"] if auto_stack else 0
+        num_bag_folds = cv_preset["num_bag_folds"] if (auto_stack or "num_bag_folds" in specified) else 0
     if num_bag_sets is None:
         # `num_bag_sets == 1` -> no repeats
-        num_bag_sets = cv_preset["num_bag_sets"] if auto_stack else 1
+        num_bag_sets = cv_preset["num_bag_sets"] if (auto_stack or "num_bag_sets" in specified) else 1
     if num_stack_levels is None:
         # Disable multi-layer stacking by default
         num_stack_levels = 0
+        # How deep the data size permits; the conditions below decide whether to stack at all.
+        stack_levels_by_size = cv_preset["num_stack_levels"]
 
-        # Activate multi-layer stacking for `auto_stack` if
-        if auto_stack and (
-            dynamic_stacking  # -> We use dynamic stacking
-            or
-            # -> We have holdout validation or a non-binary problem with more than 750 training rows
-            ((use_bag_holdout or (problem_type != BINARY)) and (num_train_rows >= 750))
-        ):
-            num_stack_levels = 1
+        if "num_stack_levels" in specified:
+            # An explicit curve is the answer, not an input to the auto_stack conditions below.
+            num_stack_levels = stack_levels_by_size
+        elif auto_stack and dynamic_stacking:
+            # Dynamic stacking detects stacked overfitting itself, so it is not size-gated.
+            num_stack_levels = max(1, stack_levels_by_size)
+        elif auto_stack and (use_bag_holdout or (problem_type != BINARY)):
+            # Holdout validation or a non-binary problem: stack as deep as the size allows.
+            num_stack_levels = stack_levels_by_size
 
     # Extra logic to handle cross-validation splits for classification
     #   - Avoid failure mode where we do not have enough samples to ensure the
@@ -170,6 +724,16 @@ def get_validation_and_stacking_method(
             )
             num_bag_folds = supported_num_bag_folds
             num_stack_levels = supported_num_stack_levels
+
+    if holdout_frac_from_caller:
+        _validate_holdout_frac(
+            holdout_frac=holdout_frac,
+            num_train_rows=num_train_rows,
+            # `holdout_frac` is only consulted for a non-bagged holdout or an explicit
+            # bag-holdout; bagging otherwise ignores it, and a size that could not be split is
+            # then as harmless as it has always been.
+            is_used=num_bag_folds < 2 or bool(use_bag_holdout),
+        )
 
     return (
         num_bag_folds,

@@ -7,6 +7,8 @@ import tempfile
 import zipfile
 from pathlib import Path
 
+from autogluon.common.loaders.load_archive import safe_unpack_archive
+
 logger = logging.getLogger(__name__)
 
 __all__ = ["unzip", "download"]
@@ -14,9 +16,9 @@ __all__ = ["unzip", "download"]
 
 def unzip(zip_file_path, root=os.path.expanduser("./")):
     """Unzips files located at `zip_file_path` into parent directory specified by `root`."""
+    safe_unpack_archive(zip_file_path, root)
     folders = []
     with zipfile.ZipFile(zip_file_path) as zf:
-        zf.extractall(root)
         for name in zf.namelist():
             folder = Path(name).parts[0]
             if folder not in folders:

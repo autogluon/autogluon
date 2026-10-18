@@ -108,8 +108,16 @@ class NNFastAiTabularModel(AbstractModel):
         }
     )
     seed_name = "random_seed"
+    _supported_problem_types = ["binary", "multiclass", "regression", "quantile"]
 
     model_internals_file_name = "model-internals.pkl"
+
+    _default_auxiliary_params_extra = dict(
+        valid_raw_types=[R_BOOL, R_INT, R_FLOAT, R_CATEGORY],
+        ignored_type_group_special=[S_TEXT_NGRAM, S_TEXT_AS_CATEGORY],
+    )
+    minimum_num_gpus = 0.5
+    default_resources_physical_cores_only = True
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -117,6 +125,7 @@ class NNFastAiTabularModel(AbstractModel):
         self.cont_columns = None
         self.columns_fills = None
         self._columns_fills_names = None
+        self._cat_dtypes = None
         self.procs = None
         self.y_scaler = None
         self._cont_normalization = None
@@ -211,6 +220,18 @@ class NNFastAiTabularModel(AbstractModel):
             self._columns_fills_names = nullable_numeric_features
             for c in self._columns_fills_names:  # No need to do this for int features, int can't have null
                 self.columns_fills[c] = X[c].mean()
+            # fastai's Categorify maps already-categorical columns via their raw category
+            # codes, so inference input must carry the exact fit-time CategoricalDtype.
+            self._cat_dtypes = {c: X[c].dtype for c in self.cat_columns if isinstance(X[c].dtype, pd.CategoricalDtype)}
+        elif self._cat_dtypes:
+            # Re-align categorical dtypes to fit time: a frame whose category set or order
+            # differs (e.g. a feature generator that appends unseen categories at transform
+            # time) would otherwise map values to wrong or out-of-range embedding rows.
+            mismatched = {c: dtype for c, dtype in self._cat_dtypes.items() if c in X.columns and X[c].dtype != dtype}
+            if mismatched:
+                X = X.copy(deep=False)
+                for c, dtype in mismatched.items():
+                    X[c] = pd.Categorical(X[c].astype(object), categories=dtype.categories, ordered=dtype.ordered)
         X = self._fill_missing(X)
         if self.cont_columns:
             cont_mean, cont_std = self._cont_normalization
@@ -623,21 +644,6 @@ class NNFastAiTabularModel(AbstractModel):
     def _get_default_searchspace(self):
         return get_default_searchspace(self.problem_type, num_classes=None)
 
-    def _get_default_auxiliary_params(self) -> dict:
-        default_auxiliary_params = super()._get_default_auxiliary_params()
-        extra_auxiliary_params = dict(
-            valid_raw_types=[R_BOOL, R_INT, R_FLOAT, R_CATEGORY],
-            ignored_type_group_special=[S_TEXT_NGRAM, S_TEXT_AS_CATEGORY],
-        )
-        default_auxiliary_params.update(extra_auxiliary_params)
-        return default_auxiliary_params
-
-    def _get_default_resources(self):
-        # only_physical_cores=True is faster in training
-        num_cpus = ResourceManager.get_cpu_count(only_physical_cores=True)
-        num_gpus = 0
-        return num_cpus, num_gpus
-
     def __get_metrics_map(self):
         from fastai.metrics import FBeta, Precision, R2Score, Recall, RocAucBinary, accuracy, mae, mse, rmse
 
@@ -672,16 +678,6 @@ class NNFastAiTabularModel(AbstractModel):
         }
         return metrics_map
 
-    def _estimate_memory_usage(self, X: pd.DataFrame, **kwargs) -> int:
-        hyperparameters = self._get_model_params()
-        return self.estimate_memory_usage_static(
-            X=X,
-            problem_type=self.problem_type,
-            num_classes=self.num_classes,
-            hyperparameters=hyperparameters,
-            **kwargs,
-        )
-
     @classmethod
     def _estimate_memory_usage_static(
         cls,
@@ -699,22 +695,9 @@ class NNFastAiTabularModel(AbstractModel):
         # fastai model trains slower when utilizing virtual cores and this issue scale up when the number of cpu cores increases
         return {"num_cpus": ResourceManager.get_cpu_count(only_physical_cores=True)}
 
-    def get_minimum_resources(self, is_gpu_available=False):
-        minimum_resources = {
-            "num_cpus": 1,
-        }
-        if is_gpu_available:
-            minimum_resources["num_gpus"] = 0.5
-        return minimum_resources
-
-    @classmethod
-    def supported_problem_types(cls) -> list[str] | None:
-        return ["binary", "multiclass", "regression", "quantile"]
-
     @classmethod
     def _class_tags(cls):
         return {
-            "can_estimate_memory_usage_static": True,
             "reset_torch_threads": True,
             "reset_torch_cudnn_deterministic": True,
         }

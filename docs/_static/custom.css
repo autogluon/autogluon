@@ -8,9 +8,44 @@ div.cell div.cell_input, .highlight-bash .highlight {
     border-radius: 0.2rem;
 }
 
+/* Pandas table styling. Previously provided by myst-nb's bundled mystnb.css,
+   which dropped these rules in newer versions, leaving dataframes unstyled. */
 div.cell_output table {
     color: #2b8cee;
     font-size: 0.8rem;
+    border: none;
+    border-collapse: collapse;
+    border-spacing: 0;
+    table-layout: fixed;
+}
+
+div.cell_output thead {
+    border-bottom: 1px solid var(--color-foreground-primary);
+    vertical-align: bottom;
+}
+
+div.cell_output tr,
+div.cell_output th,
+div.cell_output td {
+    text-align: right;
+    vertical-align: middle;
+    padding: 0.5em 0.5em;
+    line-height: normal;
+    white-space: normal;
+    max-width: none;
+    border: none;
+}
+
+div.cell_output th {
+    font-weight: bold;
+}
+
+div.cell_output tbody tr:nth-child(odd) {
+    background: var(--color-background-secondary);
+}
+
+div.cell_output tbody tr:hover {
+    background: rgba(66, 165, 245, 0.2);
 }
 
 div.cell_output {

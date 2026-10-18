@@ -15,7 +15,6 @@ from autogluon.core.constants import BINARY, MULTICLASS, QUANTILE, REGRESSION
 from autogluon.core.models import AbstractModel
 from autogluon.core.utils import generate_train_test_split
 from autogluon.core.utils.exceptions import TimeLimitExceeded
-from autogluon.features.generators import LabelEncoderFeatureGenerator
 
 logger = logging.getLogger(__name__)
 
@@ -44,12 +43,17 @@ class TabPFNMixModel(AbstractModel):
     ag_name = "TabPFNMix"
     ag_priority = 45
     seed_name = "random_state"
+    _supported_problem_types = ["binary", "multiclass", "regression"]
 
     weights_file_name = "model.pt"
 
+    _default_auxiliary_params_extra = {
+        "max_classes": 10,
+    }
+    default_resources_physical_cores_only = True
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self._feature_generator = None
         self._weights_saved = False
 
     def _get_model_type(self):
@@ -286,13 +290,7 @@ class TabPFNMixModel(AbstractModel):
         Keeps missing values, as TabPFN automatically handles missing values internally.
         """
         X = super()._preprocess(X, **kwargs)
-        if self._feature_generator is None:
-            # FIXME: Check if this is needed, never actually tried removing it, copy pasted from TabPFNModel implementation in AG
-            self._feature_generator = LabelEncoderFeatureGenerator(verbosity=0)
-            self._feature_generator.fit(X=X)
-        if self._feature_generator.features_in:
-            X = X.copy()
-            X[self._feature_generator.features_in] = self._feature_generator.transform(X=X)
+        X = self._label_encode_categoricals(X)
         X = X.values.astype(np.float64)
         return X
 
@@ -328,38 +326,9 @@ class TabPFNMixModel(AbstractModel):
     def weights_path(self) -> str:
         return os.path.join(self.path, self.weights_file_name)
 
-    @classmethod
-    def supported_problem_types(cls) -> list[str] | None:
-        return ["binary", "multiclass", "regression"]
-
-    def _get_default_auxiliary_params(self) -> dict:
-        default_auxiliary_params = super()._get_default_auxiliary_params()
-        default_auxiliary_params.update(
-            {
-                "max_classes": 10,
-            }
-        )
-        return default_auxiliary_params
-
     def _get_maximum_resources(self) -> dict[str, int | float]:
         # torch model trains slower when utilizing virtual cores and this issue scale up when the number of cpu cores increases
         return {"num_cpus": ResourceManager.get_cpu_count(only_physical_cores=True)}
-
-    def _get_default_resources(self) -> tuple[int, float]:
-        # only_physical_cores=True is faster in training
-        num_cpus = ResourceManager.get_cpu_count(only_physical_cores=True)
-        num_gpus = 0
-        return num_cpus, num_gpus
-
-    def _estimate_memory_usage(self, X: pd.DataFrame, **kwargs) -> int:
-        hyperparameters = self._get_model_params()
-        return self.estimate_memory_usage_static(
-            X=X,
-            problem_type=self.problem_type,
-            num_classes=self.num_classes,
-            hyperparameters=hyperparameters,
-            **kwargs,
-        )
 
     def get_minimum_ideal_resources(self) -> dict[str, int | float]:
         return {"num_cpus": 4}
@@ -385,12 +354,6 @@ class TabPFNMixModel(AbstractModel):
         model_fit_usage = model_size * 50  # TODO: This is a placeholder large value to try to avoid OOM errors
         mem_usage_estimate = data_mem_usage + model_mem_usage + model_fit_usage
         return mem_usage_estimate
-
-    @classmethod
-    def _class_tags(cls) -> dict:
-        return {
-            "can_estimate_memory_usage_static": True,
-        }
 
     def _ag_params(self) -> set:
         return {"max_classes", "max_rows", "sample_rows", "sample_rows_val"}

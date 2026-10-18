@@ -105,8 +105,7 @@ class ConfigSaveLoadMixin(yaml.YAMLObject):
     @classmethod
     def load(cls, path: Path) -> Self:
         with open(path, "r") as f:
-            # It's unsafe, but not unsafer than the pickle module
-            config = yaml.unsafe_load(f)
+            config = yaml.full_load(f)
 
         return config
 

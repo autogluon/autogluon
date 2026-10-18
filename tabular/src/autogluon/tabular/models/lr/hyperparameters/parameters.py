@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 
 from autogluon.core.constants import BINARY
@@ -25,13 +27,24 @@ def get_param_baseline():
         "proc.ngram_range": (1, 5),  # range of n-grams for TFIDF vectorizer dictionary; used only in text model
         "proc.skew_threshold": 0.99,  # numerical features whose absolute skewness is greater than this receive special power-transform preprocessing. Choose big value to avoid using power-transforms
         "proc.impute_strategy": "median",  # strategy argument of sklearn.SimpleImputer() used to impute missing numeric values
-        "penalty": "L2",  # regularization to use with regression models
+        "penalty": "L2",  # regularization to use with classification and regression models
         "handle_text": IGNORE,  # how text should be handled: `ignore` - don't use NLP features; `only` - only use NLP features; `include` - use both regular and NLP features
     }
     return default_params
 
 
-def _get_solver(problem_type):
+def get_penalty(params: dict) -> str:
+    """Return the model's `penalty` hyperparameter, "L2" when unset, after checking it is "L1" or "L2"."""
+    penalty = params.get("penalty", "L2")
+    if penalty not in ("L1", "L2"):
+        raise ValueError(f'Unknown value for penalty "{penalty}" - supported types are ["L1", "L2"]')
+    return penalty
+
+
+def _get_solver(problem_type, penalty="L2"):
+    if penalty == "L1":
+        # SAGA supports L1 for both binary and multinomial logistic regression.
+        return "saga"
     if problem_type == BINARY:
         # TODO explore using liblinear for smaller datasets
         solver = "lbfgs"

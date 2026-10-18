@@ -295,7 +295,7 @@ class SemanticSegmentationLearner(BaseLearner):
         Optionally return a dataframe of prediction results.
         """
         data = self.on_predict_start(data)
-        return self.evaluate_semantic_segmentation(data, metrics, realtime)
+        return self.evaluate_semantic_segmentation(data, metrics, return_pred, realtime)
 
     def predict(
         self,

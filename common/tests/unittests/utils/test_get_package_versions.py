@@ -1,8 +1,21 @@
-import types
-
 import pytest
 
-from autogluon.common.utils.utils import get_package_versions
+from autogluon.common.utils.utils import (
+    _get_package_versions_cached,
+    _name_and_version_from_metadata_header,
+    _name_and_version_from_path,
+    compare_autogluon_metadata,
+    get_package_versions,
+    normalize_package_name,
+)
+
+
+@pytest.fixture(autouse=True)
+def _fresh_package_versions():
+    """Each test enumerates its own fake distributions, so the per-process cache is emptied around it."""
+    _get_package_versions_cached.cache_clear()
+    yield
+    _get_package_versions_cached.cache_clear()
 
 
 class _FakeDist:
@@ -94,3 +107,134 @@ def test_get_package_versions_strict_raises(monkeypatch):
 
     with pytest.raises(ValueError):
         get_package_versions(strict=True)
+
+
+def test_get_package_versions_is_computed_once_per_process(monkeypatch):
+    import importlib.metadata as im
+
+    calls = []
+
+    def distributions():
+        calls.append(1)
+        return iter([_FakeDist(metadata={"Name": "NumPy"}, version="2.0.0")])
+
+    monkeypatch.setattr(im, "distributions", distributions)
+    first, first_invalid = get_package_versions()
+    second, second_invalid = get_package_versions()
+    assert first == second == {"numpy": "2.0.0"} and first_invalid == second_invalid == []
+    assert len(calls) == 1
+    # callers get their own containers: mutating one result must not leak into the next
+    first["numpy"] = "changed"
+    first_invalid.append("x")
+    third, third_invalid = get_package_versions()
+    assert third == {"numpy": "2.0.0"} and third_invalid == []
+
+
+class _DiskDist:
+    """A distribution whose metadata lives on disk, like importlib's `PathDistribution`."""
+
+    def __init__(self, path, *, name="Fallback", version="9.9"):
+        self._path = path
+        self.name = name
+        self.version = version
+        self.metadata = {"Name": name}
+
+
+def test_metadata_header_read(tmp_path):
+    dist_info = tmp_path / "some_pkg-1.2.3.dist-info"
+    dist_info.mkdir()
+    (dist_info / "METADATA").write_text(
+        "Metadata-Version: 2.1\nName: Some_Pkg\nVersion: 1.2.3\nSummary: x\n\n"
+        "Name: not-the-name\nVersion: 0.0\nlong description\n",
+        encoding="utf-8",
+    )
+    assert _name_and_version_from_metadata_header(_DiskDist(dist_info)) == ("Some_Pkg", "1.2.3")
+
+    egg_info = tmp_path / "legacy.egg-info"
+    egg_info.mkdir()
+    (egg_info / "PKG-INFO").write_text("Metadata-Version: 1.0\nName: legacy\nVersion: 0.1\n", encoding="utf-8")
+    assert _name_and_version_from_metadata_header(_DiskDist(egg_info)) == ("legacy", "0.1")
+
+    empty = tmp_path / "empty.dist-info"
+    empty.mkdir()
+    assert _name_and_version_from_metadata_header(_DiskDist(empty)) == (None, None)
+    (empty / "METADATA").write_text("Version: 1.0\n\n", encoding="utf-8")  # no Name: fall back
+    assert _name_and_version_from_metadata_header(_DiskDist(empty)) == (None, None)
+    assert _name_and_version_from_metadata_header(_FakeDist(metadata={"Name": "x"})) == (None, None)
+
+
+def test_get_package_versions_prefers_the_header_and_falls_back_to_metadata(tmp_path, monkeypatch):
+    import importlib.metadata as im
+
+    dist_info = tmp_path / "some_pkg-1.2.3.dist-info"
+    dist_info.mkdir()
+    (dist_info / "METADATA").write_text("Name: Some_Pkg\nVersion: 1.2.3\n\nbody\n", encoding="utf-8")
+    on_disk = _DiskDist(dist_info, name="ignored", version="0")
+    no_file = _DiskDist(tmp_path / "missing.dist-info", name="FromMetadata", version="4.5")
+    monkeypatch.setattr(im, "distributions", lambda: iter([on_disk, no_file]))
+    versions, invalid = get_package_versions()
+    assert versions == {"some-pkg": "1.2.3", "frommetadata": "4.5"}
+    assert invalid == []
+
+
+def test_name_and_version_from_path(tmp_path):
+    assert _name_and_version_from_path(_DiskDist(tmp_path / "some_pkg-1.2.3.dist-info")) == ("some_pkg", "1.2.3")
+    assert _name_and_version_from_path(_DiskDist(tmp_path / "Some_Pkg-1.2.3b20260911.dist-info")) == (
+        "Some_Pkg",
+        "1.2.3b20260911",
+    )
+    assert _name_and_version_from_path(_DiskDist(tmp_path / "legacy-0.1-py3.11.egg-info")) == ("legacy", "0.1")
+    assert _name_and_version_from_path(_DiskDist(tmp_path / "legacy-0.1.egg-info")) == ("legacy", "0.1")
+    # an editable install's directory carries no version: the caller reads the metadata instead
+    assert _name_and_version_from_path(_DiskDist(tmp_path / "editable.egg-info")) == (None, None)
+    assert _name_and_version_from_path(_DiskDist(tmp_path / "not-a-metadata-dir")) == (None, None)
+    assert _name_and_version_from_path(_FakeDist(metadata={"Name": "x"})) == (None, None)
+
+
+def test_get_package_versions_reads_the_directory_name_before_any_file(tmp_path, monkeypatch):
+    import importlib.metadata as im
+
+    dist_info = tmp_path / "Dir_Named-7.7.dist-info"
+    dist_info.mkdir()
+    # no METADATA file at all: the directory name is enough
+    editable = tmp_path / "editable.egg-info"
+    editable.mkdir()
+    (editable / "PKG-INFO").write_text("Name: Editable.Pkg\nVersion: 0.0.1\n", encoding="utf-8")
+    monkeypatch.setattr(im, "distributions", lambda: iter([_DiskDist(dist_info), _DiskDist(editable)]))
+    versions, invalid = get_package_versions()
+    assert versions == {"dir-named": "7.7", "editable-pkg": "0.0.1"}
+    assert invalid == []
+
+
+def test_normalize_package_name():
+    assert (
+        normalize_package_name("autogluon.tabular")
+        == normalize_package_name("autogluon_tabular")
+        == "autogluon-tabular"
+    )
+    assert normalize_package_name("Scikit-Learn") == "scikit-learn"
+    assert normalize_package_name("nvidia-nccl-cu12") == normalize_package_name("nvidia_nccl_cu12")
+
+
+def test_compare_autogluon_metadata_matches_raw_and_normalized_names():
+    """Metadata saved before names were normalized compares equal to metadata saved after."""
+    base = dict(system="Linux", version="1.6", py_version="3.11", py_version_micro="3.11.15")
+    original = {**base, "packages": {"autogluon.tabular": "1.6", "Scikit-Learn": "1.5", "numpy": "2.0"}}
+    current = {**base, "packages": {"autogluon-tabular": "1.6", "scikit-learn": "1.5", "numpy": "2.0"}}
+    assert compare_autogluon_metadata(original=original, current=current) == []
+    current["packages"]["numpy"] = "2.1"
+    assert len(compare_autogluon_metadata(original=original, current=current)) == 1
+
+
+def test_get_package_versions_matches_the_full_metadata_parse_on_this_environment():
+    """The directory-name read must agree with `Distribution.metadata` for every installed distribution."""
+    import importlib.metadata as im
+
+    expected = {}
+    for dist in im.distributions():
+        name = dist.metadata.get("Name") if dist.metadata is not None else None
+        name = name or getattr(dist, "name", None)
+        if name:
+            expected[normalize_package_name(str(name))] = str(dist.version) if dist.version is not None else "unknown"
+    versions, _ = get_package_versions()
+    assert versions == expected

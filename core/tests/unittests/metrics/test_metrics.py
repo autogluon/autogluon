@@ -1,11 +1,12 @@
 from math import isclose
 
 import numpy as np
+import pandas as pd
 import pytest
 import sklearn
 
 from autogluon.core.constants import BINARY, MULTICLASS, QUANTILE, REGRESSION
-from autogluon.core.metrics import METRICS, Scorer, make_scorer, rmse_func
+from autogluon.core.metrics import METRICS, Scorer, get_metric, make_scorer, rmse_func
 
 METRICS_NEEDS_CLASS = {}
 METRICS_NEEDS_PROBA = {}
@@ -411,6 +412,15 @@ def test_rmse_with_sklearn(sample_weight):
     assert np.isclose(computed_rmse, expected_rmse)
 
 
+@pytest.mark.parametrize("y_true_type", [np.asarray, pd.Series])
+def test_rmse_nan_prediction_gives_nan(y_true_type):
+    """A NaN prediction makes rmse NaN, also when y_true is a pandas Series (whose mean would skip the NaN)."""
+    y_true = y_true_type(np.array([1.0, 2.0, 3.0, 4.0]))
+    y_pred = np.array([1.0, 2.0, 3.0, np.nan])
+    assert np.isnan(rmse_func(y_true, y_pred))
+    assert np.isnan(get_metric("rmse", problem_type=REGRESSION)(y_true, y_pred))
+
+
 def test_invalid_scorer():
     """
     Ensure various edge-cases are appropriately handled when Scorers are created incorrectly
@@ -433,3 +443,19 @@ def test_invalid_scorer():
     with pytest.raises(ValueError):
         # Invalid: Specifying needs_pred=True when needs_proba=True
         make_scorer("dummy", score_func=sklearn.metrics.accuracy_score, needs_pred=True, needs_proba=True)
+
+
+def test_get_metric_raw_callable_fails_fast():
+    raw_metric = sklearn.metrics.root_mean_squared_log_error
+    assert not isinstance(raw_metric, Scorer)
+    assert not hasattr(raw_metric, "needs_proba")
+
+    with pytest.raises(ValueError, match="make_scorer"):
+        get_metric(raw_metric, problem_type=REGRESSION, metric_type="eval_metric")
+
+    # Valid: an explicitly wrapped Scorer is still returned unchanged.
+    wrapped = make_scorer("rmsle", score_func=raw_metric, optimum=0, greater_is_better=False)
+    assert get_metric(wrapped, problem_type=REGRESSION, metric_type="eval_metric") is wrapped
+
+    # Valid: `metric=None` means "use the default" and must keep passing through.
+    assert get_metric(None, problem_type=REGRESSION, metric_type="eval_metric") is None

@@ -23,7 +23,7 @@ def patch_naive_models():
         mock.patch("autogluon.timeseries.models.local.naive.NaiveModel.predict", mock_predict),
         mock.patch("autogluon.timeseries.models.local.naive.SeasonalNaiveModel.predict", mock_predict),
         mock.patch("autogluon.timeseries.models.ensemble.weighted.greedy.GreedyEnsemble.fit", mock_greedy_fit),
-        # nvutil cudaInit and cudaShutdown is triggered for each run of the trainer. we disable this here
+        # GPU detection runs for each run of the trainer. we disable this here
         mock.patch("autogluon.common.utils.resource_utils.ResourceManager.get_gpu_count", return_value=0),
     ):
         yield

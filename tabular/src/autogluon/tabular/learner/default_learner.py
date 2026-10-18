@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 from pandas import DataFrame, Series
 
+from autogluon.common.features.feature_metadata import FeatureMetadata
 from autogluon.common.utils.log_utils import convert_time_in_s_to_log_friendly
 from autogluon.core.constants import AUTO_WEIGHT, BALANCE_WEIGHT, BINARY, MULTICLASS, QUANTILE, REGRESSION
 from autogluon.core.data import LabelCleaner
@@ -17,6 +18,7 @@ from autogluon.core.utils.time import sample_df_for_time_func, time_func
 from autogluon.core.utils.utils import augment_rare_classes, extract_column
 
 from ..trainer import AutoTrainer
+from ..trainer.group_views import GROUP_KEY_COLUMN, GroupPooling, group_codes, group_key_feature_metadata
 from .abstract_learner import AbstractTabularLearner
 
 logger = logging.getLogger(__name__)
@@ -55,6 +57,14 @@ class DefaultLearner(AbstractTabularLearner):
         verbosity: int = 2,
         raise_on_model_failure: bool = False,
         time_limit_preprocessing: float | None = None,
+        validation_structure=None,
+        no_validation: bool = False,
+        ensemble_weights: dict | None = None,
+        ensemble_weights_missing: str = "error",
+        ensemble_hyperparameters: dict | None = None,
+        validation_folds: int | None = None,
+        group_views: list[str] | None = None,
+        group_pooling: str | GroupPooling | tuple[str | GroupPooling, ...] | None = None,
         **trainer_fit_kwargs,
     ):
         """Arguments:
@@ -80,6 +90,7 @@ class DefaultLearner(AbstractTabularLearner):
         """
         # TODO: if provided, feature_types in X, X_val are ignored right now, need to pass to Learner/trainer and update this documentation.
         self._time_limit = time_limit
+        self._group_views = group_views
         if time_limit:
             logger.log(20, f"Beginning AutoGluon training ... Time limit = {time_limit:.0f}s")
         else:
@@ -110,6 +121,11 @@ class DefaultLearner(AbstractTabularLearner):
             # Ensure that the eval_metric is valid for the problem_type
             self._verify_metric(eval_metric=self.eval_metric, problem_type=self.problem_type)
         if self.groups is not None:
+            # `groups` is the deprecated spelling of `validation_structure={"group_on": ...}`; the
+            # structure itself is built in `TabularPredictor.fit` (DyStack needs it earlier than
+            # here). What remains is reproducing the fold arithmetic the `groups` channel implied:
+            # `CVSplitter` swapped in `LeaveOneGroupOut`, whose partition is exactly grouped k-fold
+            # at k == n_groups with a single repeat (verified for binary, multiclass and regression).
             num_bag_sets = 1
             num_bag_folds = len(X[self.groups].unique())
         X_og = None if infer_limit_batch_size is None else X
@@ -132,17 +148,41 @@ class DefaultLearner(AbstractTabularLearner):
         elif time_limit_for_preprocessing is not None:
             log_time_str = f" for up to {time_limit_for_preprocessing}s"
         logger.log(20, f"Preprocessing data{log_time_str}...")
-        X, y, X_val, y_val, X_test, y_test, X_unlabeled, holdout_frac, num_bag_folds, groups = (
-            self.general_data_processing(
-                X=X,
-                X_val=X_val,
-                X_test=X_test,
-                X_unlabeled=X_unlabeled,
-                holdout_frac=holdout_frac,
-                num_bag_folds=num_bag_folds,
-                time_limit=time_limit_for_preprocessing,
-            )
+        (
+            X,
+            y,
+            X_val,
+            y_val,
+            X_test,
+            y_test,
+            X_unlabeled,
+            holdout_frac,
+            num_bag_folds,
+            num_bag_sets,
+            groups,
+            structure_splits,
+        ) = self.general_data_processing(
+            X=X,
+            X_val=X_val,
+            X_test=X_test,
+            X_unlabeled=X_unlabeled,
+            holdout_frac=holdout_frac,
+            num_bag_folds=num_bag_folds,
+            num_bag_sets=num_bag_sets,
+            use_bag_holdout=trainer_fit_kwargs.get("use_bag_holdout", False),
+            time_limit=time_limit_for_preprocessing,
+            validation_structure=validation_structure,
+            no_validation=no_validation,
         )
+        if structure_splits is not None:
+            # Every bagged model consumes the same structure-aware splits (CVSplitter reads
+            # `custom_splits` from ag_args_ensemble), so repeats are honored unlike the
+            # groups channel, which forces leave-one-group-out with n_repeats == 1.
+            core_kwargs = dict(trainer_fit_kwargs.get("core_kwargs") or {})
+            ag_args_ensemble = dict(core_kwargs.get("ag_args_ensemble") or {})
+            ag_args_ensemble.setdefault("custom_splits", structure_splits)
+            core_kwargs["ag_args_ensemble"] = ag_args_ensemble
+            trainer_fit_kwargs["core_kwargs"] = core_kwargs
         if X_og is not None:
             infer_limit = self._update_infer_limit(
                 X=X_og, infer_limit_batch_size=infer_limit_batch_size, infer_limit=infer_limit
@@ -168,16 +208,19 @@ class DefaultLearner(AbstractTabularLearner):
             eval_metric=self.eval_metric,
             num_classes=self.label_cleaner.num_classes,
             quantile_levels=self.quantile_levels,
-            feature_metadata=self.feature_generator.feature_metadata,
-            low_memory=True,
+            feature_metadata=self._trainer_feature_metadata(),
+            low_memory=self.save_to_disk,  # in memory only: keep every model resident, nothing to reload
             k_fold=num_bag_folds,  # TODO: Consider moving to fit call
             n_repeats=num_bag_sets,  # TODO: Consider moving to fit call
             sample_weight=self.sample_weight,
             weight_evaluation=self.weight_evaluation,
-            save_data=self.cache_data,
+            save_data=self.cache_data,  # an in-memory trainer keeps the data in memory instead of pickling it
+            save_to_disk=self.save_to_disk,
             random_state=self.random_state,
             verbosity=verbosity,
             raise_on_model_failure=raise_on_model_failure,
+            group_views=group_views,
+            group_pooling=group_pooling,
         )
 
         self.trainer_path = trainer.path
@@ -197,7 +240,12 @@ class DefaultLearner(AbstractTabularLearner):
             time_limit=time_limit_trainer,
             infer_limit=infer_limit,
             infer_limit_batch_size=infer_limit_batch_size,
-            groups=groups,
+            validation_structure=validation_structure,
+            no_validation=no_validation,
+            ensemble_weights=ensemble_weights,
+            ensemble_weights_missing=ensemble_weights_missing,
+            ensemble_hyperparameters=ensemble_hyperparameters,
+            validation_folds=validation_folds,
             label_cleaner=copy.deepcopy(self.label_cleaner),
             **trainer_fit_kwargs,
         )
@@ -252,9 +300,9 @@ class DefaultLearner(AbstractTabularLearner):
                 infer_limit_new = 0
                 logger.log(
                     30,
-                    f"WARNING: Impossible to satisfy inference constraint, budget is exceeded during data preprocessing!\n"
-                    f"\tAutoGluon will be unable to satisfy the constraint, but will return the fastest model it can.\n"
-                    f"\tConsider using fewer features, relaxing the inference constraint, or simplifying the feature generator.",
+                    "WARNING: Impossible to satisfy inference constraint, budget is exceeded during data preprocessing!\n"
+                    "\tAutoGluon will be unable to satisfy the constraint, but will return the fastest model it can.\n"
+                    "\tConsider using fewer features, relaxing the inference constraint, or simplifying the feature generator.",
                 )
             infer_limit = infer_limit_new
         return infer_limit
@@ -268,7 +316,11 @@ class DefaultLearner(AbstractTabularLearner):
         X_unlabeled: DataFrame = None,
         holdout_frac: float = 1,
         num_bag_folds: int = 0,
+        num_bag_sets: int = 1,
+        use_bag_holdout: bool = False,
         time_limit: float | None = None,
+        validation_structure=None,
+        no_validation: bool = False,
     ):
         """General data processing steps used for all models."""
         X = self._check_for_non_finite_values(X, name="train", is_train=True)
@@ -285,8 +337,25 @@ class DefaultLearner(AbstractTabularLearner):
             # Metric requires all classes present in training to be able to compute a score
             if num_bag_folds > 0:
                 self.threshold = 2
-                if self.groups is None:
-                    X = augment_rare_classes(X, self.label, threshold=2)
+                # Applied whichever channel declares the grouping. Skipping it when `groups` was
+                # set left that path dropping single-row classes in the cleaner below while the
+                # `validation_structure` path duplicated them, so the two trained on different
+                # data for the same input; duplicating is the one that keeps the class.
+                X = augment_rare_classes(X, self.label, threshold=2)
+                if validation_structure is not None:
+                    # Duplicating rows cannot make a class span a second group, and only that
+                    # gives every fold a class to train on, so report what the threshold could
+                    # not deliver rather than implying it settled the matter.
+                    rare = validation_structure.rare_stratification_values(
+                        X, X[self.label], min_units=2, problem_type=self.problem_type
+                    )
+                    if rare:
+                        logger.warning(
+                            f"WARNING: stratification value(s) "
+                            f"{ {str(k): v for k, v in rare.items()} } occupy fewer than 2 groups, so "
+                            f"one fold will train on none of them. Duplicating rows cannot fix this; "
+                            f"add data in another group or expect those values to be predicted poorly."
+                        )
             else:
                 self.threshold = 1
 
@@ -306,6 +375,78 @@ class DefaultLearner(AbstractTabularLearner):
         y = self.label_cleaner.transform(y)
         X = self.set_predefined_weights(X, y)
         X, w = extract_column(X, self.sample_weight)
+        structure_splits = None
+        structure_holdout = None
+        if validation_structure is not None and num_bag_folds < 2 and X_val is None:
+            # Non-bagged holdout, resolved here for the same reason the bagged path below is:
+            # feature transformation can drop the very columns the structure names (TabArena's
+            # `tabarena_default` pipeline builds aggregate features from the group column and then
+            # drops it), and the trainer's own holdout split runs *after* that. Carving the rows
+            # here, off the raw cleaned frame, hands the trainer explicit validation data so it
+            # never needs to split — and never needs the structure columns to still exist.
+            # `holdout_split_indices` returns None for a stratify-only structure, where
+            # AutoGluon's default holdout already needs no correction.
+            holdout_split = validation_structure.holdout_split_indices(
+                X,
+                y,
+                holdout_frac=holdout_frac,
+                random_state=self.random_state,
+                problem_type=self.problem_type,
+            )
+            if holdout_split is not None:
+                train_idx, val_idx = holdout_split
+                structure_holdout = (X.iloc[val_idx].copy(), y.iloc[val_idx].copy())
+                X, y = X.iloc[train_idx].copy(), y.iloc[train_idx].copy()
+                if w is not None:
+                    w = w.iloc[train_idx].copy()
+                logger.log(
+                    20,
+                    f"Structure-aware holdout: {len(val_idx)} validation rows "
+                    f"(holdout_frac={holdout_frac}); training on {len(X)} rows.",
+                )
+        if validation_structure is not None and num_bag_folds >= 2:
+            # Structure-aware bagging: explicit (train_idx, val_idx) splits, computed on the
+            # raw cleaned frame before feature transformation can alter the referenced
+            # columns. Explicit splits rather than the `groups` channel because that channel
+            # forces leave-one-group-out with n_repeats == 1, ruling out repeated bagging.
+            if use_bag_holdout and X_val is None:
+                # Carve the bag-holdout here, before the splits are resolved, so the split
+                # indices address the rows that actually reach bagging. Resolving splits first
+                # and letting the trainer remove rows afterwards leaves indices pointing past
+                # the end of the reduced frame.
+                bag_holdout_split = validation_structure.holdout_split_indices(
+                    X,
+                    y,
+                    holdout_frac=holdout_frac,
+                    random_state=self.random_state,
+                    problem_type=self.problem_type,
+                    # Bagging follows this carve, so every class must survive into the bagged rows.
+                    min_cls_count_train=2,
+                )
+                if bag_holdout_split is not None:
+                    train_idx, val_idx = bag_holdout_split
+                    structure_holdout = (X.iloc[val_idx].copy(), y.iloc[val_idx].copy())
+                    X, y = X.iloc[train_idx].copy(), y.iloc[train_idx].copy()
+                    if w is not None:
+                        w = w.iloc[train_idx].copy()
+                    logger.log(
+                        20,
+                        f"use_bag_holdout with validation_structure: holding out {len(val_idx)} rows "
+                        f"(structure-aware, holdout_frac={holdout_frac}); bagging over {len(X)} rows.",
+                    )
+            custom_splits, num_bag_folds, num_bag_sets = validation_structure.custom_splits(
+                X,
+                y,
+                num_folds=num_bag_folds,
+                num_repeats=num_bag_sets,
+                random_state=self.random_state,
+                problem_type=self.problem_type,
+            )
+            structure_splits = custom_splits
+        # After the splits are resolved, not before: the structure reads the group/time columns off
+        # `X`, while `groups` additionally requires its column not to be trained on. Dropping it
+        # here satisfies both -- the splits are already computed, and the column never reaches
+        # feature generation.
         X, groups = extract_column(X, self.groups)
         if self.label_cleaner.num_classes is not None and self.problem_type != BINARY:
             logger.log(20, f"Train Data Class Count: {self.label_cleaner.num_classes}")
@@ -318,6 +459,11 @@ class DefaultLearner(AbstractTabularLearner):
             name="val",
             is_test=False,
         )
+        if structure_holdout is not None:
+            # Already label-cleaned (carved off the cleaned frame above), so it skips the cleaner
+            # transform and is handed to the trainer directly -- as its bag-holdout when bagging,
+            # or as its validation data on the non-bagged path.
+            X_val, y_val = structure_holdout
         X_test, y_test, w_test, _ = self._apply_cleaner_transform(
             X=X_test,
             y_uncleaned=y_uncleaned,
@@ -329,7 +475,7 @@ class DefaultLearner(AbstractTabularLearner):
 
         self._original_features = list(X.columns)
         # TODO: Move this up to top of data before removing data, this way our feature generator is better
-        logger.log(20, f"Using Feature Generators to preprocess the data ...")
+        logger.log(20, "Using Feature Generators to preprocess the data ...")
 
         if X_test is not None:
             logger.log(
@@ -345,6 +491,13 @@ class DefaultLearner(AbstractTabularLearner):
         if transform_with_test:
             X_test_super = X_test
             y_test_super = y_test
+
+        # Computed off the raw frames: feature generation may transform or drop the `group_on` columns.
+        group_keys = (
+            [None if data is None else group_codes(data, self._group_views) for data in (X, X_val, X_test)]
+            if self._group_views
+            else None
+        )
 
         datasets = [X, X_val, X_test_super, X_unlabeled]
         X_super = pd.concat(datasets, ignore_index=True)
@@ -385,11 +538,38 @@ class DefaultLearner(AbstractTabularLearner):
         if transform_with_test:
             X_test = X_test_super
 
+        if group_keys is not None:
+            X, X_val, X_test = (
+                data if data is None else data.assign(**{GROUP_KEY_COLUMN: keys})
+                for data, keys in zip((X, X_val, X_test), group_keys)
+            )
+
         # TODO: consider not bundling sample-weights inside X, X_val
         X = self.bundle_weights(X, w, "X", is_train=True)
         X_val = self.bundle_weights(X_val, w_val, "X_val", is_train=False)
         X_test = self.bundle_weights(X_test, w_test, "X_test", is_train=False)
-        return X, y, X_val, y_val, X_test, y_test, X_unlabeled, holdout_frac, num_bag_folds, groups
+        return (
+            X,
+            y,
+            X_val,
+            y_val,
+            X_test,
+            y_test,
+            X_unlabeled,
+            holdout_frac,
+            num_bag_folds,
+            num_bag_sets,
+            groups,
+            structure_splits,
+        )
+
+    def _trainer_feature_metadata(self) -> FeatureMetadata:
+        """The metadata of the features the trainer receives: the generated features, plus the group key under
+        group views."""
+        feature_metadata = self.feature_generator.feature_metadata
+        if self._group_views:
+            feature_metadata = feature_metadata.join_metadata(group_key_feature_metadata())
+        return feature_metadata
 
     def bundle_weights(self, X: DataFrame | None, w: Series | None, name: str, is_train=False) -> DataFrame:
         if is_train:
@@ -436,9 +616,12 @@ class DefaultLearner(AbstractTabularLearner):
             X = copy.deepcopy(X)
 
             # treat None, NaN, INF, NINF as NA
-            # `.infer_objects(copy=False)` retains the pre-pandas-2.2 dtype behavior of `replace`
-            # explicitly, avoiding the "Downcasting behavior in `replace` is deprecated" FutureWarning.
-            X[self.label] = X[self.label].replace([np.inf, -np.inf], np.nan).infer_objects(copy=False)
+            # The option context keeps `replace` from downcasting internally (which logs the
+            # "Downcasting behavior in `replace` is deprecated" FutureWarning whenever the label
+            # arrives as a numeric-valued object column); `.infer_objects(copy=False)` then applies
+            # the same downcast explicitly, so values and dtype match the pre-pandas-2.2 behavior.
+            with pd.option_context("future.no_silent_downcasting", True):
+                X[self.label] = X[self.label].replace([np.inf, -np.inf], np.nan).infer_objects(copy=False)
             invalid_labels = X[self.label].isna()
             if invalid_labels.any():
                 first_invalid_label_idx = invalid_labels.idxmax()

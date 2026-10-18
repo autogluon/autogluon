@@ -1,7 +1,7 @@
 import logging
 import os
 import shutil
-import subprocess
+import sys
 from typing import Union
 
 from autogluon.common.utils.try_import import try_import_ray
@@ -43,10 +43,8 @@ class ResourceManager:
 
     @staticmethod
     def get_gpu_count() -> int:
-        num_gpus = ResourceManager._get_gpu_count_cuda()
-        if num_gpus == 0:
-            num_gpus = ResourceManager.get_gpu_count_torch()
-        return num_gpus
+        """The GPUs this process can use: `get_gpu_count_torch`, so every consumer sees one count."""
+        return ResourceManager.get_gpu_count_torch()
 
     @staticmethod
     def get_gpu_count_torch(cuda_only: bool = False) -> int:
@@ -63,7 +61,17 @@ class ResourceManager:
         -------
         int
             Number of available GPUs. When cuda_only=True, returns the actual CUDA device count.
+
+        The count is what torch reports. While torch is not imported yet it is computed from
+        NVML and `CUDA_VISIBLE_DEVICES` instead (see `gpu_count`), so a fit without GPU models
+        does not pay for importing torch.
         """
+        if "torch" not in sys.modules:
+            from .gpu_count import gpu_count_without_torch
+
+            num_gpus = gpu_count_without_torch(cuda_only=cuda_only)
+            if num_gpus is not None:
+                return num_gpus
         try:
             import torch
 
@@ -76,32 +84,63 @@ class ResourceManager:
             else:
                 num_gpus = 0
         except Exception:
-            logger.log(
-                40,
-                "\tFailed to import torch or check CUDA availability!"
-                "Please ensure you have the correct version of PyTorch installed by running `pip install -U torch`",
-            )
+            # An install without torch has no GPU it could use; that is an answer, not an error.
+            logger.log(10, "\tCould not import torch to count GPUs; assuming none are available.")
             num_gpus = 0
         return num_gpus
 
     @staticmethod
-    def get_gpu_free_memory():
-        """Grep gpu free memory from nvidia-smi tool.
-        This function can fail due to many reasons(driver, nvidia-smi tool, envs, etc) so please simply use
-        it as a suggestion, stay away with any rules bound to it.
-        E.g. for a 4-gpu machine, the result can be list of int
-        >>> print(get_gpu_free_memory)
-        >>> [13861, 13859, 13859, 13863]
-        """
-        _output_to_list = lambda x: x.decode("ascii").split("\n")[:-1]
+    def get_available_vram(device: int = 0) -> float | None:
+        """Available GPU memory (VRAM) of `device` in bytes, or None when it cannot be determined.
 
+        The GPU counterpart of `get_available_virtual_mem`. Three effects make this more
+        than a `torch.cuda.mem_get_info` call:
+
+        1. `mem_get_info` reports memory free on the *device*, which excludes memory
+           PyTorch's caching allocator already holds. That memory is reusable by this
+           process without a new device allocation, so it is added back
+           (`memory_reserved - memory_allocated`); ignoring it under-reports what a fit
+           can actually use and needlessly skips models.
+        2. `torch.cuda.set_per_process_memory_fraction` caps this process below the
+           device total. The cap is not visible to `mem_get_info`, so it is applied here —
+           a process allocating past its fraction OOMs even with the device free.
+        3. Without torch/CUDA, NVML gives device-level free memory only (no allocator or
+           fraction information available).
+        """
         try:
-            COMMAND = "nvidia-smi --query-gpu=memory.free --format=csv"
-            memory_free_info = _output_to_list(subprocess.check_output(COMMAND.split()))[1:]
-            memory_free_values = [int(x.split()[0]) for i, x in enumerate(memory_free_info)]
-        except:
-            memory_free_values = []
-        return memory_free_values
+            import torch
+
+            if torch.cuda.is_available() and device < torch.cuda.device_count():
+                device_free, device_total = torch.cuda.mem_get_info(device)
+                cached_unused = torch.cuda.memory_reserved(device) - torch.cuda.memory_allocated(device)
+                available = float(device_free + cached_unused)
+
+                # Respect a per-process cap when one is set (used to partition a GPU
+                # across processes). The getter exists from torch 2.9; older versions
+                # expose no way to read it back, so the cap is simply not applied.
+                get_fraction = getattr(torch.cuda, "get_per_process_memory_fraction", None)
+                if get_fraction is not None:
+                    fraction = float(get_fraction(device))
+                    if fraction < 1.0:
+                        process_headroom = fraction * device_total - torch.cuda.memory_allocated(device)
+                        available = min(available, max(process_headroom, 0.0))
+                return min(available, float(device_total))
+        except Exception:
+            pass
+        memory_free_values = ResourceManager.get_gpu_free_memory()  # MiB per device
+        if device < len(memory_free_values):
+            return float(memory_free_values[device]) * 1024**2
+        return None
+
+    @staticmethod
+    def get_gpu_free_memory():
+        """Free memory in MiB of each GPU this process can see, in visible-device order; `[]` when NVML cannot tell."""
+        from .gpu_count import visible_device_memory
+
+        memory = visible_device_memory()
+        if memory is None:
+            return []
+        return [int(free // (1024**2)) for total, free, used in memory]
 
     @staticmethod
     def get_memory_size(format: str = "B") -> float:
@@ -187,18 +226,6 @@ class ResourceManager:
         return shutil.disk_usage(path=path)
 
     @staticmethod
-    def _get_gpu_count_cuda():
-        # FIXME: Sometimes doesn't detect GPU on Windows
-        # FIXME: Doesn't ensure the GPUs are actually usable by the model (PyTorch, etc.)
-        from .nvutil import cudaDeviceGetCount, cudaInit, cudaShutdown
-
-        if not cudaInit():
-            return 0
-        gpu_count = cudaDeviceGetCount()
-        cudaShutdown()
-        return gpu_count
-
-    @staticmethod
     def _get_custom_memory_size():
         memory_limit = float(os.environ.get("AG_MEMORY_LIMIT_IN_GB"))
 
@@ -276,6 +303,15 @@ class RayResourceManager:
     def get_gpu_count() -> int:
         """Get number of gpus available in the cluster"""
         return int(RayResourceManager._get_cluster_resources("GPU"))
+
+    @staticmethod
+    def get_gpu_count_torch(cuda_only: bool = False) -> int:
+        """Get the number of GPUs this process can address with torch, see `ResourceManager.get_gpu_count_torch`.
+
+        This describes the local process, not the cluster: callers use it for the devices they can index with torch,
+        for example the per-device memory in the system info. For the GPUs in the cluster, use `get_gpu_count`.
+        """
+        return ResourceManager.get_gpu_count_torch(cuda_only=cuda_only)
 
     @staticmethod
     def get_available_virtual_mem(format: str = "B") -> float:

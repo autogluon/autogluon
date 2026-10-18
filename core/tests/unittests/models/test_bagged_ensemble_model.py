@@ -1,8 +1,30 @@
+import pickle
+
 import numpy as np
 import pandas as pd
+import pytest
 
 from autogluon.common.utils.cv_splitter import CVSplitter
+from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
 from autogluon.core.models import BaggedEnsembleModel
+from autogluon.core.models.dummy.dummy_model import DummyModel
+
+
+class ChildOOFDummyModel(DummyModel):
+    """A core-only stand-in for a model that produces its own out-of-fold predictions.
+
+    ``use_child_oof`` requires a child tagged ``valid_oof`` with a working ``predict_proba_oof``
+    (RandomForest's OOB, KNN's leave-one-out). No model in ``autogluon.core`` has that, so these
+    tests reached into ``autogluon.tabular`` for one -- which is not installed in the ``test_core``
+    CI job, where they failed with ``ModuleNotFoundError``. The behaviour under test belongs to the
+    bag, not to the child, so a local child keeps the tests in core and running everywhere.
+    """
+
+    def predict_proba_oof(self, X, **kwargs) -> np.ndarray:
+        return self.predict_proba(X=X, **kwargs)
+
+    def _more_tags(self) -> dict:
+        return {"valid_oof": True}
 
 
 def test_generate_fold_configs():
@@ -128,3 +150,439 @@ def test_generate_fold_configs_with_offset_index():
     # iloc access with those positional indices gives the correct labels
     assert X.iloc[test_idx_0].index[0] == 1000
     assert X.iloc[test_idx_1].index[0] == 1000 + n // 2
+
+
+class OofCapableDummyModel(DummyModel):
+    """A DummyModel that reports its own out-of-fold predictions, as forests / KNN do.
+
+    Module scope rather than nested in a test, so a fitted bag can be pickled.
+    """
+
+    def predict_proba_oof(self, X, y=None, **kwargs):
+        return self.predict_proba(X=X)
+
+    def _more_tags(self):
+        return {"valid_oof": True}
+
+
+def test_use_child_oof_disabled_by_custom_splits():
+    """`use_child_oof` must yield to explicit splits, which exist to prevent leakage.
+
+    A child's internal out-of-bag estimate resamples rows independently, so on grouped or
+    temporal data it scores across the very boundary the splits enforce. `custom_splits` is the
+    channel grouped / temporal validation arrives through (directly via `ag_args_ensemble`, or
+    resolved from a `validation_structure`), so it must force real cross-validation -- as
+    `groups` already did.
+    """
+    n_rows = 12
+    X = pd.DataFrame({"a": range(n_rows)})
+    y = pd.Series([0, 1] * (n_rows // 2))
+    splits = [
+        (np.arange(4, n_rows), np.arange(0, 4)),
+        (np.setdiff1d(np.arange(n_rows), np.arange(4, 8)), np.arange(4, 8)),
+        (np.arange(0, 8), np.arange(8, n_rows)),
+    ]
+
+    bagged = BaggedEnsembleModel(
+        model_base=DummyModel(),
+        hyperparameters={"use_child_oof": True, "custom_splits": splits, "fold_fitting_strategy": "sequential_local"},
+    )
+    bagged.fit(X=X, y=y, k_fold=len(splits))
+
+    # One child per supplied split (not the single child `use_child_oof` would have trained),
+    # and every row has an out-of-fold prediction from the fold that held it out.
+    assert bagged.n_children == len(splits)
+    assert len(bagged._oof_pred_proba) == n_rows
+
+    # The realized folds are the ones that were passed in.
+    realized = [tuple(val_idx) for _, val_idx in bagged._cv_splitters[0].split(X=X, y=y)]
+    assert realized == [tuple(val_idx) for _, val_idx in splits]
+
+
+def test_use_child_oof_kept_without_custom_splits():
+    """Without explicit splits there is no boundary to violate, so `use_child_oof` still applies.
+
+    The counterpart of the test above: the guard must be specific to explicit splits rather than
+    disabling `use_child_oof` generally.
+    """
+    X = pd.DataFrame({"a": range(12)})
+    y = pd.Series([0, 1] * 6)
+
+    bagged = BaggedEnsembleModel(
+        model_base=OofCapableDummyModel(),
+        hyperparameters={"use_child_oof": True, "fold_fitting_strategy": "sequential_local"},
+    )
+    bagged.fit(X=X, y=y, k_fold=3)
+
+    # A single child, whose own estimate stands in for cross-validation.
+    assert bagged.n_children == 1
+
+
+def test_oof_is_nan_for_rows_no_fold_validated():
+    """Rows outside every validation fold must read as missing, not as a prediction of 0.
+
+    The out-of-fold accumulator starts at 0, so a row no fold validated would otherwise emerge as
+    a confident 0 — silently wrong for anything consuming out-of-fold predictions as features or
+    as a score. Partial coverage is reachable via explicit splits that skip rows, which is what
+    forward-chaining temporal validation does with its earliest time block.
+    """
+    n_rows = 12
+    X = pd.DataFrame({"a": range(n_rows)})
+    y = pd.Series([0, 1] * (n_rows // 2))
+    # Expanding-window splits: rows 0-3 are training data only and never validated.
+    splits = [
+        (np.arange(0, 4), np.arange(4, 8)),
+        (np.arange(0, 8), np.arange(8, n_rows)),
+    ]
+
+    bagged = BaggedEnsembleModel(
+        model_base=DummyModel(),
+        hyperparameters={"custom_splits": splits, "fold_fitting_strategy": "sequential_local"},
+    )
+    bagged.fit(X=X, y=y, k_fold=len(splits))
+
+    oof = bagged.predict_proba_oof()
+    uncovered = np.arange(0, 4)
+    covered = np.arange(4, n_rows)
+    assert np.isnan(np.asarray(oof, dtype=float)[uncovered]).all()
+    assert not np.isnan(np.asarray(oof, dtype=float)[covered]).any()
+
+    # Scoring already excludes the uncovered rows, so a score is still produced.
+    assert bagged.score_with_oof(y=y) is not None
+
+
+def test_oof_has_no_nan_when_every_row_is_validated():
+    """The ordinary case is untouched: full coverage means no NaN."""
+    X = pd.DataFrame({"a": range(12)})
+    y = pd.Series([0, 1] * 6)
+
+    bagged = BaggedEnsembleModel(
+        model_base=DummyModel(),
+        hyperparameters={"fold_fitting_strategy": "sequential_local"},
+    )
+    bagged.fit(X=X, y=y, k_fold=3)
+
+    assert not np.isnan(np.asarray(bagged.predict_proba_oof(), dtype=float)).any()
+
+
+def test_refit_folds_carries_oof_fold_val_idx():
+    """`refit_folds` keeps the OOF predictions of the folds it discards, so it must also keep
+    the validation indices that say which fold produced each OOF row. Without them the refit's
+    own single child is the only split on record, and every OOF row looks like it came from a
+    model trained on all the data.
+    """
+    k_fold = 4
+    n_rows = 40
+    rng = np.random.default_rng(0)
+    X = pd.DataFrame({"a": rng.normal(size=n_rows), "b": rng.normal(size=n_rows)})
+    y = pd.Series(rng.integers(0, 2, size=n_rows))
+
+    bag = BaggedEnsembleModel(
+        model_base=DummyModel(),
+        hyperparameters={"refit_folds": True, "fold_fitting_strategy": "sequential_local"},
+    )
+    refit = bag.fit(X=X, y=y, k_fold=k_fold)
+
+    assert not refit._child_oof, "the OOF came from the folds, not from one child's own mechanism"
+    assert refit._refit_oof
+    assert len(refit.models) == 1, "refit_folds keeps one child, not one per fold"
+
+    val_idx = refit._oof_fold_val_idx
+    assert val_idx is not None, "the discarded folds' validation indices must survive the refit"
+    assert len(val_idx) == k_fold
+
+    covered = np.concatenate(val_idx)
+    assert len(covered) == n_rows, "one bag set: every row is validated exactly once"
+    assert sorted(covered.tolist()) == list(range(n_rows))
+
+
+def test_non_refit_bag_has_no_oof_fold_val_idx():
+    """A plain bag's own `_cv_splitters` already describe its folds, so nothing is carried."""
+    rng = np.random.default_rng(0)
+    X = pd.DataFrame({"a": rng.normal(size=40), "b": rng.normal(size=40)})
+    y = pd.Series(rng.integers(0, 2, size=40))
+
+    bag = BaggedEnsembleModel(
+        model_base=DummyModel(),
+        hyperparameters={"fold_fitting_strategy": "sequential_local"},
+    )
+    fitted = bag.fit(X=X, y=y, k_fold=4)
+
+    assert fitted._oof_fold_val_idx is None
+    assert len(fitted.models) == 4
+
+
+def test_reduce_memory_size_drops_oof_fold_val_idx():
+    """The indices describe the OOF predictions, so they go when those are discarded
+    (`save_space` / `clone_for_deployment` reach here via `remove_fit_stack=True`).
+    """
+    rng = np.random.default_rng(0)
+    X = pd.DataFrame({"a": rng.normal(size=40), "b": rng.normal(size=40)})
+    y = pd.Series(rng.integers(0, 2, size=40))
+
+    bag = BaggedEnsembleModel(
+        model_base=DummyModel(),
+        hyperparameters={"refit_folds": True, "fold_fitting_strategy": "sequential_local"},
+    )
+    refit = bag.fit(X=X, y=y, k_fold=4)
+    assert refit._oof_fold_val_idx is not None
+
+    refit.reduce_memory_size(remove_fit_stack=True, requires_save=True)
+    assert refit._oof_fold_val_idx is None
+    assert refit._oof_pred_proba is None
+
+
+def _fit_bag(hyperparameters, model_base=None, k_fold=4, n_rows=60):
+    rng = np.random.default_rng(0)
+    X = pd.DataFrame({"a": rng.normal(size=n_rows), "b": rng.normal(size=n_rows)})
+    y = pd.Series(rng.integers(0, 2, size=n_rows))
+    base = DummyModel() if model_base is None else model_base
+    hp = {"fold_fitting_strategy": "sequential_local", **hyperparameters}
+    return BaggedEnsembleModel(model_base=base, hyperparameters=hp).fit(X=X, y=y, k_fold=k_fold)
+
+
+def test_oof_provenance_plain_bag():
+    """A plain bag owns the fold models, so its OOF can be recomputed on permuted features."""
+    bag = _fit_bag({})
+    assert bag.has_oof and bag.is_valid_oof()
+    assert bag.can_infer_oof
+
+
+def test_oof_provenance_refit_folds():
+    """A refit inherits valid OOF but not the models that made it."""
+    refit = _fit_bag({"refit_folds": True})
+    assert refit.has_oof and refit.is_valid_oof(), "refit_folds keeps the bag's OOF"
+    assert not refit.can_infer_oof, "the fold models were discarded"
+
+
+def test_oof_provenance_child_oof():
+    """A child-OOF model's OOF is internal to one model, with no per-fold models to re-predict."""
+    bag = _fit_bag({"use_child_oof": True}, model_base=ChildOOFDummyModel())
+    assert bag._child_oof and not bag._refit_oof
+    assert bag.has_oof and bag.is_valid_oof()
+    assert not bag.can_infer_oof
+
+
+def test_get_oof_fold_val_idx_covers_every_provenance():
+    """One call answers "which rows did each child validate?" for all three provenances."""
+    rng = np.random.default_rng(0)
+    # A shifted, shuffled index: positions and labels coincide under a RangeIndex, so a
+    # trivial index would hide the `_child_oof` case emitting labels.
+    index = rng.permutation(np.arange(1000, 1060))
+    X = pd.DataFrame({"a": rng.normal(size=60), "b": rng.normal(size=60)}, index=index)
+    y = pd.Series(rng.integers(0, 2, size=60), index=index)
+
+    cases = [(_fit_bag({}), 4), (_fit_bag({"refit_folds": True}), 4)]
+    cases.append((_fit_bag({"use_child_oof": True}, model_base=ChildOOFDummyModel()), 1))
+    for model, n_entries in cases:
+        val_idx = model.get_oof_fold_val_idx(X=X, y=y)
+        assert len(val_idx) == n_entries
+        covered = np.concatenate([np.asarray(v) for v in val_idx])
+        assert len(covered) == len(X), "one bag set: every row validated exactly once"
+        # Positions into X, never index labels: every case must be indexable the same way.
+        assert sorted(covered.tolist()) == list(range(len(X)))
+
+
+def test_get_oof_fold_val_idx_raises_once_the_oof_is_dropped():
+    """`_refit_oof` outlives the indices, so the refit branch has to say so rather than return None."""
+    rng = np.random.default_rng(0)
+    X = pd.DataFrame({"a": rng.normal(size=60), "b": rng.normal(size=60)})
+    y = pd.Series(rng.integers(0, 2, size=60))
+
+    refit = _fit_bag({"refit_folds": True})
+    refit.reduce_memory_size(remove_fit_stack=True, requires_save=True)
+    with pytest.raises(AssertionError, match="Fold validation indices were dropped"):
+        refit.get_oof_fold_val_idx(X=X, y=y)
+
+
+def test_get_info_loads_each_child_once(monkeypatch):
+    """`get_info` reads a child's info, hyperparameters and trained hyperparameters from a single load."""
+    bag = _fit_bag({}, k_fold=3)
+    assert all(isinstance(model, str) for model in bag.models), "a low-memory bag holds its children on disk"
+    children = [bag.load_child(model) for model in bag.models]
+
+    loaded_paths = []
+    load = DummyModel.load
+
+    def counting_load(path, **kwargs):
+        loaded_paths.append(path)
+        return load(path=path, **kwargs)
+
+    monkeypatch.setattr(DummyModel, "load", staticmethod(counting_load))
+    info = bag.get_info()
+
+    assert len(loaded_paths) == 3
+    assert len(set(loaded_paths)) == 3
+    assert list(info["children_info"]) == [child.name for child in children]
+    assert info["bagged_info"]["child_hyperparameters"] == children[0].params
+    assert info["bagged_info"]["child_ag_args_fit"] == children[0].params_aux
+    assert info["bagged_info"]["child_hyperparameters_user"] == children[0].get_hyperparameters_init()
+    assert info["bagged_info"]["child_hyperparameters_fit"] == bag._get_compressed_params_trained()
+    assert info["bagged_info"]["num_child_models"] == 3
+
+
+def test_get_memory_size_excludes_children_and_skips_gc(monkeypatch):
+    """The bag measures its own pickle without the children, and without a garbage collection pass."""
+    import gc
+    import pickle
+    import sys
+
+    bag = _fit_bag({}, k_fold=3)
+    collects = []
+    monkeypatch.setattr(gc, "collect", lambda *args, **kwargs: collects.append(args))
+
+    memory_size = bag.get_memory_size()
+
+    assert collects == []
+    assert bag.models and all(isinstance(model, str) for model in bag.models), "children are reattached"
+    models, bag.models = bag.models, None
+    try:
+        assert memory_size == sys.getsizeof(pickle.dumps(bag, protocol=4))
+    finally:
+        bag.models = models
+
+
+def test_get_info_leaves_out_a_child_without_memory_size(monkeypatch):
+    """A child whose pickle fails reports ``memory_size=None`` (``get_memory_size(allow_exception=True)``);
+    the bag's totals leave that child out instead of failing on the ``None``."""
+    bag = _fit_bag({}, k_fold=3)
+    first = bag.load_child(bag.models[0]).name
+    get_memory_size = DummyModel.get_memory_size
+
+    def failing_for_first(self, allow_exception=False):
+        if self.name == first:
+            if allow_exception:
+                return None
+            raise pickle.PicklingError("cannot pickle")
+        return get_memory_size(self, allow_exception=allow_exception)
+
+    monkeypatch.setattr(DummyModel, "get_memory_size", failing_for_first)
+    info = bag.get_info()
+
+    children = info["children_info"]
+    assert children[first]["memory_size"] is None
+    others = [child["memory_size"] for name, child in children.items() if name != first]
+    assert len(others) == 2 and all(isinstance(size, int) for size in others)
+    bagged_info = info["bagged_info"]
+    if bagged_info["low_memory"]:
+        assert bagged_info["max_memory_size"] == info["memory_size"] + sum(others)
+        assert bagged_info["min_memory_size"] == info["memory_size"] + max(others)
+    else:
+        assert bagged_info["max_memory_size"] == info["memory_size"]
+        assert bagged_info["min_memory_size"] == info["memory_size"] - sum(others) + max(others)
+
+
+def test_get_info_totals_are_none_without_the_bags_memory_size(monkeypatch):
+    """When the bag's own pickle fails, the aggregate memory sizes are ``None`` like its ``memory_size``."""
+    bag = _fit_bag({}, k_fold=3)
+    monkeypatch.setattr(BaggedEnsembleModel, "get_memory_size", lambda self, allow_exception=False: None)
+
+    info = bag.get_info()
+
+    assert info["memory_size"] is None
+    assert info["bagged_info"]["max_memory_size"] is None
+    assert info["bagged_info"]["min_memory_size"] is None
+    assert all(isinstance(child["memory_size"], int) for child in info["children_info"].values())
+
+
+class _LinearDummyModel(DummyModel):
+    """A DummyModel whose children differ: a linear fit on the fold's rows rather than a constant."""
+
+    def _get_model_type(self):
+        from sklearn.linear_model import LinearRegression, LogisticRegression
+
+        return LinearRegression if self.problem_type == REGRESSION else LogisticRegression
+
+
+def _fit_linear_bag(problem_type: str, max_batch_size: int | None = None, n_rows: int = 60):
+    rng = np.random.default_rng(0)
+    X = pd.DataFrame({"a": rng.normal(size=n_rows), "b": rng.normal(size=n_rows)})
+    signal = X["a"] + rng.normal(scale=0.5, size=n_rows)
+    if problem_type == REGRESSION:
+        y = pd.Series(signal)
+    elif problem_type == MULTICLASS:
+        y = pd.Series(pd.qcut(signal, 3, labels=False).astype(int))
+    else:
+        y = pd.Series((signal > 0).astype(int))
+    hyperparameters = {"fold_fitting_strategy": "sequential_local"}
+    if max_batch_size is not None:
+        hyperparameters["ag.max_batch_size"] = max_batch_size
+    base = _LinearDummyModel(problem_type=problem_type)
+    bag = BaggedEnsembleModel(model_base=base, hyperparameters=hyperparameters).fit(X=X, y=y, k_fold=3)
+    return bag, X
+
+
+@pytest.mark.parametrize("problem_type", [BINARY, MULTICLASS, REGRESSION])
+@pytest.mark.parametrize("max_batch_size", [None, 25])
+def test_predict_proba_from_children_matches_predict_proba(problem_type, max_batch_size):
+    """One pass over the children gives both the per-child arrays and, through the same arithmetic, the bag's output."""
+    bag, X = _fit_linear_bag(problem_type, max_batch_size=max_batch_size)
+    expected = bag.predict_proba(X)  # 60 rows, predicted in chunks of 25 when max_batch_size is set
+
+    children = bag.predict_proba_children(X)
+    before = [child.copy() for child in children]
+    y_pred_proba = bag.predict_proba_from_children(children)
+
+    assert len(children) == bag.n_children == 3
+    assert not np.array_equal(children[0], children[1]), "the children differ, so the mean is a real check"
+    assert y_pred_proba.dtype == expected.dtype == np.float32
+    assert np.array_equal(y_pred_proba, expected), "bit-identical to predict_proba"
+    for child, copy_before in zip(children, before):
+        assert np.array_equal(child, copy_before), "the children's arrays are left untouched"
+
+
+def test_predict_proba_from_children_applies_the_bags_calibration():
+    bag, X = _fit_linear_bag(BINARY)
+    children = bag.predict_proba_children(X)
+    plain = bag.predict_proba_from_children(children)
+
+    bag.temperature_scalar = 2.0
+
+    calibrated = bag.predict_proba_from_children(children)
+    assert np.array_equal(calibrated, bag.predict_proba(X)), "the same post-hoc calibration as predict_proba"
+    assert not np.array_equal(calibrated, plain)
+
+
+def test_predict_proba_from_children_rejects_a_subset_of_children():
+    bag, X = _fit_linear_bag(REGRESSION)
+    with pytest.raises(ValueError, match="expected the predictions of 3 children"):
+        bag.predict_proba_from_children(bag.predict_proba_children(X, children_idx=[0, 1]))
+
+
+def test_mean_pred_proba_children_copies_unless_in_place():
+    first = np.array([1.0, 3.0], dtype=np.float32)
+    second = np.array([3.0, 5.0], dtype=np.float32)
+
+    mean = BaggedEnsembleModel.mean_pred_proba_children([first, second])
+    assert mean.dtype == np.float32 and np.array_equal(mean, [2.0, 4.0])
+    assert np.array_equal(first, [1.0, 3.0]), "the first array is copied by default"
+
+    mean_in_place = BaggedEnsembleModel.mean_pred_proba_children(iter([first, second]), in_place=True)
+    assert np.array_equal(mean_in_place, [2.0, 4.0])
+    assert np.array_equal(first, [4.0, 8.0]), "in place, the first array is the accumulator"
+
+    with pytest.raises(ValueError, match="at least one child"):
+        BaggedEnsembleModel.mean_pred_proba_children([])
+    with pytest.raises(ValueError, match="expected the predictions of 2 children, got 1"):
+        BaggedEnsembleModel.mean_pred_proba_children([second], n_children=2)
+
+
+def test_predict_proba_and_the_children_pass_run_each_child_once(monkeypatch):
+    bag, X = _fit_linear_bag(BINARY)
+    calls = []
+    original = _LinearDummyModel.predict_proba
+
+    def counted(self, *args, **kwargs):
+        calls.append(self.name)
+        return original(self, *args, **kwargs)
+
+    monkeypatch.setattr(_LinearDummyModel, "predict_proba", counted)
+
+    bag.predict_proba(X)
+    assert len(calls) == 3 and len(set(calls)) == 3
+    calls.clear()
+    children = bag.predict_proba_children(X)
+    assert len(calls) == 3
+    calls.clear()
+    bag.predict_proba_from_children(children)
+    assert calls == [], "deriving the bag's output from the children runs no child"

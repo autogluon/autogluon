@@ -175,7 +175,10 @@ class ParallelFitManager:
     def total_num_cpus_virtual(self) -> int:
         return self.total_num_cpus + self.extra_num_cpus
 
-    def num_children_model(self, model: AbstractModel) -> int:
+    def num_children_model(self, model: AbstractModel | str) -> int:
+        if self.mode == "refit":
+            # `model` is a str. A refit_full fits a single model on all data (folds are collapsed).
+            return 1
         if (not isinstance(model, BaggedEnsembleModel)) or model._user_params.get("use_child_oof", False):
             return 1
         else:
@@ -253,19 +256,17 @@ class ParallelFitManager:
         total_models_to_fit = 0
         for i, model in enumerate(models_to_schedule):
             model_name = model if self.mode == "refit" else model.name
-            if model_name in self.model_child_mem_estimate_cache:
-                model_child_memory_estimate = self.model_child_mem_estimate_cache[model_name]
-            else:
-                try:
-                    # FIXME: DONT USE TRY/EXCEPT, this is done to handle models crashing during initialization such as KNN when `NoValidFeatures`. Instead figure this out earlier or in the worker thread
-                    model_child_memory_estimate = self.get_memory_estimate_for_model_child(model=model)
-                except Exception as e:
-                    logger.log(
-                        20,
-                        f"Ran into exception when getting memory estimate for model, skipping model {model.name}: {e.__class__.__name__}: {e}",
-                    )
-                    continue
-                self.model_child_mem_estimate_cache[model_name] = model_child_memory_estimate
+            try:
+                # FIXME: DONT USE TRY/EXCEPT, this is done to handle models crashing during initialization such as KNN when `NoValidFeatures`. Instead figure this out earlier or in the worker thread
+                model_child_memory_estimate = self.get_cached_memory_estimate_for_model_child(
+                    model=model, model_name=model_name
+                )
+            except Exception as e:
+                logger.log(
+                    20,
+                    f"Ran into exception when getting memory estimate for model, skipping model {model_name}: {e.__class__.__name__}: {e}",
+                )
+                continue
             if model_child_memory_estimate > self.max_mem:
                 logger.log(
                     20, f"Insufficient total memory to fit model for even a single fold. Skipping {model_name}..."
@@ -294,19 +295,17 @@ class ParallelFitManager:
         for i, model in enumerate(models_to_schedule):
             model_name = model if self.mode == "refit" else model.name
             # TODO: refactor memory estimate logic to be one function call with the same code below
-            if model_name in self.model_child_mem_estimate_cache:
-                model_child_memory_estimate = self.model_child_mem_estimate_cache[model_name]
-            else:
-                try:
-                    # FIXME: DONT USE TRY/EXCEPT, this is done to handle models crashing during initialization such as KNN when `NoValidFeatures`. Instead figure this out earlier or in the worker thread
-                    model_child_memory_estimate = self.get_memory_estimate_for_model_child(model=model)
-                except Exception as e:
-                    logger.log(
-                        20,
-                        f"Ran into exception when getting memory estimate for model, skipping model {model.name}: {e.__class__.__name__}: {e}",
-                    )
-                    continue
-                self.model_child_mem_estimate_cache[model_name] = model_child_memory_estimate
+            try:
+                # FIXME: DONT USE TRY/EXCEPT, this is done to handle models crashing during initialization such as KNN when `NoValidFeatures`. Instead figure this out earlier or in the worker thread
+                model_child_memory_estimate = self.get_cached_memory_estimate_for_model_child(
+                    model=model, model_name=model_name
+                )
+            except Exception as e:
+                logger.log(
+                    20,
+                    f"Ran into exception when getting memory estimate for model, skipping model {model_name}: {e.__class__.__name__}: {e}",
+                )
+                continue
             if model_child_memory_estimate > self.max_mem:
                 logger.log(
                     20, f"Insufficient total memory to fit model for even a single fold. Skipping {model_name}..."
@@ -537,6 +536,32 @@ class ParallelFitManager:
         else:
             raise ValueError(f"Unknown mode: {self.mode}")
 
+    def get_cached_memory_estimate_for_model_child(self, *, model: AbstractModel | str, model_name: str) -> int:
+        """Return the per-child memory estimate for `model`, computing it only if not already known.
+
+        In `refit` mode the model is only known by name, so the estimate cannot be (re)computed here.
+        Instead, we read the estimate that was recorded on the trainer's model graph during the
+        original parallel fit (see `AbstractTrainer._fit_level_parallel`).
+        """
+        if model_name in self.model_child_mem_estimate_cache:
+            return self.model_child_mem_estimate_cache[model_name]
+
+        if self.mode == "refit":
+            mem_usage_child = self.get_model_attribute_func(
+                model=model_name, attribute="fit_child_mem_estimate", default=None
+            )
+            if mem_usage_child is None:
+                # Models without a recorded estimate are refit by cloning the parent rather than by
+                # training (e.g. WeightedEnsemble), so they require effectively no extra memory.
+                # The trainer gates on the estimate being present for all models that actually retrain.
+                logger.log(15, f"No cached memory estimate for {model_name}, assuming refit requires no memory.")
+                mem_usage_child = 0
+        else:
+            mem_usage_child = self.get_memory_estimate_for_model_child(model=model)
+
+        self.model_child_mem_estimate_cache[model_name] = mem_usage_child
+        return mem_usage_child
+
     def get_memory_estimate_for_model_child(self, *, model: AbstractModel) -> int:
         X = self.X
         y = self.y
@@ -580,7 +605,7 @@ class ParallelFitManager:
             return mem_usage_child
 
     def get_memory_estimate_for_model(
-        self, *, model: AbstractModel, mem_usage_child: int = None, num_children: int = None
+        self, *, model: AbstractModel | str, mem_usage_child: int = None, num_children: int = None
     ) -> int:
         if num_children is None:
             num_children = self.num_children_model(model)
@@ -592,7 +617,7 @@ class ParallelFitManager:
 
         logger.log(
             15,
-            f"\t{mem_usage_bag_mb:.0f} MB (per bag)\t| {mem_usage_child_mb:.0f} MB (per child)\t| {num_children} children\t| {model.name}",
+            f"\t{mem_usage_bag_mb:.0f} MB (per bag)\t| {mem_usage_child_mb:.0f} MB (per child)\t| {num_children} children\t| {model if isinstance(model, str) else model.name}",
         )
         return mem_usage_bag
 
@@ -694,8 +719,12 @@ class ParallelFitManager:
         self.job_refs_to_model_name[job_ref] = model_name
         self.job_refs_to_model_memory_estimate[job_ref] = model_memory_estimate
 
-    def deallocate_resources(self, *, job_ref: str) -> None:
-        """Deallocate resources for a model fit."""
+    def deallocate_resources(self, *, job_ref: str) -> int | None:
+        """Deallocate resources for a model fit.
+
+        Returns the per-child memory estimate that was used to schedule the job, so that the caller
+        can persist it (e.g. on the trainer's model graph) for later reuse by `refit_full`.
+        """
 
         resources = self.job_refs_to_allocated_resources.pop(job_ref)
         model_name = self.job_refs_to_model_name.pop(job_ref)
@@ -703,7 +732,7 @@ class ParallelFitManager:
         self.available_num_gpus += resources.total_num_gpus
         model_memory_estimate = self.job_refs_to_model_memory_estimate.pop(job_ref)
         self.available_mem += model_memory_estimate
-        self.model_child_mem_estimate_cache.pop(model_name)
+        return self.model_child_mem_estimate_cache.pop(model_name, None)
 
     def clean_unfinished_job_refs(self, *, unfinished_job_refs: list[str] | None = None):
         import ray

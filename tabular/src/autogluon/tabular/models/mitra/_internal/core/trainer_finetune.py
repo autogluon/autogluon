@@ -335,7 +335,7 @@ class TrainerFinetune(BaseEstimator):
         return y_pred
 
     def load_params(self, path):
-        self.model.load_state_dict(torch.load(path))
+        self.model.load_state_dict(torch.load(path, weights_only=True))
 
     def make_loader(self, dataset: torch.utils.data.Dataset, training: bool) -> torch.utils.data.DataLoader:
         if self.cfg.model_name == ModelName.TABPFN:

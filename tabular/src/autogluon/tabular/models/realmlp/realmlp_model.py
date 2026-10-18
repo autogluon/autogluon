@@ -15,7 +15,6 @@ import pandas as pd
 from sklearn.impute import SimpleImputer
 
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
-from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.tabular import __version__
 from autogluon.tabular.models.abstract.abstract_torch_model import AbstractTorchModel
 
@@ -53,6 +52,9 @@ class RealMLPModel(AbstractTorchModel):
     ag_name = "RealMLP"
     ag_priority = 75
     seed_name = "random_state"
+    _supported_problem_types = ["binary", "multiclass", "regression"]
+    default_resources_physical_cores_only = True
+    default_num_gpus = 1
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -62,6 +64,8 @@ class RealMLPModel(AbstractTorchModel):
         self._indicator_columns = None
         self._features_bool = None
         self._bool_to_cat = None
+        self._cat_col_names = None
+        self._category_mapping = None
 
     def get_model_cls(self, default_hyperparameters: Literal["td", "td_s"] = "td"):
         from pytabkit import (
@@ -123,12 +127,7 @@ class RealMLPModel(AbstractTorchModel):
             _lightning_log_level = logging.INFO
 
         # FIXME: code assume we only see one GPU in the fit process.
-        device = "cpu" if num_gpus == 0 else "cuda:0"
-        if (device == "cuda:0") and (not torch.cuda.is_available()):
-            raise AssertionError(
-                "Fit specified to use GPU, but CUDA is not available on this machine. "
-                "Please switch to CPU usage instead.",
-            )
+        device = self._resolve_fit_device(num_gpus=num_gpus, gpu_device="cuda:0")
 
         hyp = self._get_model_params()
 
@@ -145,7 +144,7 @@ class RealMLPModel(AbstractTorchModel):
             "root_mean_squared_error": "rmse",
             "r2": "rmse",
             "mae": "mae",
-            "mean_average_error": "mae",
+            "mean_absolute_error": "mae",
         }
 
         val_metric_name = metric_map.get(self.stopping_metric.name, None)
@@ -193,11 +192,12 @@ class RealMLPModel(AbstractTorchModel):
 
         X = self.preprocess(X, y=y, is_train=True, bool_to_cat=bool_to_cat, impute_bool=impute_bool)
 
-        # FIXME: In rare cases can cause exceptions if name_categories=False, unknown why
+        # `_cat_col_names` is recorded by `_preprocess` on the training call, so fit and predict
+        # name the same columns. Deriving it here from `X` instead would work at fit time but
+        # leave `_preprocess` without the list it needs to re-code categories at predict time.
         extra_fit_kwargs = {}
         if name_categories:
-            cat_col_names = X.select_dtypes(include="category").columns.tolist()
-            extra_fit_kwargs["cat_col_names"] = cat_col_names
+            extra_fit_kwargs["cat_col_names"] = self._cat_col_names
 
         if X_val is not None:
             X_val = self.preprocess(X_val)
@@ -211,6 +211,21 @@ class RealMLPModel(AbstractTorchModel):
                 time_to_fit_in_seconds=time_limit - (time.time() - start_time) if time_limit is not None else None,
                 **extra_fit_kwargs,
             )
+        if X_val is not None:
+            self.params_trained["stop_epoch"] = self._best_epoch(val_metric_name=val_metric_name)
+
+    def _best_epoch(self, val_metric_name: str | None) -> int:
+        """The epoch whose checkpoint the fit kept: pytabkit's best validation epoch (of the ensemble when ``n_ens > 1``).
+
+        As the ``stop_epoch`` hyperparameter, it makes a refit train with the same ``n_epochs`` schedule and stop at
+        that epoch.
+        """
+        stop_epoch = self.model.alg_interface_.fit_params[0]["stop_epoch"]
+        if isinstance(stop_epoch, dict):  # one entry per validation metric
+            stop_epoch = (
+                stop_epoch[val_metric_name] if val_metric_name in stop_epoch else next(iter(stop_epoch.values()))
+            )
+        return int(stop_epoch)
 
     def _predict_proba(self, X, **kwargs) -> np.ndarray:
         with set_logger_level("lightning.pytorch", logging.WARNING):
@@ -259,6 +274,32 @@ class RealMLPModel(AbstractTorchModel):
         if self._bool_to_cat and self._features_bool:
             # FIXME: Use CategoryFeatureGenerator? Or tell the model which is category
             X[self._features_bool] = X[self._features_bool].astype("category")
+
+        if is_train:
+            self._cat_col_names = X.select_dtypes(include="category").columns.tolist()
+
+        # Re-code every category column to integer codes fixed at fit time, and send unseen
+        # categories to one reserved code above them.
+        #
+        # RealMLP ordinal-encodes categories downstream, and sklearn's unknown-value check
+        # dispatches on the dtype of the values being transformed while calling `np.isnan` on the
+        # *fitted* categories. A column whose category dtype or numpy view differs between the fit
+        # frame and a later frame therefore raises `ufunc 'isnan' not supported for the input
+        # types` instead of encoding. That happens whenever upstream preprocessing preserves raw
+        # category dtypes rather than normalising them (integer categories read as float64 once a
+        # frame contains an unseen value, object elsewhere), so the model cannot rely on the two
+        # frames agreeing. Fixing the codes here makes them agree by construction.
+        if self._cat_col_names:
+            if self._category_mapping is None:
+                self._category_mapping = {
+                    col: {category: code for code, category in enumerate(X[col].cat.categories)}
+                    for col in self._cat_col_names
+                }
+            for col in self._cat_col_names:
+                mapping = self._category_mapping[col]
+                nan_mask = X[col].isna()
+                X[col] = X[col].astype(object).map(mapping).fillna(len(mapping)).astype(int).astype("category")
+                X.loc[nan_mask, col] = np.nan
         return X
 
     def _set_default_params(self):
@@ -283,30 +324,8 @@ class RealMLPModel(AbstractTorchModel):
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
 
-    @classmethod
-    def supported_problem_types(cls) -> list[str] | None:
-        return ["binary", "multiclass", "regression"]
-
     def _get_default_stopping_metric(self):
         return self.eval_metric
-
-    def _get_default_resources(self) -> tuple[int, int]:
-        # Use only physical cores for better performance based on benchmarks
-        num_cpus = ResourceManager.get_cpu_count(only_physical_cores=True)
-
-        num_gpus = min(1, ResourceManager.get_gpu_count_torch(cuda_only=True))
-
-        return num_cpus, num_gpus
-
-    def _estimate_memory_usage(self, X: pd.DataFrame, **kwargs) -> int:
-        hyperparameters = self._get_model_params()
-        return self.estimate_memory_usage_static(
-            X=X,
-            problem_type=self.problem_type,
-            num_classes=self.num_classes,
-            hyperparameters=hyperparameters,
-            **kwargs,
-        )
 
     @classmethod
     def _estimate_memory_usage_static(
@@ -316,10 +335,16 @@ class RealMLPModel(AbstractTorchModel):
         hyperparameters: dict = None,
         **kwargs,
     ) -> int:
-        """
-        Heuristic memory estimate that correlates strongly with RealMLP's more sophisticated method
+        """Peak CPU RSS: a process baseline plus the model's per-feature cost and
+        several copies of the dataset.
 
-        More comprehensive memory estimate logic:
+        Calibrated against measured peak RSS on 136 real tasks (100 to 1M rows):
+        1.05-3.4x of measured, no underestimates. GPU fits are the calibration
+        target; a CPU-only fit of the same task uses *less* host RAM (no CUDA
+        context, no pinned transfer buffers), so the estimate stays conservative
+        there.
+
+        The shape of the estimate follows RealMLP's own, more comprehensive logic:
 
         ```python
         from typing import Any
@@ -361,19 +386,50 @@ class RealMLPModel(AbstractTorchModel):
         columns_mem_est_hidden_2 = columns_mem_est * hidden_2_weight * plr_hidden_2 / 16 * width_factor
         columns_mem_est = columns_mem_est_hidden_1 + columns_mem_est_hidden_2
 
-        dataset_size_mem_est = 5 * get_approximate_df_mem_usage(X).sum()  # roughly 5x DataFrame memory size
-        baseline_overhead_mem_est = 3e8  # 300 MB generic overhead
+        dataset_size_mem_est = 11 * get_approximate_df_mem_usage(X).sum()  # roughly 11x DataFrame memory size
+        # Process baseline: torch plus AutoGluon overhead, and the CUDA context when
+        # fitting on GPU (measured ~0.47 GB of host RAM on its own). The previous
+        # 300 MB constant was below the floor a real fit starts from, so small
+        # datasets - where the baseline is nearly all of the footprint - were
+        # underestimated ~7x.
+        baseline_overhead_mem_est = 2.2e9
 
         mem_estimate = dataset_size_mem_est + columns_mem_est + baseline_overhead_mem_est
 
         return mem_estimate
 
     @classmethod
-    def _class_tags(cls) -> dict:
-        return {"can_estimate_memory_usage_static": True}
+    def _estimate_gpu_memory_usage_static(
+        cls,
+        *,
+        X,
+        hyperparameters: dict | None = None,
+        **kwargs,
+    ) -> int:
+        """Peak VRAM (reserved + CUDA context) across fit and prediction.
+
+        RealMLP is lightweight on GPU: a ~1.65 GB base (context + runtime) dominates
+        on nearly every real task (measured peaks are 0.65-2 GB on 125 of 136 of
+        them), plus small per-row (~660 B), per-feature (~50 KB) and per-cell
+        (~28 B) terms over the *effective* feature count after pytabkit's
+        categorical encoding — low-cardinality categoricals are one-hot expanded
+        (one column per level up to ``max_one_hot_cat_size=9``), higher-cardinality
+        ones become fixed-width embeddings (``embedding_size=8``). Calibrated on
+        numeric-only synthetic fit+predict measurements (1k-1M rows, 10-1000
+        features) and all 51 TabArena plus 85 BeyondArena tasks spanning 100 to 1M
+        rows (1.0-2.5x, no underestimates). Epoch count adds time, not peak memory
+        (SGD steady state).
+        """
+        n_train = len(X)
+        n_features_eff = len(X.select_dtypes(include=["number"]).columns)
+        for col in X.select_dtypes(include=["category", "object"]).columns:
+            cardinality = X[col].nunique()
+            # pytabkit RealMLP defaults: one-hot up to max_one_hot_cat_size, else embedding_size
+            n_features_eff += cardinality if cardinality <= 9 else 8
+        return int(1.65e9 + 660 * n_train + 0.05e6 * n_features_eff + 28 * n_train * n_features_eff)
 
     def _more_tags(self) -> dict:
-        # TODO: Need to add train params support, track best epoch
-        #  How to mirror RealMLP learning rate scheduler while forcing stopping at a specific epoch?
-        tags = {"can_refit_full": False}
+        # The fit records its best epoch in `params_trained["stop_epoch"]`; a refit trains the same `n_epochs`
+        # schedule on all rows and stops there.
+        tags = {"can_refit_full": True}
         return tags

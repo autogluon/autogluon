@@ -53,11 +53,19 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
     ag_name = "NeuralNetTorch"
     ag_priority = 25
     seed_name = "seed_value"
+    _supported_problem_types = ["binary", "multiclass", "regression", "quantile", "softclass"]
 
     # Constants used throughout this class:
     unique_category_str = (
         np.nan
     )  # string used to represent missing values and unknown categories for categorical features.
+
+    _default_auxiliary_params_extra = dict(
+        valid_raw_types=[R_BOOL, R_INT, R_FLOAT, R_CATEGORY],
+        ignored_type_group_special=[S_TEXT_NGRAM, S_TEXT_AS_CATEGORY],
+    )
+    minimum_num_gpus = 1
+    default_resources_physical_cores_only = True
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -77,15 +85,6 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         default_params = get_default_param(problem_type=self.problem_type, framework="pytorch")
         for param, val in default_params.items():
             self._set_default_param_value(param, val)
-
-    def _get_default_auxiliary_params(self) -> dict:
-        default_auxiliary_params = super()._get_default_auxiliary_params()
-        extra_auxiliary_params = dict(
-            valid_raw_types=[R_BOOL, R_INT, R_FLOAT, R_CATEGORY],
-            ignored_type_group_special=[S_TEXT_NGRAM, S_TEXT_AS_CATEGORY],
-        )
-        default_auxiliary_params.update(extra_auxiliary_params)
-        return default_auxiliary_params
 
     def _get_default_searchspace(self):
         return get_default_searchspace(problem_type=self.problem_type, framework="pytorch")
@@ -882,16 +881,6 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
     def _get_default_stopping_metric(self):
         return self.eval_metric
 
-    def _estimate_memory_usage(self, X: pd.DataFrame, **kwargs) -> int:
-        hyperparameters = self._get_model_params()
-        return self.estimate_memory_usage_static(
-            X=X,
-            problem_type=self.problem_type,
-            num_classes=self.num_classes,
-            hyperparameters=hyperparameters,
-            **kwargs,
-        )
-
     @classmethod
     def _estimate_memory_usage_static(
         cls,
@@ -904,12 +893,6 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
     def _get_maximum_resources(self) -> Dict[str, Union[int, float]]:
         # torch model trains slower when utilizing virtual cores and this issue scale up when the number of cpu cores increases
         return {"num_cpus": ResourceManager.get_cpu_count(only_physical_cores=True)}
-
-    def _get_default_resources(self):
-        # only_physical_cores=True is faster in training
-        num_cpus = ResourceManager.get_cpu_count(only_physical_cores=True)
-        num_gpus = 0
-        return num_cpus, num_gpus
 
     def save(self, path: str = None, verbose=True) -> str:
         import torch
@@ -985,15 +968,6 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         """Choose which backend(Ray or Custom) to use for hpo"""
         return RAY_BACKEND
 
-    def get_minimum_resources(self, is_gpu_available=False):
-        minimum_resources = {
-            "num_cpus": 1,
-        }
-        if is_gpu_available:
-            # Our custom implementation does not support partial GPU. No gpu usage according to nvidia-smi when the `num_gpus` passed to fit is fractional`
-            minimum_resources["num_gpus"] = 1
-        return minimum_resources
-
     @classmethod
     def _valid_compilers(cls):
         return [TabularNeuralNetTorchNativeCompiler, TabularNeuralNetTorchOnnxCompiler]
@@ -1049,13 +1023,8 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
         )
 
     @classmethod
-    def supported_problem_types(cls) -> list[str] | None:
-        return ["binary", "multiclass", "regression", "quantile", "softclass"]
-
-    @classmethod
     def _class_tags(cls):
         return {
-            "can_estimate_memory_usage_static": True,
             "supports_learning_curves": True,
         }
 

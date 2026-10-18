@@ -83,7 +83,7 @@ class MetaTransformer(nn.Module):
             ]
         )
 
-        checkpoint = torch.load(checkpoint_path)  # nosec B614
+        checkpoint = torch.load(checkpoint_path, weights_only=True)
         self.checkpoint_path = checkpoint_path
         self.model.load_state_dict(checkpoint, strict=True)
 

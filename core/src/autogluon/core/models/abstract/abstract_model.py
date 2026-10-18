@@ -12,21 +12,22 @@ import time
 from abc import ABC, abstractmethod
 from pathlib import Path
 from types import MappingProxyType
-from typing import Any, Type
+from typing import Any, ClassVar, Type
 
 import numpy as np
 import pandas as pd
 from typing_extensions import Self
 
 from autogluon.common.features.feature_metadata import FeatureMetadata
+from autogluon.common.features.types import S_GROUP_KEY
 from autogluon.common.space import Space
 from autogluon.common.utils.distribute_utils import DistributedContext
 from autogluon.common.utils.log_utils import DuplicateFilter
-from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
+from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage, get_constant_columns
 from autogluon.common.utils.resource_utils import ResourceManager, get_resource_manager
 from autogluon.common.utils.try_import import try_import_ray
 from autogluon.common.utils.utils import setup_outputdir
-from autogluon.features.generators.abstract import AbstractFeatureGenerator, estimate_feature_metadata_after_generators
+from autogluon.features.generators.abstract import AbstractFeatureGenerator
 from autogluon.features.generators.bulk import BulkFeatureGenerator
 from autogluon.features.registry._ag_feature_generator_registry import ag_feature_generator_registry
 from autogluon.features.registry.parse_custom_generator import resolve_fg_class
@@ -45,6 +46,7 @@ from ...constants import (
     SOFTCLASS,
 )
 from ...data.label_cleaner import LabelCleaner
+from ...global_settings import get_global_settings, set_global_settings
 from ...hpo.constants import CUSTOM_BACKEND, RAY_BACKEND
 from ...hpo.exceptions import EmptySearchSpace
 from ...hpo.executors import HpoExecutor, HpoExecutorFactory
@@ -56,16 +58,28 @@ from ...utils import (
     infer_problem_type,
     normalize_pred_probas,
 )
-from ...utils.exceptions import NotEnoughMemoryError, NoValidFeatures, TimeLimitExceeded
+from ...utils.exceptions import (
+    ConstraintViolationError,
+    NotEnoughCudaMemoryError,
+    NotEnoughMemoryError,
+    NoValidFeatures,
+    TimeLimitExceeded,
+)
 from ...utils.loaders import load_json, load_pkl
 from ...utils.savers import save_json, save_pkl
 from ...utils.time import sample_df_for_time_func, time_func
+from ._auxiliary_params import AuxiliaryParams, ParamsAuxDict
+from ._class_settings import ClassSettings
+from ._mutation_deprecated_dict import ParamsDict
 from ._tags import _DEFAULT_CLASS_TAGS, _DEFAULT_TAGS
 from .model_trial import model_trial, skip_hpo
 
 logger = logging.getLogger(__name__)
 dup_filter = DuplicateFilter()
 logger.addFilter(dup_filter)
+
+#: Placeholder ``ag_key`` values of intermediate model bases that are not registered themselves.
+_UNREGISTERED_AG_KEYS: frozenset[str | None] = frozenset({None, "", "NOTSET"})
 
 
 class Taggable(ABC):
@@ -228,6 +242,27 @@ class AbstractModel(ModelBase, Tunable):
         None  # the name of the hyperparameter that controls the model's random seed, or None if no random seed exists.
     )
     seed_name_alt: list[str] = []  # alternative names for the random seed hyperparameter.
+    _supported_problem_types: list[str] | None = (
+        None  # problem types the model supports; None = unspecified (never filtered by problem type). Read via `supported_problem_types()`.
+    )
+    _default_auxiliary_params_extra: dict | None = (
+        None  # auxiliary-param overrides merged onto the base defaults (base-most class first); see `_get_default_auxiliary_params`.
+    )
+    _default_ag_args_ensemble_extra: dict | None = (
+        None  # ag_args_ensemble overrides merged base-most class first; see `_get_default_ag_args_ensemble`.
+    )
+    default_resources_physical_cores_only: bool = False
+    """Whether `_get_default_resources` counts only physical CPU cores (faster for
+    training-bound models based on benchmarks) instead of logical cores."""
+    default_num_gpus: int = 0
+    """num_gpus in `_get_default_resources`: use up to this many CUDA GPUs by default when
+    available (0 = train on CPU by default)."""
+    minimum_num_gpus: float = 0
+    """num_gpus in `get_minimum_resources` when a GPU is available: the smallest GPU share the
+    model can fit with (fractional = the model can share a GPU with other jobs; 0 = fits on CPU)."""
+    gpu_required: bool = False
+    """If True, the `minimum_num_gpus` requirement applies even when no GPU is detected
+    (GPU-mandatory models that cannot fit on CPU, e.g. RAPIDS)."""
 
     model_file_name = "model.pkl"
     model_info_name = "info.pkl"
@@ -235,6 +270,86 @@ class AbstractModel(ModelBase, Tunable):
     learning_curve_file_name = "curves.json"
 
     default_random_seed: int | None = 0
+
+    class_settings_cls: ClassVar[type[ClassSettings] | None] = None
+    """The :class:`ClassSettings` dataclass this class declares for knobs shared by every model of
+    the class in the process, or None. A subclass inherits its base's declaration and, unless
+    ``class_settings_per_subclass`` is set, shares the base's settings instance rather than
+    declaring its own."""
+
+    class_settings_per_subclass: ClassVar[bool] = False
+    """When True on a class that declares ``class_settings_cls``, every registered subclass (one
+    with its own ``ag_key``) owns a separate settings instance of that dataclass instead of sharing
+    the declaring base's. ``model_class_settings={"<ag_key>": {...}}`` then reaches that one
+    wrapper only. A subclass without an ``ag_key`` of its own shares the nearest registered
+    ancestor's instance, or owns one itself when there is none."""
+
+    @classmethod
+    def _class_settings_owner(cls) -> type | None:
+        """The class whose settings instance ``cls`` uses, or None when no base declares ``class_settings_cls``.
+
+        The nearest class in the MRO declaring ``class_settings_cls`` is the declarer and, by
+        default, the owner. With ``class_settings_per_subclass`` the owner is instead the nearest
+        registered class at or above ``cls`` below the declarer (``cls`` itself when none is
+        registered), so registered subclasses do not share one instance.
+        """
+        declarer = None
+        for base in cls.__mro__:
+            if base.__dict__.get("class_settings_cls") is not None:
+                declarer = base
+                break
+        if declarer is None:
+            return None
+        if not getattr(cls, "class_settings_per_subclass", False):
+            return declarer
+        for base in cls.__mro__:
+            if base is declarer:
+                break
+            if base.__dict__.get("ag_key") not in _UNREGISTERED_AG_KEYS:
+                return base
+        return cls
+
+    @classmethod
+    def get_class_settings(cls) -> ClassSettings | None:
+        """The process-wide settings of this class's declaring base, defaults until set; None if undeclared."""
+        owner = cls._class_settings_owner()
+        if owner is None:
+            return None
+        settings = owner.__dict__.get("_class_settings")
+        if settings is None:
+            settings = owner.class_settings_cls()
+            owner._class_settings = settings
+        return settings
+
+    @classmethod
+    def set_class_settings(cls, **values: Any) -> ClassSettings:
+        """Set process-wide settings for every model of this class's declaring base.
+
+        Raises ``ValueError`` for an unknown key or a class that declares no settings. A change
+        to a value set earlier in the process is logged, since models fit under the old value
+        see the new one from now on.
+        """
+        owner = cls._class_settings_owner()
+        if owner is None:
+            raise ValueError(f"{cls.__name__} declares no class settings; nothing to set from {sorted(values)}.")
+        current = cls.get_class_settings()
+        new = current.replace(**values)
+        if owner.__dict__.get("_class_settings_set", False) and new != current:
+            logger.log(
+                30,
+                f"\t{owner.__name__} class settings change from {current.to_dict()} to {new.to_dict()}: "
+                f"every model of this class in the process now uses the new values.",
+            )
+        owner._class_settings = new
+        owner._class_settings_set = True
+        return new
+
+    def _apply_settings_snapshots(self) -> None:
+        """Re-apply the global and class settings this model was constructed under, for a fit or load in another process."""
+        if self._global_settings_snapshot:
+            set_global_settings(**self._global_settings_snapshot)
+        if self._class_settings_snapshot is not None:
+            type(self).set_class_settings(**self._class_settings_snapshot)
 
     def __init__(
         self,
@@ -269,6 +384,15 @@ class AbstractModel(ModelBase, Tunable):
 
         # whether to calibrate predictions via conformal methods
         self.conformalize: bool | None = None
+        # temperature-scaling parameter learned post-fit by the trainer during calibration
+        # (see `temperature_scalar`); runtime state, distinct from the user-configured
+        # `ag.temperature_scalar` it falls back to.
+        self._temperature_scalar: float | None = None
+        # probability calibrator learned post-fit by the trainer (`calibration_method="logistic"`):
+        # any object whose `predict_proba` maps predicted probabilities to calibrated ones.
+        self.calibrator = None
+        # stateful categorical label encoder fitted by `_label_encode_categoricals`
+        self._label_encoder = None
         self.label_cleaner: LabelCleaner | None = None
 
         if eval_metric is not None:
@@ -280,7 +404,9 @@ class AbstractModel(ModelBase, Tunable):
         self.stopping_metric: Scorer | None = None
         self.normalize_pred_probas: bool | None = None
 
-        self.features: list[str] | None = None  # External features, do not use internally
+        # External features: the input columns `preprocess` selects from the raw data. Do not use internally,
+        # and never replace with the output columns of a feature transform (see `_check_features_not_mutated`).
+        self.features: list[str] | None = None
         self.feature_metadata: FeatureMetadata | None = None  # External feature metadata, do not use internally
         self._features_internal: list[str] | None = (
             None  # Internal features, safe to use internally via the `_features` property
@@ -302,6 +428,13 @@ class AbstractModel(ModelBase, Tunable):
         self._memory_usage_estimate: float | None = None  # Peak training memory usage estimate in bytes
 
         self._user_params, self._user_params_aux = self._init_user_params(params=hyperparameters)
+        # Taken at construction, in the process that launches the fit: a bag ships its fold template
+        # to worker processes uninitialized, and a fit or load there applies these values first.
+        #: The explicitly set global settings in force when this model was constructed.
+        self._global_settings_snapshot: dict = get_global_settings().explicit()
+        class_settings = self.get_class_settings()
+        #: The class settings in force when this model was constructed; None for a class without settings.
+        self._class_settings_snapshot: dict | None = None if class_settings is None else class_settings.to_dict()
 
         self.params: dict = {}
         self.params_aux: dict = {}
@@ -410,7 +543,8 @@ class AbstractModel(ModelBase, Tunable):
         These parameters are generally not model specific and can have a wide variety of effects.
         For documentation on some of the available options and their defaults, refer to `self._get_default_auxiliary_params`.
         """
-        self.params_aux = self._get_params_aux()
+        # ParamsAuxDict deprecates post-construction mutation (raises from AutoGluon 1.7).
+        self.params_aux = ParamsAuxDict(self._get_params_aux())
         self._validate_params_aux()
 
     def _get_params_aux(self) -> dict:
@@ -473,12 +607,28 @@ class AbstractModel(ModelBase, Tunable):
         # TODO: v1.0: Enforce this by raising if `predict_proba` called when this is False.
         return self.can_infer() and self.problem_type in [BINARY, MULTICLASS, SOFTCLASS]
 
-    def can_estimate_memory_usage_static(self) -> bool:
+    @classmethod
+    def _overrides(cls, method_name: str) -> bool:
+        """Whether `cls` replaces `AbstractModel`'s implementation of `method_name`.
+
+        Compares the underlying functions rather than the attributes: accessing a
+        classmethod yields a fresh bound object every time, so an identity check on the
+        attributes would always report an override.
+        """
+        own = getattr(cls, method_name, None)
+        base = getattr(AbstractModel, method_name, None)
+        return getattr(own, "__func__", own) is not getattr(base, "__func__", base)
+
+    @classmethod
+    def can_estimate_memory_usage_static(cls) -> bool:
         """
         True if `estimate_memory_usage_static` is implemented for this model.
         If False, calling `estimate_memory_usage_static` will raise a NotImplementedError.
+
+        Derived from whether the model implements `_estimate_memory_usage_static`, so
+        implementing the estimate is all that is required to enable it.
         """
-        return self._get_class_tags().get("can_estimate_memory_usage_static", False)
+        return cls._overrides("_estimate_memory_usage_static")
 
     def can_estimate_memory_usage_static_child(self) -> bool:
         """
@@ -487,12 +637,13 @@ class AbstractModel(ModelBase, Tunable):
         """
         return self.can_estimate_memory_usage_static()
 
-    def can_estimate_memory_usage_static_lite(self) -> bool:
+    @classmethod
+    def can_estimate_memory_usage_static_lite(cls) -> bool:
         """
         True if `estimate_memory_usage_static_lite` is implemented for this model.
         If False, calling `estimate_memory_usage_static_lite` will raise a NotImplementedError.
         """
-        return self._get_class_tags().get("can_estimate_memory_usage_static_lite", False)
+        return cls._overrides("_estimate_memory_usage_static_lite")
 
     # TODO: v0.1 update to be aligned with _set_default_auxiliary_params(), add _get_default_params()
     def _set_default_params(self):
@@ -513,34 +664,30 @@ class AbstractModel(ModelBase, Tunable):
         """
         Dictionary of auxiliary parameters that dictate various model-agnostic logic, such as:
             Which column dtypes are filtered out of the input data, or how much memory the model is allowed to use.
+
+        The base defaults and per-key documentation live on the `AuxiliaryParams` schema.
         """
-        default_auxiliary_params = dict(
-            max_memory_usage_ratio=1.0,  # Ratio of memory usage allowed by the model. Values > 1.0 have an increased risk of causing OOM errors. Used in memory checks during model training to avoid OOM errors.
-            # TODO: Add more params
-            # max_memory_usage=None,
-            # max_disk_usage=None,
-            max_time_limit_ratio=1.0,  # ratio of given time_limit to use during fit(). If time_limit == 10 and max_time_limit_ratio=0.3, time_limit would be changed to 3.
-            max_time_limit=None,  # max time_limit value during fit(). If the provided time_limit is greater than this value, it will be replaced by max_time_limit. Occurs after max_time_limit_ratio is applied.
-            min_time_limit=0,  # min time_limit value during fit(). If the provided time_limit is less than this value, it will be replaced by min_time_limit. Occurs after max_time_limit is applied.
-            # drop_unique=True,  # Whether to drop features that have only 1 unique value
-            # num_cpus=None,
-            # num_gpus=None,
-            # ignore_hpo=False,
-            # max_early_stopping_rounds=None,
-            # TODO: add option for only top-k ngrams
-            valid_raw_types=None,  # If a feature's raw type is not in this list, it is pruned.
-            valid_special_types=None,  # If a feature has a special type not in this list, it is pruned.
-            ignored_type_group_special=None,  # List, drops any features in `self.feature_metadata.type_group_map_special[type]` for type in `ignored_type_group_special`. | Currently undocumented in task.
-            ignored_type_group_raw=None,  # List, drops any features in `self.feature_metadata.type_group_map_raw[type]` for type in `ignored_type_group_raw`. | Currently undocumented in task.
-            # Kwargs for `autogluon.tabular.features.feature_metadata.FeatureMetadata.get_features()`.
-            #  Overrides valid_raw_types, valid_special_types, ignored_type_group_special and ignored_type_group_raw. | Currently undocumented in task.
-            get_features_kwargs=None,
-            # TODO: v0.1 Document get_features_kwargs_extra in task.fit
-            get_features_kwargs_extra=None,  # If not None, applies an additional feature filter to the result of get_feature_kwargs. This should be reserved for users and be None by default. | Currently undocumented in task.
-            predict_1_batch_size=None,  # If not None, calculates `self.predict_1_time` at end of fit call by predicting on this many rows of data.
-            temperature_scalar=None,  # Temperature scaling parameter that is set post-fit if calibrate=True during TabularPredictor.fit() on the model with the best validation score and eval_metric="log_loss".
-        )
+        default_auxiliary_params = AuxiliaryParams.base_defaults()
+        # Merge each class's declarative `_default_auxiliary_params_extra` overrides,
+        # base-most class first so subclasses win — the same semantics as the historical
+        # chained `super()._get_default_auxiliary_params()` + `update` method overrides,
+        # which also remain supported.
+        for klass in reversed(type(self).__mro__):
+            extra = klass.__dict__.get("_default_auxiliary_params_extra")
+            if extra:
+                default_auxiliary_params.update(extra)
         return default_auxiliary_params
+
+    @property
+    def aux_params(self) -> AuxiliaryParams:
+        """Typed view of `params_aux`, built fresh on each access. Nothing in AutoGluon
+        mutates `params_aux` after construction (runtime state like the calibration
+        temperature lives on the instance instead), but the dict is not enforced
+        immutable, so the view is not cached. Keys that are not schema fields
+        (model-private params registered via `_ag_params()`) are available under
+        `.extra`.
+        """
+        return AuxiliaryParams.from_dict(self.params_aux)
 
     def _set_default_param_value(self, param_name, param_value, params=None):
         if params is None:
@@ -655,7 +802,51 @@ class AbstractModel(ModelBase, Tunable):
         In bagged ensembles, preprocessing code that lives in `_preprocess` will be executed on each child model once per inference call.
         If preprocessing code could produce different output depending on the child model that processes the input data, then it must live here.
         When in doubt, put preprocessing code here instead of in `_preprocess_nonadaptive`.
+
+        Transforms that change the feature space (e.g. dimensionality reduction to new columns) belong here or in a
+        model-specific feature generator (see `get_preprocessor`), not in `_fit`. For a stateful transform, call
+        `self.preprocess(X, is_train=True)` in `_fit`, fit the transform here when `is_train=True`, and reuse it
+        otherwise. Do not update `self.features` to the transformed columns, as it must remain the model's input
+        columns. Refer to `AbstractModel._fit`.
         """
+        return X
+
+    def _label_encode_categoricals(
+        self, X: pd.DataFrame, is_train: bool = False, preserve_missing: bool = False
+    ) -> pd.DataFrame:
+        """Convert categorical features to label-encoded integers.
+
+        Common `_preprocess` step for models that require fully numeric input. The stateful
+        encoder is stored on `self._label_encoder`: it is fitted on the first call, or
+        refitted when `is_train=True` (pass it for models whose `_preprocess` distinguishes
+        fit-time calls). Columns without categorical content are untouched; the categorical
+        feature names are available afterwards via `self._label_encoder.features_in`.
+
+        Parameters
+        ----------
+        preserve_missing : bool, default False
+            Whether missing values stay missing. The encoding maps them to -1 (pandas'
+            `.cat.codes` convention), which a model reads as an ordinary value one step below
+            the first real level, and which hides the missingness from any handling the model
+            has for it. Pass True for models that handle NaN themselves; the affected columns
+            become float, since an integer dtype cannot hold NaN.
+        """
+        from autogluon.features.generators import LabelEncoderFeatureGenerator
+
+        if is_train or self._label_encoder is None:
+            self._label_encoder = LabelEncoderFeatureGenerator(verbosity=0)
+            self._label_encoder.fit(X=X)
+        features_in = self._label_encoder.features_in
+        if features_in:
+            missing = X[features_in].isna() if preserve_missing else None
+            # Only the encoded columns are written, and they are replaced wholesale on the
+            # next line, so every other column stays shared with the caller rather than
+            # being copied. The `preserve_missing` write below lands on those replacements.
+            X = X.copy(deep=False)
+            X[features_in] = self._label_encoder.transform(X=X)
+            if preserve_missing:
+                for column in features_in:
+                    X.loc[missing[column].to_numpy(), column] = np.nan
         return X
 
     # TODO: Remove kwargs?
@@ -670,7 +861,22 @@ class AbstractModel(ModelBase, Tunable):
         """
         # TODO: In online-inference this becomes expensive, add option to remove it (only safe in controlled environment where it is already known features are present
         if list(X.columns) != self.features:
-            X = X[self.features]
+            try:
+                X = X[self.features]
+            except KeyError as err:
+                if self.features is None:
+                    raise KeyError(
+                        f"Model '{self.name}' ({self.__class__.__name__}) has no input features: "
+                        f"it must be fit before it can predict."
+                    ) from err
+                X_columns = set(X.columns)
+                missing_features = [f for f in self.features if f not in X_columns]
+                raise KeyError(
+                    f"Model '{self.name}' ({self.__class__.__name__}) is missing {len(missing_features)} of its "
+                    f"{len(self.features)} input features in the provided data, for example {missing_features[:5]}. "
+                    f"Ensure the data has the same columns as the training data. If this is a custom model, ensure "
+                    f"it does not assign `self.features` to transformed columns, refer to `AbstractModel._fit`."
+                ) from err
         return X
 
     def _preprocess_set_features(self, X: pd.DataFrame, feature_metadata: FeatureMetadata = None):
@@ -688,7 +894,7 @@ class AbstractModel(ModelBase, Tunable):
             feature_metadata = copy.deepcopy(feature_metadata)
         feature_metadata = self._update_feature_metadata(X=X, feature_metadata=feature_metadata)
 
-        valid_features = self._get_valid_features(feature_metadata=feature_metadata)
+        valid_features = set(self._get_valid_features(feature_metadata=feature_metadata))
         dropped_features = [feature for feature in self.features if feature not in valid_features]
         if dropped_features:
             logger.log(10, f"\tDropped {len(dropped_features)} of {len(self.features)} features.")
@@ -699,11 +905,12 @@ class AbstractModel(ModelBase, Tunable):
             raise NoValidFeatures(f"No valid features exist to fit {self.name}")
         # TODO: If unique_counts == 2 (including NaN), then treat as boolean
         #  FIXME: v1.3: Need to do this on a per-fold basis
-        if self.params_aux.get("drop_unique", True):
-            # TODO: Could this be optimized to be faster? This might be a bit slow for large data.
-            unique_counts = X[self.features].nunique(axis=0, dropna=False)
-            columns_to_drop = list(unique_counts[unique_counts < 2].index)
-            features_to_drop_internal = columns_to_drop
+        if self.aux_params.drop_unique:
+            # at most one distinct value, missing included (`nunique(dropna=False) < 2`); block-wise on numeric columns
+            if len(X) == 0:
+                features_to_drop_internal = list(self.features)
+            else:
+                features_to_drop_internal = get_constant_columns(X, columns=self.features)
             if not features_to_drop_internal:
                 features_to_drop_internal = None
         else:
@@ -785,6 +992,10 @@ class AbstractModel(ModelBase, Tunable):
         if get_features_kwargs_extra is not None:
             valid_features_extra = feature_metadata.get_features(**get_features_kwargs_extra)
             valid_features = [feature for feature in valid_features if feature in valid_features_extra]
+        if not self._uses_group_key():
+            group_key_features = set(feature_metadata.get_features(required_special_types=[S_GROUP_KEY]))
+            if group_key_features:
+                valid_features = [feature for feature in valid_features if feature not in group_key_features]
 
         return valid_features
 
@@ -875,7 +1086,10 @@ class AbstractModel(ModelBase, Tunable):
 
         self._init_params()
 
-        self.params = self.init_random_seed(random_seed=kwargs.get("random_seed", "auto"), hyperparameters=self.params)
+        # ParamsDict deprecates post-construction mutation (raises from AutoGluon 1.7).
+        self.params = ParamsDict(
+            self.init_random_seed(random_seed=kwargs.get("random_seed", "auto"), hyperparameters=self.params)
+        )
 
         if X is not None:
             self._preprocess_set_features(X=X, feature_metadata=feature_metadata)
@@ -1114,20 +1328,12 @@ class AbstractModel(ModelBase, Tunable):
                 and enforced_num_gpus is not None
                 and enforced_num_gpus != "auto"
             )
-            # The logic below is needed because ray cluster is running some process in the backend even when it's ready to be used
-            # Trying to use all cores on the machine could lead to resource contention situation
-            # TODO: remove this logic if ray team can identify what's going on underneath and how to workaround
+            # Cap the enforced resources at the model's maximum resources.
             max_resources = self._get_maximum_resources()
             max_num_cpus = max_resources.get("num_cpus", None)
             max_num_gpus = max_resources.get("num_gpus", None)
             if max_num_gpus is not None:
                 enforced_num_gpus = min(max_num_gpus, enforced_num_gpus)
-            if DistributedContext.is_distributed_mode() and (not DistributedContext.is_shared_network_file_system()):
-                minimum_model_resources = self.get_minimum_resources(is_gpu_available=(enforced_num_gpus > 0))
-                minimum_model_num_cpus = minimum_model_resources.get("num_cpus", 1)
-                enforced_num_cpus = max(
-                    minimum_model_num_cpus, enforced_num_cpus - 2
-                )  # leave some cpu resources for process running by cluster nodes
             if max_num_cpus is not None:
                 enforced_num_cpus = min(max_num_cpus, enforced_num_cpus)
             kwargs["num_cpus"] = enforced_num_cpus
@@ -1188,6 +1394,7 @@ class AbstractModel(ModelBase, Tunable):
         *,
         log_resources: bool = False,
         log_resources_prefix: str | None = None,
+        approx_mem_size_req: int | None = None,
         **kwargs,
     ):
         """
@@ -1255,10 +1462,17 @@ class AbstractModel(ModelBase, Tunable):
             If True, will log information about the number of CPUs, GPUs, and memory usage during fit.
         log_resources_prefix : str | None, default = None
             If specified, will be prepended to the log generated when `log_resources=True`.
+        approx_mem_size_req : int | None, default = None
+            The estimated peak memory usage of this fit in bytes, if the caller has already computed one.
+            The memory check uses it instead of calling `estimate_memory_usage` on the fit data.
+            A bagged ensemble fitting its folds in parallel passes the estimate it made on the full
+            training data, so each fold model skips its own estimate. Not passed to `_fit`.
         **kwargs :
             Any additional fit arguments a model supports.
         """
         time_start = time.time()
+        # A fold model fit in a worker process starts from default settings there.
+        self._apply_settings_snapshots()
         kwargs = self.initialize(
             **kwargs
         )  # FIXME: This might have to go before self._preprocess_fit_args, but then time_limit might be incorrect in **kwargs init to initialize
@@ -1266,7 +1480,10 @@ class AbstractModel(ModelBase, Tunable):
 
         self._register_fit_metadata(**kwargs)
         self.validate_fit_resources(**kwargs)
-        approx_mem_size_req, available_mem = self._validate_fit_memory_usage(**kwargs)
+        approx_mem_size_req, available_mem = self._validate_fit_memory_usage(
+            approx_mem_size_req=approx_mem_size_req, **kwargs
+        )
+        self._validate_fit_gpu_memory_usage(**kwargs)
         if "time_limit" in kwargs and kwargs["time_limit"] is not None:
             time_start_fit = time.time()
             kwargs["time_limit"] -= time_start_fit - time_start
@@ -1307,10 +1524,12 @@ class AbstractModel(ModelBase, Tunable):
 
                 if reset_torch_cudnn_deterministic:
                     torch_cudnn_deterministic_og = torch.backends.cudnn.deterministic
+        features_in = list(self.features) if self.features is not None else None
         try:
             out = self._fit(**kwargs)
             if out is None:
                 out = self
+            out._check_features_not_mutated(features_in=features_in)
             out = out._post_fit(**kwargs)
         finally:
             # Always executed even if _fit or _post_fit raise
@@ -1330,6 +1549,22 @@ class AbstractModel(ModelBase, Tunable):
                             cudnn.deterministic = torch_cudnn_deterministic_og
         return out
 
+    #: Set on bagged fold children before fitting: the containing bag already validated the fit
+    #: constraints (`ag.min_rows`, `ag.min_cells`, ...) against the full training data, which is
+    #: what the constraints are defined over. A fold child sees only a (k-1)/k slice of that data,
+    #: so re-validating on the slice rejects models the bag correctly accepted — a dataset whose
+    #: full split satisfies `ag.min_rows` but whose fold slices do not would otherwise fail every
+    #: child and lose the model entirely.
+    _fit_constraints_validated_upstream: bool = False
+
+    #: Whether the model reads features of special type `S_GROUP_KEY` (the group a row belongs to). Such a
+    #: feature is row-aligned side information for per-group models, so every other model leaves it out of
+    #: its features (see `_get_valid_features`).
+    uses_group_key: bool = False
+
+    def _uses_group_key(self) -> bool:
+        return self.uses_group_key
+
     # FIXME: Simply log a message that the model is being skipped instead of logging a traceback.
     def validate_fit_args(self, X: pd.DataFrame, feature_metadata: FeatureMetadata | None = None, **kwargs):
         """
@@ -1338,44 +1573,70 @@ class AbstractModel(ModelBase, Tunable):
 
         Checks for:
             ag.problem_types
+            ag.min_rows
             ag.max_rows
+            ag.min_features
             ag.max_features
+            ag.min_cells
+            ag.max_cells
             ag.max_classes
             ag.ignore_constraints
         """
+        if self._fit_constraints_validated_upstream:
+            logger.log(15, "\tFit constraints were validated upstream on the full training data, skipping...")
+            return
         if self.is_initialized():
-            ag_params = self._get_ag_params()
+            params_aux_dict = self.params_aux
+            aux_params = self.aux_params
         else:
-            ag_params = self._get_ag_params(params_aux=self._get_params_aux())
+            params_aux_dict = self._get_params_aux()
+            aux_params = AuxiliaryParams.from_dict(params_aux_dict)
 
-        problem_types: list[str] | None = ag_params.get("problem_types", None)
-        max_classes: int | None = ag_params.get("max_classes", None)
-        max_rows: int | None = ag_params.get("max_rows", None)
-        max_features: int | None = ag_params.get("max_features", None)
-        ignore_constraints: bool = ag_params.get("ignore_constraints", False)
+        problem_types: list[str] | None = aux_params.problem_types
+        max_classes: int | None = aux_params.max_classes
+        min_rows: int | None = aux_params.min_rows
+        max_rows: int | None = aux_params.max_rows
+        min_features: int | None = aux_params.min_features
+        max_features: int | None = aux_params.max_features
+        min_cells: int | None = aux_params.min_cells
+        max_cells: int | None = aux_params.max_cells
+        ignore_constraints: bool = aux_params.ignore_constraints
 
         if ignore_constraints:
             # skip all validation checks
-            logger.log(15, f"\t`ag.ignore_constraints=True`, skipping sanity checks for model...")
+            logger.log(15, "\t`ag.ignore_constraints=True`, skipping sanity checks for model...")
             return
 
         if problem_types is not None:
             if self.problem_type not in problem_types:
-                raise AssertionError(
+                raise ConstraintViolationError(
                     f"ag.problem_types={problem_types} for model '{self.name}', "
-                    f"but found '{self.problem_type}' problem_type."
+                    f"but found '{self.problem_type}' problem_type.",
+                    reason=f"ag.problem_types={problem_types}, but the problem type is '{self.problem_type}'",
                 )
-            assert self.problem_type in problem_types
         if max_classes is not None:
             if self.num_classes is not None and self.num_classes > max_classes:
-                raise AssertionError(
-                    f"ag.max_classes={max_classes} for model '{self.name}', but found {self.num_classes} classes."
+                raise ConstraintViolationError(
+                    f"ag.max_classes={max_classes} for model '{self.name}', but found {self.num_classes} classes.",
+                    reason=f"ag.max_classes={max_classes}, but the data has {self.num_classes} classes",
+                )
+        if min_rows is not None:
+            n_rows = X.shape[0]
+            if n_rows < min_rows:
+                raise ConstraintViolationError(
+                    f"ag.min_rows={min_rows} for model '{self.name}', but found {n_rows} rows.",
+                    reason=f"ag.min_rows={min_rows}, but the data has only {n_rows} rows",
                 )
         if max_rows is not None:
             n_rows = X.shape[0]
             if n_rows > max_rows:
-                raise AssertionError(f"ag.max_rows={max_rows} for model '{self.name}', but found {n_rows} rows.")
-        if max_features is not None:
+                raise ConstraintViolationError(
+                    f"ag.max_rows={max_rows} for model '{self.name}', but found {n_rows} rows.",
+                    reason=f"ag.max_rows={max_rows}, but the data has {n_rows} rows",
+                )
+        if any(bound is not None for bound in (min_features, max_features, min_cells, max_cells)):
+            # Shared between the feature and cell checks: estimating the post-preprocessing column
+            # count fits a feature generator, so do it at most once and only if a check needs it.
             n_features = X.shape[1]
 
             if feature_metadata is None:
@@ -1383,20 +1644,61 @@ class AbstractModel(ModelBase, Tunable):
                 feature_metadata = self._feature_metadata
 
             if feature_metadata is not None:
-                feature_generator = self.get_preprocessor()
+                # Resolve the model-specific preprocessor from the same params-aux source the
+                # constraint values above came from: `get_preprocessor()`'s internal lookup reads
+                # the initialized `params_aux`, which is empty before `initialize()` runs — and the
+                # bag validates its child template uninitialized, so the feature checks silently
+                # used the raw feature count for models whose preprocessing changes it (TabPrep).
+                feature_generator = self.get_preprocessor(
+                    ag_params=self._get_ag_params(params_aux=params_aux_dict).get(
+                        "model_specific_feature_generator_kwargs", None
+                    )
+                )
                 if feature_generator is not None:
                     # TODO: Can be faster if can calculate new_feature_metadata w/o fitting feature generator
-                    new_feature_metadata = self._estimate_dtypes_after_preprocessing_cheap(
-                        X=X,
-                        y=kwargs["y"],
-                        feature_generator=feature_generator,
-                    )
-                    n_features = len(new_feature_metadata.get_features())
+                    try:
+                        new_feature_metadata = self._estimate_dtypes_after_preprocessing_cheap(
+                            X=X,
+                            y=kwargs["y"],
+                            feature_generator=feature_generator,
+                        )
+                    except Exception as err:
+                        # The estimate fits the model-specific preprocessor on a sample, which can
+                        # fail for reasons the real fit would not hit (e.g. generators that need
+                        # more rows than the sample has). A failed estimate should degrade the
+                        # feature checks to the raw count, not fail the model here.
+                        logger.log(
+                            15,
+                            f"\tEstimating the post-preprocessing feature count failed for model "
+                            f"'{self.name}' ({err!r}); validating feature constraints against the "
+                            f"raw feature count instead.",
+                        )
+                    else:
+                        n_features = len(new_feature_metadata.get_features())
 
-            if n_features > max_features:
-                raise AssertionError(
-                    f"ag.max_features={max_features} for model '{self.name}', but found {n_features} features."
+            if min_features is not None and n_features < min_features:
+                raise ConstraintViolationError(
+                    f"ag.min_features={min_features} for model '{self.name}', but found {n_features} features.",
+                    reason=f"ag.min_features={min_features}, but the data has only {n_features} features",
                 )
+            if max_features is not None and n_features > max_features:
+                raise ConstraintViolationError(
+                    f"ag.max_features={max_features} for model '{self.name}', but found {n_features} features.",
+                    reason=f"ag.max_features={max_features}, but the data has {n_features} features",
+                )
+            if min_cells is not None or max_cells is not None:
+                n_cells = X.shape[0] * n_features
+                shape = f"{X.shape[0]} rows x {n_features} features"
+                if min_cells is not None and n_cells < min_cells:
+                    raise ConstraintViolationError(
+                        f"ag.min_cells={min_cells} for model '{self.name}', but found {n_cells} cells ({shape}).",
+                        reason=f"ag.min_cells={min_cells}, but the data has only {n_cells} cells ({shape})",
+                    )
+                if max_cells is not None and n_cells > max_cells:
+                    raise ConstraintViolationError(
+                        f"ag.max_cells={max_cells} for model '{self.name}', but found {n_cells} cells ({shape}).",
+                        reason=f"ag.max_cells={max_cells}, but the data has {n_cells} cells ({shape})",
+                    )
 
     def _post_fit(self, **kwargs):
         """
@@ -1466,11 +1768,44 @@ class AbstractModel(ModelBase, Tunable):
         Examples of logic that should be handled by a model include missing value handling, rescaling of features (if neural network), etc.
         If implementing a new model, it is recommended to refer to existing model implementations and experiment using toy datasets.
 
+        Do not assign `self.features` to the output columns of a feature transform (e.g. PCA, NMF, or other
+        width-changing projections). `self.features` must stay the input columns, as bagged inference selects
+        `X[self.features]` on the raw data once for all fold models without calling `_predict_proba`.
+        Narrowing `self.features` to a subset of the input columns is allowed, anything else raises an error.
+        Instead, apply the transform in one of these places, which run on every fit and inference call:
+
+        * `_preprocess`: model-owned transform logic, fit on `self.preprocess(X, is_train=True)` in `_fit`.
+        * `get_preprocessor` / the `ag.model_specific_feature_generator_kwargs` hyperparameter: a feature
+          generator fit per model (per fold in bagging), whose output columns are tracked in
+          `self._features_internal`.
+
         Refer to `fit` method for documentation.
         """
 
         X = self.preprocess(X=X, y=y)
         self.model = self.model.fit(X, y)
+
+    def _check_features_not_mutated(self, features_in: list[str] | None):
+        """Raise if `_fit` replaced `self.features` with columns that are not in the model's input columns.
+
+        `self.features` is used by `_preprocess_nonadaptive` to select columns from the raw input data, and
+        bagged ensembles call it once for all fold models. If `_fit` sets it to the output columns of a
+        transform, bagged inference fails later with an opaque `KeyError`, so we fail fast here instead.
+        """
+        if features_in is None or self.features is None:
+            return
+        features_in_set = set(features_in)
+        unknown_features = [f for f in self.features if f not in features_in_set]
+        if unknown_features:
+            raise AssertionError(
+                f"Model '{self.name}' ({self.__class__.__name__}) changed `self.features` during `_fit` to include "
+                f"{len(unknown_features)} column(s) that are not in its input data, for example "
+                f"{unknown_features[:5]}. `self.features` must remain the input columns (or a subset of them), "
+                f"otherwise inference fails, e.g. with a `KeyError` in bagged models. To change the feature space "
+                f"(e.g. PCA or other projections), apply the transform in `_preprocess` or via a model-specific "
+                f"feature generator (`get_preprocessor` / `ag.model_specific_feature_generator_kwargs`) and do not "
+                f"assign `self.features`. Refer to the docstring of `AbstractModel._fit` for details."
+            )
 
     # TODO: add model-tag to check if the model can work with `None` random seed?
     # TODO: add check that int seed is smaller than `int(np.iinfo(np.int32).max)`?
@@ -1547,10 +1882,36 @@ class AbstractModel(ModelBase, Tunable):
                         return hyperparameters[seed_name], seed_name
         return "N/A", None
 
+    @property
+    def temperature_scalar(self) -> float | None:
+        """Temperature-scaling parameter applied to `predict_proba` (None = no scaling).
+
+        Learned post-fit: the trainer assigns it during calibration
+        (`calibrate=True`); falls back to the user-configured `ag.temperature_scalar`.
+        """
+        if self._temperature_scalar is not None:
+            return self._temperature_scalar
+        return self.aux_params.temperature_scalar
+
+    @temperature_scalar.setter
+    def temperature_scalar(self, value: float | None) -> None:
+        self._temperature_scalar = value
+
+    def _apply_calibration(self, y_pred_proba: np.ndarray) -> np.ndarray:
+        """The post-hoc calibration `predict_proba` applies to the model's output: temperature scaling when
+        `temperature_scalar` is set, else conformalization when `conformalize` is, then `calibrator` when fitted."""
+        if self.temperature_scalar is not None:
+            y_pred_proba = self._apply_temperature_scaling(y_pred_proba)
+        elif self.conformalize is not None:
+            return self._apply_conformalization(y_pred_proba)
+        if self.calibrator is not None:
+            y_pred_proba = self.calibrator.predict_proba(y_pred_proba)
+        return y_pred_proba
+
     def _apply_temperature_scaling(self, y_pred_proba: np.ndarray) -> np.ndarray:
         return apply_temperature_scaling(
             y_pred_proba=y_pred_proba,
-            temperature_scalar=self.params_aux.get("temperature_scalar"),
+            temperature_scalar=self.temperature_scalar,
             problem_type=self.problem_type,
         )
 
@@ -1601,20 +1962,24 @@ class AbstractModel(ModelBase, Tunable):
         """
         time_start = time.time() if record_time else None
 
-        max_batch_size: int | None = self.params_aux.get("max_batch_size", None)
+        max_batch_size: int | None = self._get_max_batch_size()
         if max_batch_size is not None and max_batch_size < len(X):
             y_pred_proba = self._predict_proba_batch(X=X, max_batch_size=max_batch_size, normalize=normalize, **kwargs)
         else:
             y_pred_proba = self._predict_proba_internal(X=X, normalize=normalize, **kwargs)
 
-        if self.params_aux.get("temperature_scalar", None) is not None:
-            y_pred_proba = self._apply_temperature_scaling(y_pred_proba)
-        elif self.conformalize is not None:
-            y_pred_proba = self._apply_conformalization(y_pred_proba)
+        y_pred_proba = self._apply_calibration(y_pred_proba)
         if record_time:
             self.predict_time = time.time() - time_start
             self.record_predict_info(X=X)
         return y_pred_proba
+
+    def _get_max_batch_size(self) -> int | None:
+        """The prediction chunk size used by `predict_proba` (`ag.max_batch_size`);
+        None disables chunking. Models whose declared value is a sentinel (e.g.
+        TabPFN's "auto") override this to return the value resolved during `_fit`.
+        """
+        return self.aux_params.max_batch_size
 
     def _predict_proba_batch(
         self,
@@ -1819,6 +2184,7 @@ class AbstractModel(ModelBase, Tunable):
         """
         file_path = os.path.join(path, cls.model_file_name)
         model = load_pkl.load(path=file_path, verbose=verbose)
+        model._apply_settings_snapshots()
         if reset_paths:
             model.set_contexts(path)
         if hasattr(model, "_compiler"):
@@ -2255,6 +2621,67 @@ class AbstractModel(ModelBase, Tunable):
             hyperparameters[AG_ARGS_FIT] = self._user_params_aux.copy()
         return hyperparameters
 
+    def declared_refit_hyperparameters(self) -> dict:
+        """The ``ag.refit_hyperparameters`` this model was configured with, or ``{}``.
+
+        Read from the raw hyperparameters rather than ``aux_params`` so it answers the same way for
+        an unfit template, whose ``params_aux`` has not been populated -- which is what a bagged
+        model's ``model_base`` is.
+        """
+        hyperparameters = self.get_params().get("hyperparameters") or {}
+        aux = hyperparameters.get(AG_ARGS_FIT)
+        declared = aux.get("refit_hyperparameters") if isinstance(aux, dict) else None
+        if declared is None:
+            declared = hyperparameters.get(f"{AG_ARG_PREFIX}refit_hyperparameters")
+        return declared or {}
+
+    @staticmethod
+    def _apply_refit_hyperparameters(hyperparameters: dict) -> None:
+        """Consume ``ag.refit_hyperparameters`` from ``hyperparameters`` and merge it in, in place.
+
+        Read out of the hyperparameters dict rather than from ``self.aux_params``, because a bagged
+        model builds its refit child from ``model_base`` -- an unfit template whose ``params_aux``
+        has not been populated yet, so the value is only present in its raw form here.
+
+        Applied after ``params_trained``, so an explicitly requested refit value wins over one the
+        fit concluded with; overriding what the fit settled on is the point of the option.
+
+        The override is consumed rather than copied through: it has been applied, and leaving it
+        would re-apply on any further refit of the refit.
+        """
+        aux = hyperparameters.get(AG_ARGS_FIT)
+        overrides = aux.pop("refit_hyperparameters", None) if isinstance(aux, dict) else None
+        prefixed = hyperparameters.pop(f"{AG_ARG_PREFIX}refit_hyperparameters", None)
+        if overrides is None:
+            overrides = prefixed
+        if not overrides:
+            return
+        for key, value in overrides.items():
+            if isinstance(key, str) and key.startswith(AG_ARG_PREFIX):
+                hyperparameters.setdefault(AG_ARGS_FIT, {})[key[len(AG_ARG_PREFIX) :]] = value
+            else:
+                hyperparameters[key] = value
+
+    @staticmethod
+    def _update_hyperparameters_with_params_trained(hyperparameters: dict, params_trained: dict) -> None:
+        """Merge ``params_trained`` into ``hyperparameters`` in place, keeping one encoding per parameter.
+
+        ``hyperparameters`` as emitted by :meth:`get_hyperparameters_init` carries auxiliary
+        parameters inside the ``ag_args_fit`` sub-dict, while ``params_trained`` carries them
+        ``ag.``-prefixed at the top level (e.g. ``"ag.max_rows": None``, recorded after fit so a
+        refit-full template skips the row-cap check). A plain ``dict.update`` would leave both
+        encodings of the same parameter in the merged dict, and the template's
+        ``_init_user_params`` would then log a spurious "present in both `ag_args_fit` and
+        `hyperparameters`" warning aimed at genuine user double-specification. Routing the
+        prefixed keys into the ``ag_args_fit`` sub-dict keeps the same precedence (the trained
+        value wins) with a single encoding, so the warning fires only for real user collisions.
+        """
+        for key, value in params_trained.items():
+            if isinstance(key, str) and key.startswith(AG_ARG_PREFIX):
+                hyperparameters.setdefault(AG_ARGS_FIT, {})[key[len(AG_ARG_PREFIX) :]] = value
+            else:
+                hyperparameters[key] = value
+
     def convert_to_template(self):
         """
         After calling this function, returned model should be able to be fit as if it was new, as well as deep-copied.
@@ -2286,7 +2713,8 @@ class AbstractModel(ModelBase, Tunable):
             params["hyperparameters"][AG_ARGS_FIT].get("max_memory_usage_ratio", 1.0) * 1.25
         )
 
-        params["hyperparameters"].update(self.params_trained)
+        self._update_hyperparameters_with_params_trained(params["hyperparameters"], self.params_trained)
+        self._apply_refit_hyperparameters(params["hyperparameters"])
         params["name"] = params["name"] + REFIT_FULL_SUFFIX
         template = self.__class__(**params)
 
@@ -2391,10 +2819,7 @@ class AbstractModel(ModelBase, Tunable):
 
         directory = self.path
         os.makedirs(directory, exist_ok=True)
-        data_path = directory
-        if DistributedContext.is_distributed_mode():
-            data_path = DistributedContext.get_util_path()
-        train_path, val_path = hpo_executor.prepare_data(X=X, y=y, X_val=X_val, y_val=y_val, path_prefix=data_path)
+        train_path, val_path = hpo_executor.prepare_data(X=X, y=y, X_val=X_val, y_val=y_val, path_prefix=directory)
 
         model_cls = self.__class__
         init_params = self.get_params()
@@ -2534,6 +2959,21 @@ class AbstractModel(ModelBase, Tunable):
 
     def _get_memory_size(self) -> int:
         gc.collect()  # Try to avoid OOM error
+        return self._get_pickled_size()
+
+    def prepare_for_inference(self) -> None:
+        """Untimed, idempotent, model-only preparation of a fitted model that is kept in memory for serving.
+
+        Called for every persisted model object (bagged children included) by
+        ``TabularPredictor.persist`` through the trainer, outside any timed fit or predict. A model
+        may reattach its own pretrained weights, move its tensors to the inference device, build
+        configuration-driven pipelines, synchronize a device and put its network in eval mode. It
+        must not touch data or run a forward pass: data-dependent first-call work stays in the timed
+        predict. Calling it twice is the same as calling it once. The default does nothing.
+        """
+
+    def _get_pickled_size(self) -> int:
+        """Size in bytes of the pickle of `self`."""
         return sys.getsizeof(pickle.dumps(self, protocol=4))
 
     # TODO: Refine this
@@ -2700,6 +3140,97 @@ class AbstractModel(ModelBase, Tunable):
         """
         return self.estimate_memory_usage(**kwargs)
 
+    def estimate_gpu_memory_usage(self, X: pd.DataFrame, **kwargs) -> int | None:
+        """
+        Estimates the peak GPU memory (VRAM) usage of the model while training.
+
+        The GPU counterpart of `estimate_memory_usage`. Returns None when the model
+        defines no GPU memory estimate (the default) — VRAM checks are then skipped.
+
+        Parameters
+        ----------
+        X: pd.DataFrame
+            The training data features
+
+        Returns
+        -------
+        int | None: estimated peak VRAM usage in bytes during training, or None if the model defines no estimate
+        """
+        assert self.is_initialized(), "Only estimate GPU memory usage after the model is initialized."
+        gpu_memory_usage_estimate = self._estimate_gpu_memory_usage(X=X, **kwargs)
+        self._gpu_memory_usage_estimate = gpu_memory_usage_estimate
+        return gpu_memory_usage_estimate
+
+    def _estimate_gpu_memory_usage(self, X: pd.DataFrame, **kwargs) -> int | None:
+        """
+        Estimates the peak GPU memory (VRAM) usage in bytes during model fitting.
+
+        Defaults to this model's static estimate when it defines one, else None (no
+        estimate; VRAM checks are skipped). Implementing
+        `_estimate_gpu_memory_usage_static` is therefore enough to enable VRAM safety
+        checks and, eventually, safe parallel scheduling of GPU models; override this
+        method only when a fitted instance can estimate better than the static form.
+        """
+        if not self.can_estimate_gpu_memory_usage_static():
+            return None
+        return self.estimate_gpu_memory_usage_static(
+            X=X,
+            problem_type=self.problem_type,
+            num_classes=self.num_classes,
+            hyperparameters=self._get_model_params(),
+            **kwargs,
+        )
+
+    @classmethod
+    def can_estimate_gpu_memory_usage_static(cls) -> bool:
+        """
+        True if `estimate_gpu_memory_usage_static` is implemented for this model.
+        If False, calling `estimate_gpu_memory_usage_static` will raise a NotImplementedError.
+
+        Derived from whether the model implements `_estimate_gpu_memory_usage_static`, so
+        implementing the estimate is all that is required to enable it.
+        """
+        return cls._overrides("_estimate_gpu_memory_usage_static")
+
+    @classmethod
+    def estimate_gpu_memory_usage_static(
+        cls,
+        *,
+        X: pd.DataFrame,
+        y: pd.Series = None,
+        hyperparameters: dict = None,
+        problem_type: str = "infer",
+        num_classes: int | None | str = "infer",
+        **kwargs,
+    ) -> int:
+        """
+        Estimates the peak GPU memory (VRAM) usage of the model while training, without
+        having to initialize the model. The GPU counterpart of `estimate_memory_usage_static`.
+        """
+        if problem_type == "infer":
+            problem_type = cls._infer_problem_type(y=y)
+        if isinstance(num_classes, str) and num_classes == "infer":
+            num_classes = cls._infer_num_classes(y=y, problem_type=problem_type)
+        if hyperparameters is None:
+            hyperparameters = {}
+        hyperparameters = cls._get_model_params_static(
+            hyperparameters=hyperparameters, convert_search_spaces_to_default=True
+        )
+        return cls._estimate_gpu_memory_usage_static(
+            X=X, y=y, hyperparameters=hyperparameters, problem_type=problem_type, num_classes=num_classes, **kwargs
+        )
+
+    @classmethod
+    def _estimate_gpu_memory_usage_static(
+        cls,
+        *,
+        X: pd.DataFrame,
+        hyperparameters: dict = None,
+        num_classes: int = 1,
+        **kwargs,
+    ) -> int:
+        raise NotImplementedError
+
     def estimate_memory_usage_static_child(
         self,
         *,
@@ -2780,13 +3311,19 @@ class AbstractModel(ModelBase, Tunable):
             Model that can be trained both on cpu and gpu can decide the minimum resources based on this.
 
         Returns a dictionary of minimum resource requirements to fit the model.
-        Subclass should consider overriding this method if it requires more resources to train.
         If a resource is not part of the output dictionary, it is considered unnecessary.
         Valid keys: 'num_cpus', 'num_gpus'.
+
+        Subclasses declare their GPU minimum via the `minimum_num_gpus` class attribute
+        (plus `gpu_required` for GPU-mandatory models); overriding this method also
+        remains supported.
         """
-        return {
+        minimum_resources: dict[str, int | float] = {
             "num_cpus": 1,
         }
+        if self.minimum_num_gpus and (is_gpu_available or self.gpu_required):
+            minimum_resources["num_gpus"] = self.minimum_num_gpus
+        return minimum_resources
 
     def _estimate_memory_usage(self, X: pd.DataFrame, **kwargs) -> int:
         """
@@ -2806,7 +3343,21 @@ class AbstractModel(ModelBase, Tunable):
         -------
         The estimated peak memory usage in bytes during model fit.
         """
+        if self.can_estimate_memory_usage_static():
+            # A static estimate is strictly better informed than the generic fallback:
+            # delegate rather than making every such model write this wrapper itself.
+            return self._estimate_memory_usage_from_static(X=X, **kwargs)
         return 4 * get_approximate_df_mem_usage(X).sum()
+
+    def _estimate_memory_usage_from_static(self, X: pd.DataFrame, **kwargs) -> int:
+        """Call this model's static estimate with the state a fitted instance knows."""
+        return self.estimate_memory_usage_static(
+            X=X,
+            problem_type=self.problem_type,
+            num_classes=self.num_classes,
+            hyperparameters=self._get_model_params(),
+            **kwargs,
+        )
 
     @classmethod
     def _estimate_memory_usage_static(
@@ -2904,8 +3455,8 @@ class AbstractModel(ModelBase, Tunable):
             )
             if min_error_memory_ratio >= 1:
                 log_user_guideline += (
-                    f'\n\t\tSetting "ag.max_memory_usage_ratio" to values above 1 may result in out-of-memory errors. '
-                    f"You may consider using a machine with more memory as a safer alternative."
+                    '\n\t\tSetting "ag.max_memory_usage_ratio" to values above 1 may result in out-of-memory errors. '
+                    "You may consider using a machine with more memory as a safer alternative."
                 )
             logger.warning(f"\tWarning: Not enough memory to safely train model. {log_user_guideline}")
             raise NotEnoughMemoryError
@@ -2917,10 +3468,70 @@ class AbstractModel(ModelBase, Tunable):
             )
             if min_warning_memory_ratio >= 1:
                 log_user_guideline += (
-                    f'\n\t\tSetting "ag.max_memory_usage_ratio" to values above 1 may result in out-of-memory errors. '
-                    f"You may consider using a machine with more memory as a safer alternative."
+                    '\n\t\tSetting "ag.max_memory_usage_ratio" to values above 1 may result in out-of-memory errors. '
+                    "You may consider using a machine with more memory as a safer alternative."
                 )
             logger.warning(f"\tWarning: Potentially not enough memory to safely train model. {log_user_guideline}")
+
+        return approx_mem_size_req, available_mem
+
+    def _validate_fit_gpu_memory_usage(
+        self,
+        mem_error_threshold: float = 0.9,
+        mem_warning_threshold: float = 0.75,
+        approx_mem_size_req: int | None = None,
+        available_mem: int | None = None,
+        num_gpus: int | float | str | None = None,
+        **kwargs,
+    ) -> tuple[int | None, int | None]:
+        """
+        Asserts that enough GPU memory (VRAM) is available to fit the model.
+
+        The GPU counterpart of `_validate_fit_memory_usage`. The check only runs when the
+        model is assigned at least one GPU AND defines a GPU memory estimate
+        (`estimate_gpu_memory_usage` returns non-None); otherwise it is skipped. Thresholds
+        depend on the `params_aux` hyperparameter `max_gpu_memory_usage_ratio` (default 1.0;
+        None skips all VRAM checks). Raises NotEnoughCudaMemoryError when the estimate
+        exceeds the error threshold (handled by the trainer as a graceful model skip).
+
+        Returns
+        -------
+        approx_mem_size_req: int | None
+            The estimated VRAM requirement of the model in bytes (None = not calculated / no estimate).
+        available_mem: int | None
+            The available VRAM in bytes (None = not calculated / not detectable).
+        """
+        max_memory_usage_ratio = self.params_aux["max_gpu_memory_usage_ratio"]
+        if max_memory_usage_ratio is None:
+            return approx_mem_size_req, available_mem  # Skip VRAM check
+        if not num_gpus or (isinstance(num_gpus, str)):
+            return approx_mem_size_req, available_mem  # Not fitting on GPU
+
+        if approx_mem_size_req is None:
+            approx_mem_size_req = self.estimate_gpu_memory_usage(**kwargs)
+        if approx_mem_size_req is None:
+            return None, available_mem  # Model defines no GPU memory estimate
+
+        if available_mem is None:
+            available_mem = ResourceManager.get_available_vram()
+        if available_mem is None:
+            logger.debug("\tAvailable VRAM could not be determined, skipping GPU memory check.")
+            return approx_mem_size_req, None
+
+        expected_memory_usage_ratio = approx_mem_size_req / available_mem
+        max_memory_usage_error_ratio = mem_error_threshold * max_memory_usage_ratio
+        max_memory_usage_warning_ratio = mem_warning_threshold * max_memory_usage_ratio
+
+        log_user_guideline = (
+            f"Estimated to require {approx_mem_size_req / (1024**3):.3f} GB "
+            f"out of {available_mem / (1024**3):.3f} GB available GPU memory ({expected_memory_usage_ratio * 100:.3f}%)... "
+            f"({max_memory_usage_error_ratio * 100:.3f}% of avail GPU memory is the max safe size)"
+        )
+        if expected_memory_usage_ratio > max_memory_usage_error_ratio:
+            logger.warning(f"\tWarning: Not enough GPU memory to safely train model. {log_user_guideline}")
+            raise NotEnoughCudaMemoryError
+        elif expected_memory_usage_ratio > max_memory_usage_warning_ratio:
+            logger.warning(f"\tWarning: Potentially not enough GPU memory to safely train model. {log_user_guideline}")
 
         return approx_mem_size_req, available_mem
 
@@ -2984,6 +3595,9 @@ class AbstractModel(ModelBase, Tunable):
             "is_valid": self.is_valid(),
             "can_infer": self.can_infer(),
             "has_learning_curves": self.saved_learning_curves,
+            # Filled by models that take their pretrained network from the shared-weights registry
+            # (`AbstractTorchModel.shared_weights`); reserved here so consumers can rely on the key.
+            "shared_weights": None,
         }
         if self._is_fit_metadata_registered:
             info.update(self._fit_metadata)
@@ -3069,9 +3683,14 @@ class AbstractModel(ModelBase, Tunable):
             )
         if init_params is None:
             init_params = {}
+        # Before `init_random_seed` runs (e.g. constraint validation on an unfit model), the seed
+        # holds the "NOTSET" sentinel, which generators pass into components that reject it (an
+        # sklearn splitter raises on a non-int seed). Fall back to the class default seed then;
+        # real fits initialize the seed before any preprocessor is built, so they are unaffected.
+        random_seed = self.random_seed if self.random_seed != "NOTSET" else self.default_random_seed
         _init_params = dict(
             verbosity=0,
-            random_state=self.random_seed,
+            random_state=random_seed,
             target_type=self.problem_type,
         )
         _init_params.update(**init_params)
@@ -3185,10 +3804,14 @@ class AbstractModel(ModelBase, Tunable):
         """
         Determines the default resource usage of the model during fit.
 
-        Models may want to override this if they depend heavily on GPUs, as the default sets num_gpus to 0.
+        Subclasses declare their defaults via the `default_resources_physical_cores_only` and
+        `default_num_gpus` class attributes; overriding this method also remains supported
+        (e.g. for non-CUDA GPU counting).
         """
-        num_cpus = ResourceManager.get_cpu_count()
+        num_cpus = ResourceManager.get_cpu_count(only_physical_cores=self.default_resources_physical_cores_only)
         num_gpus = 0
+        if self.default_num_gpus:
+            num_gpus = min(self.default_num_gpus, ResourceManager.get_gpu_count_torch(cuda_only=True))
         return num_cpus, num_gpus
 
     # TODO: v0.1 Add reference link to all valid keys and their usage or keep full docs here and reference elsewhere?
@@ -3207,8 +3830,17 @@ class AbstractModel(ModelBase, Tunable):
         """
         [Advanced] Dictionary of customization options related to meta properties of the model ensemble this model will be a child in.
         Refer to hyperparameters of ensemble models for valid options.
+
+        Subclasses declare their overrides via the `_default_ag_args_ensemble_extra` class
+        attribute (merged base-most class first, so subclasses win); overriding this
+        classmethod also remains supported.
         """
-        return {}
+        default_ag_args_ensemble = {}
+        for klass in reversed(cls.__mro__):
+            extra = klass.__dict__.get("_default_ag_args_ensemble_extra")
+            if extra:
+                default_ag_args_ensemble.update(extra)
+        return default_ag_args_ensemble
 
     @classmethod
     def supported_problem_types(cls) -> list[str] | None:
@@ -3216,8 +3848,11 @@ class AbstractModel(ModelBase, Tunable):
         Returns the list of supported problem types.
         If None is returned, then the model has not specified the supported problem types, and it is unknown which problem types are valid.
             In this case, all problem types are considered supported and the model will never be filtered out based on problem type.
+
+        Subclasses declare their supported problem types via the `_supported_problem_types` class attribute;
+        overriding this classmethod also remains supported.
         """
-        return None
+        return cls._supported_problem_types
 
     def _get_default_stopping_metric(self) -> Scorer:
         """
@@ -3337,24 +3972,44 @@ class AbstractModel(ModelBase, Tunable):
         These params are available to all models without requiring special handling in the model.
         They are in addition to the params specified in `_ag_params`
 
+        min_rows: int
+            If specified, raises an AssertionError at fit time if len(X) < min_rows
         max_rows: int
             If specified, raises an AssertionError at fit time if len(X) > max_rows
+        min_features: int
+            If specified, raises an AssertionError at fit time if len(X.columns) < min_features
         max_features: int
-            If specified, raises an AssertionError at fit time if len(X.columns) > max_rows
+            If specified, raises an AssertionError at fit time if len(X.columns) > max_features
+        min_cells: int
+            If specified, raises an AssertionError at fit time if len(X) * len(X.columns) < min_cells
+        max_cells: int
+            If specified, raises an AssertionError at fit time if len(X) * len(X.columns) > max_cells
         max_classes: int
             If specified, raises an AssertionError at fit time if self.num_classes > max_classes
         problem_types: list[str]
             If specified, raises an AssertionError at fit time if self.problem_type not in problem_types
         ignore_constraints: bool
-            If True, ignores the values of `max_rows`, `max_features`, `max_classes` and `problem_types`.
+            If True, ignores the values of `min_rows`, `max_rows`, `min_features`, `max_features`,
+            `min_cells`, `max_cells`, `max_classes` and `problem_types`.
+        max_batch_size: int
+            If specified, predictions on more than `max_batch_size` rows are computed in chunks of at most
+            `max_batch_size` rows each (see `_predict_proba_batch`), bounding prediction-time memory usage.
+        drop_unique: bool
+            Whether to drop features that have only 1 unique value (default True).
 
         """
         return {
+            "min_rows",
             "max_rows",
+            "min_features",
             "max_features",
+            "min_cells",
+            "max_cells",
             "max_classes",
             "problem_types",
             "ignore_constraints",
+            "max_batch_size",
+            "drop_unique",
             "model_specific_feature_generator_kwargs",
             "prep_params",
             "prep_params.passthrough_types",

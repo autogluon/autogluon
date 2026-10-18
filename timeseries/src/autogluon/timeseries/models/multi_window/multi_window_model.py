@@ -4,6 +4,7 @@ import logging
 import math
 import os
 import time
+from pathlib import Path
 from typing import Any, Type
 
 import numpy as np
@@ -73,6 +74,11 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
     @property
     def supports_past_covariates(self) -> bool:
         return self.model_base.supports_past_covariates
+
+    @property
+    def supports_export(self) -> bool:
+        # exporting delegates to the model fit on the most recent window, so its transforms are what matter
+        return self.most_recent_model is not None and self.most_recent_model.supports_export
 
     def _get_model_base(self):
         return self.model_base
@@ -265,6 +271,11 @@ class MultiWindowBacktestingModel(AbstractTimeSeriesModel):
             raise ValueError(f"{self.name} must be fit before persisting")
         self.most_recent_model.persist()
         return self
+
+    def export_model(self, path: str | Path) -> str:
+        if self.most_recent_model is None:
+            raise ValueError(f"{self.name} must be fit before exporting")
+        return self.most_recent_model.export_model(path)
 
     @classmethod
     def load(

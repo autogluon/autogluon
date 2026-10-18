@@ -52,7 +52,9 @@ def test_dump_timm_image():
 
 def test_dump_hf_text():
     model_dump_path = "./hf_text_test"
-    base_model_name = "prajjwal1/bert-tiny"
+    # NOTE: use a checkpoint whose config.json has a `model_type` key. transformers>=5 dropped
+    # the fallback that inferred the type from the checkpoint name (e.g. "prajjwal1/bert-tiny").
+    base_model_name = "google/bert_uncased_L-2_H-128_A-2"
     dataset = AEDataset()
     predictor_1 = MultiModalPredictor(
         label=dataset.label_columns[0], problem_type=dataset.problem_type, eval_metric=dataset.metric

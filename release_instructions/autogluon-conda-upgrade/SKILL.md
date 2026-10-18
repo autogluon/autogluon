@@ -5,7 +5,9 @@ description: Automate AutoGluon conda-forge feedstock version upgrades. Use when
 
 # AutoGluon Conda Feedstock Upgrade Workflow
 
-**CRITICAL: DO NOT MERGE PULL REQUESTS.** Only create PRs. The user will review and merge them manually.
+**CRITICAL: DO NOT MERGE PULL REQUESTS** during the PR-creation workflow (Steps 1–8). Only create PRs. The user will review them.
+
+**Exception:** Step 9 (Automated Merge Chain) is an opt-in workflow that DOES merge PRs, but ONLY when the user explicitly asks you to watch and merge the chain. Never merge otherwise.
 
 ## Step 1: Prerequisites Check
 
@@ -199,25 +201,114 @@ List all 7 created PRs with clickable links.
 > 3. Once CI passes again, merge
 > 4. Wait for package to be published before merging dependent PRs
 
+## Step 9: Automated Merge Chain (opt-in)
+
+**Only run this when the user explicitly asks you to watch CI and merge the PRs.**
+
+The 7 PRs must merge in dependency order because each feedstock's CI installs its
+`autogluon.*` dependencies **from the conda-forge channel** — so a dependent PR's CI
+cannot pass until every dependency it needs has been *built and published* to
+conda-forge (which happens only after that dependency's PR is merged, and takes
+~30 min to a few hours after merge). "CI green" is therefore gated on "deps live",
+not just on merging the upstream PR.
+
+### 9.1 Merge Order and Dependency Gates
+
+| Step | Feedstock(s) to merge | conda-forge deps that must be LIVE first |
+|------|-----------------------|------------------------------------------|
+| A | autogluon.common | (none) |
+| B | autogluon.features | autogluon.common |
+| C | autogluon.core | autogluon.common, autogluon.features |
+| D | autogluon.tabular | autogluon.core, autogluon.features |
+| D | autogluon.multimodal | autogluon.common, autogluon.core, autogluon.features |
+| E | autogluon.timeseries | autogluon.common, autogluon.core, autogluon.features, autogluon.tabular |
+| F | autogluon | autogluon.core, autogluon.features, autogluon.tabular, autogluon.multimodal, autogluon.timeseries |
+
+Feedstocks in the same step can be processed in parallel.
+**Gates are derived from the `autogluon.* =={{ version }}` run-deps in each recipe — always
+re-verify them from the recipes (`grep 'autogluon\.' recipe/meta.yaml`); do not trust the
+Appendix A tree, which historically understated deps (e.g. core actually needs features).**
+
+### 9.2 Per-PR Loop
+
+For the next unmerged PR whose dependency gate is satisfied:
+
+1. **Check deps are live on conda-forge** (anaconda.org API):
+   ```bash
+   curl -s "https://api.anaconda.org/package/conda-forge/{DEP_PACKAGE}" \
+     | python3 -c "import sys,json; print('{NEW_VERSION}' in json.load(sys.stdin).get('versions',[]))"
+   ```
+   `{DEP_PACKAGE}` is the conda name (e.g. `autogluon.common`). Repeat for every dep in the gate.
+   If any dep is NOT live → sleep 10 min and retry (do nothing else).
+
+   **Important — repodata lag (observed up to ~45+ min for v1.6.2):** the anaconda.org
+   API lists a version as soon as the artifact is *uploaded*, but conda-build solves
+   against the channel's regenerated repodata, which lags upload significantly. So a dep
+   can show "live" in the API (and even in the `/files` endpoint on label `main`) yet
+   still fail CI with `autogluon.common=X.Y.Z does not exist`.
+
+   **Authoritative resolvability check** — the version must appear in the trimmed
+   `current_repodata.json` (small, fast; do NOT parse the full `repodata.json` — it is
+   hundreds of MB and truncates, giving false negatives):
+   ```bash
+   curl -s "https://conda.anaconda.org/conda-forge/noarch/current_repodata.json" \
+     | python3 -c "import sys,json; d=json.load(sys.stdin); p={**d.get('packages',{}),**d.get('packages.conda',{})}; print('{VER}' in {v['version'] for v in p.values() if v.get('name')=='{PKG}'})"
+   ```
+   Only expect a dependent PR's CI to pass once its deps show `True` here. If CI fails with
+   "does not exist" while this still says `False`, it's repodata lag — wait ~10–15 min and
+   recheck; rerun CI only once it flips to `True`. Do not treat lag as a real failure.
+
+2. **Check CI status:**
+   ```bash
+   gh pr checks {PR_NUM} --repo conda-forge/{FEEDSTOCK}
+   ```
+   - All required checks **pass** → go to step 4 (merge).
+   - Any check **in_progress / pending / queued** → sleep 10 min and retry.
+   - A check **failed** but deps just became live (CI ran before publish) → step 3 (restart CI).
+
+3. **Restart failed CI** (deps are live now, so a rerun should pass):
+   ```bash
+   sha=$(gh pr view {PR_NUM} --repo conda-forge/{FEEDSTOCK} --json headRefOid --jq '.headRefOid')
+   runid=$(gh run list --repo conda-forge/{FEEDSTOCK} --commit "$sha" \
+     --json databaseId,name --jq '.[0].databaseId')
+   gh run rerun "$runid" --repo conda-forge/{FEEDSTOCK} --failed
+   ```
+   Then sleep 10 min and retry from step 2.
+   (Alternative if `gh run rerun` is unavailable: comment `@conda-forge-admin, please restart ci`.)
+
+4. **Merge — ONLY if CI is fully green:**
+   ```bash
+   gh pr merge {PR_NUM} --repo conda-forge/{FEEDSTOCK} --merge
+   ```
+   **NEVER merge on failed or pending CI.** After merging, that package must publish
+   (poll step 1 for it) before its dependents' gates open.
+
+### 9.3 Polling Cadence
+
+Use a 10-minute poll (`ScheduleWakeup` / `/loop 10m`). Each tick: advance every PR whose
+gate is satisfied, merge the green ones, restart the stale-red ones, and report what
+changed. Stop when all 7 are merged (or the user says stop).
+
+**Safety:** merging is outward-facing. Do it only under the user's explicit direction
+(they triggered this step), strictly in dependency order, and never on red/pending CI.
+
 ---
 
 ## Appendix A: Dependency Tree
 
+Verified from the `autogluon.* =={{ version }}` run-deps in each recipe (2026-09, v1.6.2):
+
 ```
-autogluon.common (base - no AG deps)
-    │
-    ├── autogluon.features (depends: common)
-    │
-    ├── autogluon.core (depends: common)
-    │       │
-    │       ├── autogluon.tabular (depends: core, features)
-    │       │
-    │       ├── autogluon.multimodal (depends: core)
-    │       │
-    │       └── autogluon.timeseries (depends: core, tabular)
-    │
-    └── autogluon [meta-package] (depends: all subpackages)
+autogluon.common   (no AG deps)
+autogluon.features (common)
+autogluon.core     (common, features)
+autogluon.tabular  (core, features)
+autogluon.multimodal (common, core, features)
+autogluon.timeseries (common, core, features, tabular)
+autogluon [meta]   (core, features, tabular, multimodal, timeseries)
 ```
+
+Merge order: common → features → core → {tabular, multimodal} → timeseries → autogluon.
 
 ## Appendix B: URL Patterns
 
