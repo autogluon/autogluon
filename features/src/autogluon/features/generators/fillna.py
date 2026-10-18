@@ -5,6 +5,7 @@ import numpy as np
 from pandas import DataFrame
 
 from autogluon.common.features.types import R_OBJECT
+from autogluon.common.utils.pandas_utils import fillna_without_downcast
 
 from .abstract import AbstractFeatureGenerator
 
@@ -56,24 +57,14 @@ class FillNaFeatureGenerator(AbstractFeatureGenerator):
     def _transform(self, X: DataFrame) -> DataFrame:
         if self._fillna_feature_map:
             with warnings.catch_warnings():
+                # On pandas 2.1 and 2.2, `downcast` is deprecated (FutureWarning), but `fillna_without_downcast` needs it
+                # there to keep an object column object when all of its values are numeric once filled
+                # (e.g. ['1', None] filled with 0). pandas>=3 no longer converts such columns and removed the argument.
                 warnings.simplefilter(action="ignore", category=FutureWarning)
-                # FIXME: v1.1 Remove this warning filter and resolve.
-                #  In Pandas 2.1, the `downcast` argument was deprecated,
-                #  but we need it to avoid incorrect type conversion.
-                #  Pandas authors may have not considered our edge-case.
-                #  We specifically want to have an object dtype not be converted to a numeric dtype,
-                from autogluon.common.utils.pandas_utils import PANDAS_V3_OR_NEWER
-
-                if PANDAS_V3_OR_NEWER:
-                    if self.inplace:
-                        X.fillna(self._fillna_feature_map, inplace=True)
-                    else:
-                        X = X.fillna(self._fillna_feature_map)
+                if self.inplace:
+                    fillna_without_downcast(X, self._fillna_feature_map, inplace=True)
                 else:
-                    if self.inplace:
-                        X.fillna(self._fillna_feature_map, inplace=True, downcast=False)
-                    else:
-                        X = X.fillna(self._fillna_feature_map, downcast=False)
+                    X = fillna_without_downcast(X, self._fillna_feature_map)
         return X
 
     @staticmethod

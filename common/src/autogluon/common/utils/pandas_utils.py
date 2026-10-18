@@ -5,8 +5,8 @@ from functools import wraps
 
 import numpy as np
 import pandas as pd
-from pandas import DataFrame, Series
 from packaging.version import Version
+from pandas import DataFrame, Series
 
 from ..features.infer_types import get_type_map_raw
 from ..features.types import R_CATEGORY, R_FLOAT, R_INT
@@ -264,8 +264,7 @@ def get_approximate_df_mem_usage(df: DataFrame, sample_ratio=0.2):
         return memory_usage
 
 
-
-def fillna_without_downcast(df: DataFrame, value, inplace: bool = False) -> DataFrame | None:
+def fillna_without_downcast(df: DataFrame, value, inplace: bool = False):
     """`df.fillna(value, inplace=inplace)`, keeping the dtype of object columns.
 
     pandas<3 converts an object column to a numeric dtype when all of its values are numeric after filling, unless
@@ -273,3 +272,15 @@ def fillna_without_downcast(df: DataFrame, value, inplace: bool = False) -> Data
     """
     kwargs = {} if PANDAS_V3_OR_NEWER else {"downcast": False}
     return df.fillna(value, inplace=inplace, **kwargs)
+
+
+def astype_str(X: DataFrame | Series) -> DataFrame | Series:
+    """`X.astype(str)`, with missing values as the string "nan" like on pandas<3.
+
+    On pandas>=3, `astype(str)` returns the string dtype, which keeps missing values missing, so code that joins or
+    searches the resulting strings would meet NaN instead of text.
+    """
+    X_str = X.astype(str)
+    if PANDAS_V3_OR_NEWER:
+        X_str = X_str.fillna("nan")
+    return X_str

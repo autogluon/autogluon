@@ -8,6 +8,7 @@ from pandas import DataFrame, Series
 from sklearn.feature_selection import SelectKBest, f_classif, f_regression
 
 from autogluon.common.features.types import S_IMAGE_BYTEARRAY, S_IMAGE_PATH, S_TEXT, S_TEXT_NGRAM
+from autogluon.common.utils.pandas_utils import astype_str
 from autogluon.common.utils.resource_utils import ResourceManager
 
 from ..vectorizers import downscale_vectorizer, get_ngram_freq, vectorizer_auto_ml_default
@@ -153,10 +154,10 @@ class TextNgramFeatureGenerator(AbstractFeatureGenerator):
         for nlp_feature in self.vectorizer_features:
             # TODO: Preprocess text?
             if nlp_feature == "__nlp__":  # Combine Text Fields
-                features_in_str = X[self.features_in].astype(object).fillna('nan').astype(str)
+                features_in_str = astype_str(X[self.features_in])
                 text_list = list(set([". ".join(row) for row in features_in_str.values]))
             else:
-                text_list = list(X[nlp_feature].astype(object).fillna('nan').astype(str).drop_duplicates().values)
+                text_list = list(astype_str(X[nlp_feature]).drop_duplicates().values)
             vectorizer_raw = copy.deepcopy(self.vectorizer_default_raw)
             try:
                 # Don't use transform_matrix output because it may contain fewer rows due to drop_duplicates call.
@@ -229,10 +230,10 @@ class TextNgramFeatureGenerator(AbstractFeatureGenerator):
         X_nlp_features_combined = []
         for nlp_feature, vectorizer_fit in zip(self.vectorizer_features, self.vectorizers):
             if nlp_feature == "__nlp__":
-                X_str = X.astype(object).fillna('nan').astype(str)
+                X_str = astype_str(X)
                 text_data = [". ".join(row) for row in X_str.values]
             else:
-                nlp_feature_str = X[nlp_feature].astype(object).fillna('nan').astype(str)
+                nlp_feature_str = astype_str(X[nlp_feature])
                 text_data = nlp_feature_str.values
             transform_matrix = vectorizer_fit.transform(text_data)
 
