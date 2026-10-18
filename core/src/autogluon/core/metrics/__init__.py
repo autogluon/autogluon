@@ -356,8 +356,10 @@ class _ThresholdScorer(Scorer):
             raise ValueError(f"{y_type} format is not supported in metric '{self.name}'")
 
         if y_type == "binary":
-            pass
-            # y_pred = y_pred[:, 1]
+            # The metric scores the positive class: take its column from 2-column probabilities and flatten a single
+            # column. Passed through as 2-D, `roc_auc` sorted each row instead of the samples: ~0.5, or an error.
+            if len(y_pred.shape) == 2 and y_pred.shape[1] in (1, 2):
+                y_pred = np.asarray(y_pred)[:, -1]
         elif isinstance(y_pred, list):
             y_pred = np.vstack([p[:, -1] for p in y_pred]).T
         return y_true, y_pred, kwargs
