@@ -443,6 +443,9 @@ def test_invalid_scorer():
     with pytest.raises(ValueError):
         # Invalid: Specifying needs_pred=True when needs_proba=True
         make_scorer("dummy", score_func=sklearn.metrics.accuracy_score, needs_pred=True, needs_proba=True)
+    with pytest.raises(ValueError, match="actual_needs_pred=True, expected_needs_pred=False"):
+        # The message reports the value the scorer requires, not the user's value twice
+        make_scorer("dummy", score_func=sklearn.metrics.accuracy_score, needs_pred=True, needs_proba=True)
 
 
 def test_get_metric_raw_callable_fails_fast():
