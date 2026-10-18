@@ -13,17 +13,18 @@ import numpy as np
 import pandas as pd
 from joblib.parallel import Parallel, delayed
 from pandas.core.internals import BlockManager  # type: ignore
-
-try:
-    from pandas.core.internals import ArrayManager  # type: ignore
-except ImportError:
-    ArrayManager = type(None)
 from typing_extensions import Self
 
 from autogluon.common.loaders import load_pd
-from autogluon.common.utils.pandas_utils import pandas_freq_alias
 
 logger = logging.getLogger(__name__)
+
+try:
+    from pandas.core.internals import ArrayManager  # type: ignore
+
+    _DATA_MANAGERS: tuple[type, ...] = (BlockManager, ArrayManager)
+except ImportError:  # removed in pandas 3.0
+    _DATA_MANAGERS = (BlockManager,)
 
 
 class TimeSeriesDataFrame(pd.DataFrame):
@@ -136,7 +137,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
         *args,
         **kwargs,
     ):
-        if isinstance(data, (BlockManager, ArrayManager)):
+        if isinstance(data, _DATA_MANAGERS):
             # necessary for copy constructor to work in pandas <= 2.0.x. In >= 2.1.x this is replaced by _constructor_from_mgr
             pass
         elif isinstance(data, pd.DataFrame):
@@ -1089,7 +1090,6 @@ class TimeSeriesDataFrame(pd.DataFrame):
         0       2020-12-31    10.0
                 2021-12-31    26.0
         """
-        freq = pandas_freq_alias(freq)
         offset = pd.tseries.frequencies.to_offset(freq)
 
         # We need to aggregate categorical columns separately because .agg("mean") deletes all non-numeric columns
