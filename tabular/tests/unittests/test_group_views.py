@@ -139,6 +139,15 @@ def test_group_views_input_forms():
     with pytest.raises(ValueError, match="must be picklable"):
         GroupViews(pooling=["mean", lambda pred, groups: pred]).resolve_pooling("binary")
 
+    assert GroupViews().views == ("pooled", "collapsed")
+    assert GroupViews.from_input({"views": "collapsed"}).views == ("collapsed",)
+    assert GroupViews(views=["collapsed", "pooled"]) == GroupViews()
+    for views in ([], ["rows"], ["pooled", "pooled"]):
+        with pytest.raises(ValueError, match="non-empty list of distinct views"):
+            GroupViews(views=views)
+    with pytest.raises(ValueError, match="fits only the collapsed ones"):
+        GroupViews(pooling="median", views="collapsed")
+
 
 def test_group_codes_number_the_groups_of_the_frame():
     df = pd.DataFrame({"a": ["x", "y", "x", "z"], "b": [1, 1, 2, 1]})
@@ -410,6 +419,48 @@ def test_a_bag_that_refits_its_folds_gets_a_collapsed_view(tmp_path):
     assert pred.groupby(test["patient"].to_numpy()).nunique().max().max() == 1
     loaded = TabularPredictor.load(predictor.path)
     pd.testing.assert_frame_equal(loaded.predict_proba(test), pred)
+
+
+@pytest.mark.parametrize("problem_type", ["binary", "regression"], ids=["binary", "rmse"])
+def test_the_collapsed_views_alone_skip_the_fits_on_the_rows(problem_type, tmp_path):
+    train = _label_per_group_frame(problem_type, n_groups=40, rows=5, seed=0)
+    test = _label_per_group_frame(problem_type, n_groups=15, rows=5, seed=1)
+    predictor = _fit(
+        train,
+        tmp_path,
+        validation_structure={"group_on": "patient"},
+        group_views={"views": ["collapsed"]},
+        refit_full=True,
+    )
+    bags = [name for name in predictor.model_names() if not name.startswith("WeightedEnsemble")]
+    assert sorted(bags) == sorted(
+        f"{base}{GROUP_COLLAPSED_SUFFIX}_BAG_L1{suffix}"
+        for base in ("LightGBM", "LinearModel")
+        for suffix in ("", "_FULL")
+    )
+    pred = _predict(predictor, test)
+    assert pred.groupby(test["patient"].to_numpy()).nunique().max().max() == 1
+    # the same collapsed models as with both views: same configuration, same folds
+    both = _fit(train, tmp_path / "both", validation_structure={"group_on": "patient"}, group_views=True)
+
+    def collapsed_lightgbm(p: TabularPredictor) -> pd.DataFrame:
+        model = f"LightGBM{GROUP_COLLAPSED_SUFFIX}_BAG_L1"
+        if problem_type == "regression":
+            return p.predict(test, model=model).to_frame()
+        return p.predict_proba(test, model=model)
+
+    pd.testing.assert_frame_equal(collapsed_lightgbm(predictor), collapsed_lightgbm(both))
+    loaded = TabularPredictor.load(predictor.path)
+    pd.testing.assert_frame_equal(_predict(loaded, test), pred)
+
+
+def test_the_pooled_views_alone_fit_no_collapsed_models(tmp_path):
+    train = _label_per_group_frame("multiclass", n_groups=40, rows=5, seed=0)
+    test = _label_per_group_frame("multiclass", n_groups=15, rows=5, seed=1)
+    predictor = _fit(train, tmp_path, validation_structure={"group_on": "patient"}, group_views={"views": "pooled"})
+    assert not any(GROUP_COLLAPSED_SUFFIX in name for name in predictor.model_names())
+    pred = predictor.predict_proba(test)
+    assert pred.groupby(test["patient"].to_numpy()).nunique().max().max() == 1
 
 
 def test_errors(tmp_path):

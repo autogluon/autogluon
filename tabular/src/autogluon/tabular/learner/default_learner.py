@@ -65,6 +65,7 @@ class DefaultLearner(AbstractTabularLearner):
         validation_folds: int | None = None,
         group_views: list[str] | None = None,
         group_pooling: str | GroupPooling | tuple[str | GroupPooling, ...] | None = None,
+        group_view_kinds: tuple[str, ...] | None = None,
         **trainer_fit_kwargs,
     ):
         """Arguments:
@@ -221,6 +222,7 @@ class DefaultLearner(AbstractTabularLearner):
             raise_on_model_failure=raise_on_model_failure,
             group_views=group_views,
             group_pooling=group_pooling,
+            group_view_kinds=group_view_kinds,
         )
 
         self.trainer_path = trainer.path
