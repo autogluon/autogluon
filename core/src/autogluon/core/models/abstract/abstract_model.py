@@ -1615,10 +1615,15 @@ class AbstractModel(ModelBase, Tunable):
                     reason=f"ag.problem_types={problem_types}, but the problem type is '{self.problem_type}'",
                 )
         if max_classes is not None:
-            if self.num_classes is not None and self.num_classes > max_classes:
+            num_classes = self.num_classes
+            y = kwargs.get("y")
+            if num_classes is None and y is not None and self.problem_type is not None:
+                # Not initialized yet (e.g. a bag's child template): the classes come from the data.
+                num_classes = self._infer_num_classes(y=y, problem_type=self.problem_type)
+            if num_classes is not None and num_classes > max_classes:
                 raise ConstraintViolationError(
-                    f"ag.max_classes={max_classes} for model '{self.name}', but found {self.num_classes} classes.",
-                    reason=f"ag.max_classes={max_classes}, but the data has {self.num_classes} classes",
+                    f"ag.max_classes={max_classes} for model '{self.name}', but found {num_classes} classes.",
+                    reason=f"ag.max_classes={max_classes}, but the data has {num_classes} classes",
                 )
         if min_rows is not None:
             n_rows = X.shape[0]
