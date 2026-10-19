@@ -7,18 +7,20 @@ of each base model use that:
 - the model's row predictions pooled within each group, so every row of a group gets the group's prediction
   (`GroupViews.pooling`: by default the geometric mean of the class probabilities, renormalised, and the mean
   for regression; several strategies give one pooled view each);
-- the same model fit on the collapsed table, one row per group (numeric features averaged, the others
-  set to their most frequent value in the group, plus the log of the group's row count), its prediction
-  for a group copied to the group's rows.
+- the same model fit on the collapsed table, one row per group (by default numeric features averaged, the
+  others set to their most frequent value in the group, plus the log of the group's row count; see
+  `GroupCollapse`), its prediction for a group copied to the group's rows.
 
-Neither view depends on the order of the rows within a group.
+By default neither view depends on the order of the rows within a group. A collapse that takes a group's
+"first" or "last" value follows `GroupCollapse.order_on`, or the order of the rows in the data without it.
 
 The weighted ensemble chooses among both views of every base model, or among one kind of view when
 `GroupViews.views` names only that one (the collapsed views alone skip the fits on the rows). The group a row
 belongs to travels as
 `GROUP_KEY_COLUMN`, a feature of special type `S_GROUP_KEY` holding integer codes computed from the raw
-`group_on` columns of the frame being processed (so unseen test groups stay distinct). Models other than the
-ones defined here leave that feature out.
+`group_on` columns of the frame being processed (so unseen test groups stay distinct); with `order_on`, a row's
+position in that order travels as `GROUP_ORDER_COLUMN`, of the same special type. Models other than the ones
+defined here leave both features out.
 """
 
 from __future__ import annotations
@@ -51,6 +53,17 @@ GROUP_COLLAPSED_SUFFIX = "_GroupCollapsed"
 GROUP_LOG_ROWS_COLUMN = "__ag_group_log_rows__"
 """The collapsed table's feature holding the log of each group's row count."""
 
+GROUP_ORDER_COLUMN = "__ag_group_order__"
+"""The feature that carries each row's position in the frame sorted by `GroupCollapse.order_on`, when set."""
+
+GROUP_COLLAPSE_NUMERIC = ("mean", "median", "min", "max", "std", "first", "last")
+"""The summaries of a numeric feature over its group's rows that `GroupCollapse.numeric` takes."""
+
+GROUP_COLLAPSE_OTHER = ("mode", "first", "last")
+"""The summaries of a non-numeric feature over its group's rows that `GroupCollapse.other` takes."""
+
+_ORDERED_SUMMARIES = ("first", "last")
+
 GROUP_VIEWS_PROBLEM_TYPES = (BINARY, MULTICLASS, REGRESSION)
 
 GROUP_VIEW_KINDS = ("pooled", "collapsed")
@@ -67,10 +80,12 @@ GROUP_POOLED_SEPARATOR = "@"
 `GroupViews.pooling` lists several (e.g. `LightGBM_BAG_L1@median`)."""
 
 
-def group_key_feature_metadata() -> FeatureMetadata:
-    """The metadata of `GROUP_KEY_COLUMN`, to join with the training features' metadata."""
+def group_key_feature_metadata(order: bool = False) -> FeatureMetadata:
+    """The metadata of `GROUP_KEY_COLUMN` (and of `GROUP_ORDER_COLUMN` with `order`), to join with the training
+    features' metadata."""
+    columns = [GROUP_KEY_COLUMN, GROUP_ORDER_COLUMN] if order else [GROUP_KEY_COLUMN]
     return FeatureMetadata(
-        type_map_raw={GROUP_KEY_COLUMN: R_INT}, type_group_map_special={S_GROUP_KEY: [GROUP_KEY_COLUMN]}
+        type_map_raw={column: R_INT for column in columns}, type_group_map_special={S_GROUP_KEY: columns}
     )
 
 
@@ -94,6 +109,24 @@ def group_codes(X: pd.DataFrame, group_on: list[str]) -> np.ndarray:
         values = X[group_on].astype(str).agg("||".join, axis=1)
     codes, _ = pd.factorize(values, sort=False)
     return codes.astype(np.int64)
+
+
+def group_order(X: pd.DataFrame, order_on: list[str]) -> np.ndarray:
+    """Each row's position in `X` sorted by the `order_on` columns (ties keep the row order of `X`; missing values
+    sort first).
+
+    Positions are only meaningful within `X`, as the order of the rows of each group.
+    """
+    missing = [column for column in order_on if column not in X.columns]
+    if missing:
+        raise KeyError(
+            f"`group_views` collapses each group in the order of `order_on`, so the data needs the column(s) "
+            f"{missing}."
+        )
+    order = X[order_on].reset_index(drop=True).sort_values(order_on, kind="stable", na_position="first").index
+    position = np.empty(len(X), dtype=np.int64)
+    position[order.to_numpy()] = np.arange(len(X))
+    return position
 
 
 def label_constant_within_groups(y: pd.Series, codes: np.ndarray) -> bool:
@@ -219,6 +252,99 @@ def pool_within_groups(
     return pooled.reshape(pred.shape).astype(pred.dtype)
 
 
+def _as_tuple(value: str | Sequence[str]) -> tuple[str, ...]:
+    return (value,) if isinstance(value, str) else tuple(value)
+
+
+@dataclass(frozen=True)
+class GroupCollapse:
+    """[EXPERIMENTAL] How the collapsed views build their table, one row per group (`GroupViews.collapse`).
+
+    The defaults average each numeric feature, set each other feature to its most frequent value in the
+    group, and add the log of the group's row count, which `GroupViews.collapse=None` also stands for. The
+    equivalent dict works too: `group_views={"collapse": {"numeric": ["mean", "last"], "order_on": "date"}}`.
+
+    Parameters
+    ----------
+    numeric : str | list[str], default "mean"
+        How each numeric feature is summarised over its group's rows: "mean", "median", "min", "max", "std",
+        "first" or "last" (the first or last non-missing value in the order of `order_on`). With a single
+        summary a column keeps its feature's name; a list gives each numeric feature one column per summary,
+        named `<feature>.<summary>`.
+    other : str, default "mode"
+        How each other feature (categorical, boolean, ...) is summarised: "mode" (its most frequent
+        non-missing value; ties: the smallest value), "first" or "last".
+    order_on : str | list[str], default None
+        The raw column(s) that order a group's rows for "first" and "last", e.g. a timestamp so "last" is each
+        group's latest value. Ties, and every row without `order_on`, keep the row order of the data passed to
+        `fit` and `predict`; missing values sort first. The data then needs these columns at prediction time.
+    exclude_special_types : list[str], default ()
+        Features with any of these special types are left out of the collapsed table, e.g. features the
+        feature generator already aggregated over each group.
+    """
+
+    numeric: str | Sequence[str] = "mean"
+    other: str = "mode"
+    order_on: str | Sequence[str] | None = None
+    exclude_special_types: Sequence[str] = ()
+
+    def __post_init__(self):
+        numeric = _as_tuple(self.numeric)
+        if not numeric:
+            raise ValueError("`group_views` collapse `numeric` must list at least one summary.")
+        for summary in numeric:
+            if summary not in GROUP_COLLAPSE_NUMERIC:
+                raise ValueError(
+                    f"`group_views` collapse `numeric` must be one of {list(GROUP_COLLAPSE_NUMERIC)} or a list of "
+                    f"these, got {summary!r}."
+                )
+        if len(set(numeric)) < len(numeric):
+            raise ValueError(f"`group_views` collapse `numeric` summaries must be distinct, got {list(numeric)}.")
+        if self.other not in GROUP_COLLAPSE_OTHER:
+            raise ValueError(
+                f"`group_views` collapse `other` must be one of {list(GROUP_COLLAPSE_OTHER)}, got {self.other!r}."
+            )
+        if self.order_on is not None and not self.ordered:
+            raise ValueError(
+                "`group_views` collapse `order_on` orders a group's rows for 'first' and 'last', which neither "
+                "`numeric` nor `other` uses."
+            )
+        # A frozen dataclass is hashable only with hashable fields.
+        if not isinstance(self.numeric, str):
+            object.__setattr__(self, "numeric", numeric)
+        if self.order_on is not None and not isinstance(self.order_on, str):
+            object.__setattr__(self, "order_on", tuple(self.order_on))
+        object.__setattr__(self, "exclude_special_types", _as_tuple(self.exclude_special_types))
+
+    @classmethod
+    def from_input(cls, value: dict | GroupCollapse | None) -> GroupCollapse | None:
+        """`GroupViews.collapse` as a `GroupCollapse`, or None for the default collapse."""
+        if value is None or isinstance(value, cls):
+            return value
+        if not isinstance(value, dict):
+            raise ValueError(f"`group_views` collapse must be a dict or a GroupCollapse, got {value!r}.")
+        invalid = set(value) - {f.name for f in fields(cls)}
+        if invalid:
+            raise ValueError(
+                f"Invalid `group_views` collapse keys: {sorted(invalid)}. Valid keys: {[f.name for f in fields(cls)]}"
+            )
+        return cls(**value)
+
+    @property
+    def numeric_summaries(self) -> tuple[str, ...]:
+        return _as_tuple(self.numeric)
+
+    @property
+    def ordered(self) -> bool:
+        """Whether some summary takes a group's first or last value, which depends on the order of its rows."""
+        return self.other in _ORDERED_SUMMARIES or any(s in _ORDERED_SUMMARIES for s in self.numeric_summaries)
+
+    @property
+    def order_columns(self) -> list[str] | None:
+        """`order_on` as a list of columns, or None."""
+        return None if self.order_on is None else list(_as_tuple(self.order_on))
+
+
 @dataclass(frozen=True)
 class GroupViews:
     """[EXPERIMENTAL] `group_views` of `TabularPredictor.fit` (which documents the views), as a dataclass.
@@ -240,11 +366,14 @@ class GroupViews:
         pooled within groups, and "collapsed", every bagged model also fit on the collapsed table. "collapsed"
         alone fits each bagged model on the collapsed table only, under its `_GroupCollapsed` name, and skips
         its fit on the rows; `pooling` then cannot be set. "pooled" alone fits no collapsed models.
+    collapse : dict | GroupCollapse, default None
+        How the collapsed views build their table (see `GroupCollapse`). None: the default collapse.
     """
 
     enabled: bool | str = True
     pooling: str | GroupPooling | Sequence[str | GroupPooling] | None = None
     views: str | Sequence[str] = GROUP_VIEW_KINDS
+    collapse: GroupCollapse | dict | None = None
 
     def __post_init__(self):
         if self.enabled not in (True, False, "auto"):
@@ -257,6 +386,12 @@ class GroupViews:
             )
         # In `GROUP_VIEW_KINDS` order; a frozen dataclass is hashable only with hashable fields.
         object.__setattr__(self, "views", tuple(view for view in GROUP_VIEW_KINDS if view in views))
+        object.__setattr__(self, "collapse", GroupCollapse.from_input(self.collapse))
+        if self.collapse is not None and "collapsed" not in self.views:
+            raise ValueError(
+                "`group_views` collapse sets how the collapsed views build their table, but `views` fits only the "
+                "pooled ones."
+            )
         if self.pooling is None:
             return
         if "pooled" not in self.views:
@@ -327,11 +462,12 @@ class GroupViews:
 class GroupCollapsedModel(AbstractModel):
     """`model_base` fit on one row per group, its prediction for a group copied to the group's rows.
 
-    The collapsed table has each numeric feature's group mean, each other feature's most frequent value in
-    the group (ties: the smallest value; boolean features count as the latter), and the log of the group's
-    row count. The `group_columns` features themselves are left out, being constant within a group. A
-    group's label is its rows' most frequent label (classification) or their mean (regression); with the
-    label constant within groups, both are simply the group's label.
+    The collapsed table summarises each numeric feature and each other feature (boolean features count as the
+    latter) over the group's rows as `collapse` says, by default the group mean and the most frequent value
+    (ties: the smallest value), and adds the log of the group's row count. The `group_columns` features
+    themselves are left out, being constant within a group, and so are the features of
+    `collapse.exclude_special_types`. A group's label is its rows' most frequent label (classification) or
+    their mean (regression); with the label constant within groups, both are simply the group's label.
 
     Bagged like any other model: the bagged folds are group-disjoint, so each fold collapses its own training
     groups and predicts its validation groups.
@@ -342,6 +478,8 @@ class GroupCollapsedModel(AbstractModel):
         The unfitted model to fit on the collapsed table.
     group_columns : list[str]
         The `group_on` columns, left out of the collapsed table.
+    collapse : GroupCollapse, default None
+        How the collapsed table summarises the features (see `GroupCollapse`). None: `GroupCollapse()`.
     hyperparameters : dict, default None
         Overrides of `model_base`'s hyperparameters (refit_full passes the trained values through here).
     """
@@ -350,21 +488,32 @@ class GroupCollapsedModel(AbstractModel):
     _default_auxiliary_params_extra = dict(drop_unique=False)
     _INNER_NAME = "inner"
 
-    def __init__(self, model_base: AbstractModel, group_columns: list[str] | None = None, **kwargs):
+    def __init__(
+        self,
+        model_base: AbstractModel,
+        group_columns: list[str] | None = None,
+        collapse: GroupCollapse | None = None,
+        **kwargs,
+    ):
         super().__init__(**kwargs)
         self.model_base = model_base
         self.group_columns = list(group_columns or [])
+        self.collapse = collapse or GroupCollapse()
         self._inner_type: type[AbstractModel] | None = None
         # Whether the last save wrote the inner model: a bag that keeps no fold models (`save_bag_folds=False`,
         # `refit_folds=True`) saves its fold children with the inner model dropped.
         self._inner_saved = False
-        self._mean_features: list[str] | None = None
-        self._mode_features: list[str] | None = None
+        self._numeric_features: list[str] | None = None
+        self._other_features: list[str] | None = None
+        #: The collapsed table's columns of the numeric features: their names, or `<feature>.<summary>` for
+        #: several summaries.
+        self._numeric_columns: list[str] | None = None
 
     def get_params(self) -> dict:
         params = super().get_params()
         params["model_base"] = self.model_base
         params["group_columns"] = self.group_columns
+        params["collapse"] = self.collapse
         return params
 
     def _get_default_resources(self) -> tuple[int, float]:
@@ -380,24 +529,60 @@ class GroupCollapsedModel(AbstractModel):
         return self.model_base.declared_refit_hyperparameters()
 
     def _set_collapse_features(self) -> None:
-        features = [f for f in self._features if f != GROUP_KEY_COLUMN and f not in self.group_columns]
+        excluded = {GROUP_KEY_COLUMN, GROUP_ORDER_COLUMN, *self.group_columns}
+        if self.collapse.exclude_special_types:
+            kept = self._feature_metadata.get_features(invalid_special_types=list(self.collapse.exclude_special_types))
+            excluded.update(set(self._features) - set(kept))
+        features = [f for f in self._features if f not in excluded]
         numeric = set(
             self._feature_metadata.get_features(valid_raw_types=[R_INT, R_FLOAT], invalid_special_types=[S_BOOL])
         )
-        self._mean_features = [f for f in features if f in numeric]
-        self._mode_features = [f for f in features if f not in numeric]
+        self._numeric_features = [f for f in features if f in numeric]
+        self._other_features = [f for f in features if f not in numeric]
+        summaries = self.collapse.numeric_summaries
+        if len(summaries) == 1:
+            self._numeric_columns = list(self._numeric_features)
+        else:
+            self._numeric_columns = [f"{f}.{summary}" for summary in summaries for f in self._numeric_features]
+        columns = [*self._numeric_columns, *self._other_features, GROUP_LOG_ROWS_COLUMN]
+        duplicated = sorted({c for c in columns if columns.count(c) > 1})
+        if duplicated:
+            raise ValueError(f"The collapsed table of `group_views` would have duplicate columns {duplicated}.")
 
     def _collapse(self, X: pd.DataFrame) -> tuple[pd.DataFrame, np.ndarray]:
         """The collapsed table of `X` (one row per group, in order of first appearance) and each row's group."""
         group, _ = pd.factorize(X[GROUP_KEY_COLUMN].to_numpy(), sort=False)
-        parts = []
-        if self._mean_features:
-            parts.append(X[self._mean_features].groupby(group, sort=True).mean())
         counts = np.bincount(group)
-        if self._mode_features:
-            parts.append(pd.concat([_group_mode(X[f], group, len(counts)) for f in self._mode_features], axis=1))
+        if self.collapse.ordered:
+            # "first" and "last" read the rows of a group in the order of `order_on`, else in the frame's.
+            if GROUP_ORDER_COLUMN in X.columns:
+                order = np.argsort(X[GROUP_ORDER_COLUMN].to_numpy(), kind="stable")
+            else:
+                order = np.arange(len(X))
+            ordered_features = []
+            if any(summary in _ORDERED_SUMMARIES for summary in self.collapse.numeric_summaries):
+                ordered_features += self._numeric_features
+            if self.collapse.other in _ORDERED_SUMMARIES:
+                ordered_features += self._other_features
+            X_ordered, group_ordered = X[ordered_features].iloc[order], group[order]
+        parts = []
+        if self._numeric_features:
+            for summary in self.collapse.numeric_summaries:
+                if summary in _ORDERED_SUMMARIES:
+                    grouped = X_ordered[self._numeric_features].groupby(group_ordered, sort=True)
+                else:
+                    grouped = X[self._numeric_features].groupby(group, sort=True)
+                parts.append(grouped.agg(summary).astype(np.float64))
+        if self._other_features:
+            if self.collapse.other == "mode":
+                parts.append(pd.concat([_group_mode(X[f], group, len(counts)) for f in self._other_features], axis=1))
+            else:
+                parts.append(
+                    X_ordered[self._other_features].groupby(group_ordered, sort=True).agg(self.collapse.other)
+                )
         parts.append(pd.DataFrame({GROUP_LOG_ROWS_COLUMN: np.log(counts).astype(np.float64)}))
         X_collapsed = pd.concat([part.reset_index(drop=True) for part in parts], axis=1)
+        X_collapsed.columns = [*self._numeric_columns, *self._other_features, GROUP_LOG_ROWS_COLUMN]
         return X_collapsed, group
 
     def _collapse_labels(self, y: pd.Series, group: np.ndarray) -> pd.Series:
@@ -412,11 +597,11 @@ class GroupCollapsedModel(AbstractModel):
         return pd.Series(values)
 
     def _collapsed_metadata(self, X_collapsed: pd.DataFrame) -> FeatureMetadata:
-        type_map_raw = {f: R_FLOAT for f in self._mean_features}
-        type_map_raw.update({f: self._feature_metadata.get_feature_type_raw(f) for f in self._mode_features})
+        type_map_raw = {f: R_FLOAT for f in self._numeric_columns}
+        type_map_raw.update({f: self._feature_metadata.get_feature_type_raw(f) for f in self._other_features})
         type_map_raw[GROUP_LOG_ROWS_COLUMN] = R_FLOAT
         type_group_map_special = {}
-        for feature in self._mode_features:
+        for feature in self._other_features:
             for special in self._feature_metadata.get_feature_types_special(feature):
                 type_group_map_special.setdefault(special, []).append(feature)
         return FeatureMetadata(type_map_raw=type_map_raw, type_group_map_special=type_group_map_special)
