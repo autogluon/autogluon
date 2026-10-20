@@ -80,6 +80,7 @@ from ..configs.pipeline_presets import (
     resolve_group_views,
     resolve_hyperparameters_curve,
     resolve_validation_folds,
+    resolve_validation_folds_time_reserve,
     resolve_validation_mode,
     validate_validation_folds,
 )
@@ -1131,6 +1132,19 @@ class TabularPredictor:
                 also be set by a size curve, e.g.
                 `validation_size_curves={"validation_folds": [[100_000, None], 1]}` fits every fold up
                 to 100,000 rows and one fold above.
+            validation_folds_time_reserve : float | str | None, default = "auto"
+                [EXPERIMENTAL] With `validation_folds` and a `time_limit`, how time is kept for completing
+                the bags the best model uses. "auto": before each model of the first folds, the time
+                completing the bags that greedy ensemble selection over the models fit so far uses would
+                take (1.2 times their remaining folds at the mean fit time of the folds they have) is kept
+                back from it, so a model is fit only in the time those completions leave; bags that are
+                refit on all rows need none. A number in `[0, 1)` keeps that share of the time limit
+                instead; None keeps nothing back. Either way a bag is completed only if its remaining folds,
+                at that mean fit time, fit in the time left; they then each get at least 1.5 times that mean,
+                so they train as long as its first folds did, and a bag that does not fit keeps its first
+                folds. The bags are taken by their weight in the best model per projected second. A
+                `refit_folds` bag's refit on all rows gets the time its first folds leave, and predicts from
+                those folds if it does not fit in it.
             validation_size_curves : dict | ValidationSizeCurves, default = None
                 [EXPERIMENTAL] Overrides for how the automatically selected validation method scales
                 with data size, as a `ValidationSizeCurves` or an equivalent dict. The curve format
@@ -1850,6 +1864,9 @@ class TabularPredictor:
             fit_weighted_ensemble=fit_weighted_ensemble,
             from_curve=validation_folds_from_curve,
         )
+        validation_folds_time_reserve = resolve_validation_folds_time_reserve(
+            kwargs["validation_folds_time_reserve"], validation_folds=validation_folds
+        )
 
         if validation_structure is not None and validation_structure.splitter is not None:
             # A splitter can leave rows unvalidated exactly as forward-chaining does -- a
@@ -2007,6 +2024,7 @@ class TabularPredictor:
             ensemble_weights_missing=ensemble_weights_missing,
             ensemble_hyperparameters=ensemble_hyperparameters,
             validation_folds=validation_folds,
+            validation_folds_time_reserve=validation_folds_time_reserve,
             **self._resolve_group_views(
                 group_views=kwargs["group_views"],
                 train_data=train_data,
@@ -6306,6 +6324,7 @@ class TabularPredictor:
             adapt_num_bag_folds_to_n_classes=False,
             group_views=None,
             validation_folds=None,
+            validation_folds_time_reserve="auto",
         )
         kwargs, ds_valid_keys = self._sanitize_dynamic_stacking_kwargs(kwargs)
         kwargs = self._validate_fit_extra_kwargs(

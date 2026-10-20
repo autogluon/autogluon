@@ -4,6 +4,7 @@ import copy
 import inspect
 import logging
 import os
+import shutil
 import time
 from collections import Counter
 from collections.abc import Iterable, Iterator, Sequence
@@ -129,6 +130,9 @@ class BaggedEnsembleModel(AbstractModel):
         # `validation_folds`): it predicts from those folds and has no out-of-fold prediction for the rows of the
         # others, and a later fit with `k_fold_start=_k_fold_end` fits the rest.
         self._folds_pending = False
+        # A partial set (`validation_folds`) of a `refit_folds` bag whose time-limited refit did not fit: the bag
+        # predicts from those folds, and is neither refit nor completed.
+        self._refit_folds_fallback = False
 
         self._predict_n_size_lst = None  # A list of the predict row count for each child, useful to calculate the expected inference throughput of the bag.
 
@@ -323,6 +327,7 @@ class BaggedEnsembleModel(AbstractModel):
         n_repeat_start: int = 0,
         groups: pd.Series = None,
         _skip_oof: bool = False,
+        fold_time_floor: float | None = None,
         **kwargs,
     ):
         """
@@ -374,6 +379,10 @@ class BaggedEnsembleModel(AbstractModel):
         _skip_oof : bool, default False
             If True, will not calculate the out-of-fold predictions from the fold models.
             This should be set to True when performing a bagged refit.
+        fold_time_floor : float, default None
+            When continuing a set (`k_fold_start > 0`, e.g. the trainer's `complete_bags`), each fold's time limit is at
+            least this multiple of the mean fit time of the folds already fit (more for a fold fit with fewer CPUs),
+            so the remaining folds train as long as those did. None keeps the usual per-fold limits.
         kwargs : dict,
             Arguments passed downstream to the fold models.
 
@@ -484,12 +493,18 @@ class BaggedEnsembleModel(AbstractModel):
                 # A first set fit only up to `k_fold_end` (the trainer's `validation_folds`) refits from the folds
                 # it has: they provide the out-of-fold predictions of their rows, the refit the predictions.
                 save_bag_folds = False
+                # Only a partial set's refit (`validation_folds`) is time-limited, with its folds kept as the fallback.
+                time_limit_refit_folds = kwargs.get("time_limit", None) if k_fold_end < k_fold else None
+                time_start_refit_folds = time.time()
                 if kwargs.get("time_limit", None) is not None:
                     fold_start = n_repeat_start * k_fold + k_fold_start
                     fold_end = (n_repeats - 1) * k_fold + k_fold_end
                     folds_to_fit = fold_end - fold_start
                     # Reserve time for final refit model
                     kwargs["time_limit"] = kwargs["time_limit"] * folds_to_fit / (folds_to_fit + 1.2)
+                    # The refit gets the time the folds leave and may not fit in it: the folds are kept until it has,
+                    # so a bag whose refit runs out of time predicts from its folds.
+                    save_bag_folds = time_limit_refit_folds is not None
             self._fit_folds(
                 X=X,
                 y=y,
@@ -503,6 +518,7 @@ class BaggedEnsembleModel(AbstractModel):
                 n_repeat_start=n_repeat_start,
                 save_folds=save_bag_folds,
                 groups=groups,
+                fold_time_floor=fold_time_floor,
                 **kwargs,
             )
             # FIXME: Cleanup self
@@ -510,9 +526,29 @@ class BaggedEnsembleModel(AbstractModel):
             if refit_folds:
                 refit_template = self.convert_to_refit_full_template(name_suffix=None)
                 refit_template.params["use_child_oof"] = False
-                kwargs["time_limit"] = None
-                # _skip_oof=True to avoid inferring on training data needlessly.
-                refit_template.fit(X=X, y=y, k_fold=1, _skip_oof=True, **kwargs)
+                if time_limit_refit_folds is None:
+                    kwargs["time_limit"] = None
+                else:
+                    kwargs["time_limit"] = time_limit_refit_folds - (time.time() - time_start_refit_folds)
+                try:
+                    if kwargs["time_limit"] is not None and kwargs["time_limit"] <= 0:
+                        raise TimeLimitExceeded
+                    # _skip_oof=True to avoid inferring on training data needlessly.
+                    refit_template.fit(X=X, y=y, k_fold=1, _skip_oof=True, **kwargs)
+                except TimeLimitExceeded:
+                    logger.log(
+                        20,
+                        f"\tNo time left to refit {self.name} on all rows: it predicts from its {self.n_children} fold(s).",
+                    )
+                    self._refit_folds_fallback = True
+                    return self
+                if save_bag_folds:
+                    # the refit replaces the folds kept for the fallback
+                    refit_children = set(refit_template.models)
+                    for child in self.models:
+                        name = child if isinstance(child, str) else child.name
+                        if name not in refit_children:
+                            shutil.rmtree(os.path.join(self.path, name), ignore_errors=True)
                 refit_template._oof_pred_proba = self._oof_pred_proba
                 refit_template._oof_pred_model_repeats = self._oof_pred_model_repeats
                 # These OOF predictions were made by the folds fit just above, not by the refit's
@@ -1034,6 +1070,7 @@ class BaggedEnsembleModel(AbstractModel):
         groups=None,
         num_cpus: int = None,
         num_gpus: float = None,
+        fold_time_floor: float | None = None,
         **kwargs,
     ):
         # This bag's `validate_fit_args` already validated the fit constraints against the full
@@ -1096,6 +1133,9 @@ class BaggedEnsembleModel(AbstractModel):
             num_cpus=num_cpus,
             num_gpus=num_gpus,
         )
+        if fold_time_floor is not None and self.n_children and self.fit_time:
+            fold_fitting_strategy_args["time_limit_fold_min"] = fold_time_floor * self.fit_time / self.n_children
+            fold_fitting_strategy_args["time_limit_fold_min_num_cpus"] = self.fit_num_cpus_child
         # noinspection PyCallingNonCallable
         if issubclass(fold_fitting_strategy_cls, ParallelFoldFittingStrategy):
             fold_fitting_strategy_args["num_jobs"] = num_folds

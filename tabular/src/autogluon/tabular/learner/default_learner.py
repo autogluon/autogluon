@@ -71,6 +71,7 @@ class DefaultLearner(AbstractTabularLearner):
         ensemble_weights_missing: str = "error",
         ensemble_hyperparameters: dict | None = None,
         validation_folds: int | None = None,
+        validation_folds_time_reserve: float | str = 0.0,
         group_views: list[str] | None = None,
         group_pooling: str | GroupPooling | tuple[str | GroupPooling, ...] | None = None,
         group_view_kinds: tuple[str, ...] | None = None,
@@ -259,6 +260,7 @@ class DefaultLearner(AbstractTabularLearner):
             ensemble_weights_missing=ensemble_weights_missing,
             ensemble_hyperparameters=ensemble_hyperparameters,
             validation_folds=validation_folds,
+            validation_folds_time_reserve=validation_folds_time_reserve,
             label_cleaner=copy.deepcopy(self.label_cleaner),
             **trainer_fit_kwargs,
         )

@@ -2,11 +2,22 @@
 
 from __future__ import annotations
 
+import os
+import time
+
 import numpy as np
 import pandas as pd
 import pytest
 
+from autogluon.core.models import DummyModel
+from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.tabular import TabularPredictor
+from autogluon.tabular.configs.pipeline_presets import resolve_validation_folds_time_reserve
+from autogluon.tabular.trainer.abstract_trainer import (
+    COMPLETION_FOLD_TIME_FLOOR,
+    COMPLETION_TIME_MARGIN,
+    AbstractTabularTrainer,
+)
 
 HYPERPARAMETERS = {"GBM": {"num_boost_round": 30}, "LR": {}, "DUMMY": {}}
 """Bagged with real folds (no child out-of-fold predictions); the dummy model is one the ensemble leaves out."""
@@ -224,3 +235,150 @@ def test_errors(tmp_path):
             num_bag_folds=None,
             validation_size_curves={"num_bag_folds": [[100, 4], 0], "validation_folds": [[100, None], 1]},
         )
+
+
+class TimedDummyModel(DummyModel):
+    """A dummy model whose fit takes `seconds` and records the time limit it gets (`time_limits`: rows, limit). With
+    `refit_rows`, a time-limited fit on that many rows or more (a `refit_folds` refit on every row) runs out of time."""
+
+    time_limits: list[tuple[int, float | None]] = []
+
+    def _fit(self, X, y, time_limit=None, **kwargs):
+        params = self._get_model_params()
+        TimedDummyModel.time_limits.append((len(X), time_limit))
+        if params.get("refit_rows") and len(X) >= params["refit_rows"] and time_limit is not None:
+            raise TimeLimitExceeded
+        time.sleep(params.get("seconds", 0.0))
+        return super()._fit(X, y, **kwargs)
+
+
+def _timed(**params) -> dict:
+    return {TimedDummyModel: [params]}
+
+
+def test_the_reserve_setting():
+    assert resolve_validation_folds_time_reserve("auto", validation_folds=1) == "auto"
+    assert resolve_validation_folds_time_reserve("auto", validation_folds=None) == 0
+    assert resolve_validation_folds_time_reserve(0.3, validation_folds=1) == 0.3
+    assert resolve_validation_folds_time_reserve(None, validation_folds=1) == 0
+    for bad in ("half", 1.0, -0.1, True):
+        with pytest.raises(ValueError, match="validation_folds_time_reserve"):
+            resolve_validation_folds_time_reserve(bad, validation_folds=1)
+
+
+def test_the_first_folds_are_fit_within_the_rest_of_the_time_limit(tmp_path, monkeypatch):
+    limits = {}
+    train_multi_levels = AbstractTabularTrainer.train_multi_levels
+    train_multi_and_ensemble = AbstractTabularTrainer._train_multi_and_ensemble
+
+    def spy_levels(self, *args, time_limit=None, **kwargs):
+        limits["first"] = time_limit
+        return train_multi_levels(self, *args, time_limit=time_limit, **kwargs)
+
+    def spy_fit(self, *args, time_limit=None, **kwargs):
+        limits["total"] = time_limit
+        return train_multi_and_ensemble(self, *args, time_limit=time_limit, **kwargs)
+
+    monkeypatch.setattr(AbstractTabularTrainer, "train_multi_levels", spy_levels)
+    monkeypatch.setattr(AbstractTabularTrainer, "_train_multi_and_ensemble", spy_fit)
+    train = _frame("binary", rows=400, seed=0)
+    _fit(train, tmp_path / "reserve", validation_folds=1, time_limit=120, validation_folds_time_reserve=0.6)
+    assert limits["first"] == pytest.approx(0.4 * limits["total"], rel=1e-6)
+    _fit(train, tmp_path / "none", validation_folds=1, time_limit=120, validation_folds_time_reserve=None)
+    assert limits["first"] == limits["total"]
+    _fit(train, tmp_path / "every_fold", time_limit=120, validation_folds_time_reserve=0.6)
+    assert limits["first"] == limits["total"]
+    # "auto" keeps time back model by model, not up front
+    _fit(train, tmp_path / "auto", validation_folds=1, time_limit=120)
+    assert limits["first"] == limits["total"]
+
+
+def test_a_bag_is_completed_only_if_it_fits_and_its_folds_get_the_first_folds_time(tmp_path, monkeypatch):
+    train = _frame("binary", rows=400, seed=0)
+    hyperparameters = {
+        TimedDummyModel: [
+            {"seconds": 0.3, "ag_args": {"name_suffix": "A"}},
+            {"seconds": 0.3, "ag_args": {"name_suffix": "B"}},
+        ]
+    }
+    # fit the first folds only, and complete by hand
+    monkeypatch.setattr(AbstractTabularTrainer, "complete_bags", lambda self, *args, **kwargs: [])
+    predictor = _fit(train, tmp_path, hyperparameters=hyperparameters, validation_folds=1)
+    monkeypatch.undo()
+    trainer = predictor._trainer
+    a, b = sorted(_bags(predictor))
+    assert trainer.load_model(a).n_children == trainer.load_model(b).n_children == 1
+    fold_time = trainer.load_model(a).fit_time
+    # A has the most weight per second; the time limit fits its completion but not B's after it
+    monkeypatch.setattr(AbstractTabularTrainer, "_model_weights", lambda self, model: {a: 0.9, b: 0.1})
+    TimedDummyModel.time_limits.clear()
+    completed = trainer.complete_bags(trainer.load_X(), trainer.load_y(), models=[b, a], time_limit=5 * fold_time)
+    assert completed == [a]
+    assert trainer.load_model(a).n_children == NUM_FOLDS
+    assert trainer.load_model(b).n_children == 1 and trainer.get_model_attribute(b, "folds_pending")
+    # the completed folds each got at least the floor times the first fold's fit time (less the moments between the
+    # limit and the fold's fit)
+    assert len(TimedDummyModel.time_limits) == NUM_FOLDS - 1
+    assert all(limit >= COMPLETION_FOLD_TIME_FLOOR * fold_time * 0.98 for _, limit in TimedDummyModel.time_limits)
+    assert np.isfinite(_proba(predictor, _frame("binary", rows=50, seed=1), model=b)).all()
+
+
+def test_a_refit_that_runs_out_of_time_leaves_the_bag_on_its_first_folds(tmp_path):
+    train = _frame("binary", rows=400, seed=0)
+    refit = _timed(refit_rows=len(train), ag_args_ensemble={"refit_folds": True})
+    predictor = _fit(train, tmp_path / "limited", hyperparameters=refit, validation_folds=1, time_limit=120)
+    trainer = predictor._trainer
+    (bag,) = _bags(predictor)
+    model = trainer.load_model(bag)
+    assert model._refit_folds_fallback and model.n_children == 1
+    assert trainer.get_model_attribute(bag, "folds_pending")  # predicts from its first fold, and is not completed
+    assert np.isfinite(_proba(predictor, _frame("binary", rows=50, seed=1))).all()
+    # without a time limit the refit fits as before
+    predictor = _fit(train, tmp_path / "unlimited", hyperparameters=refit, validation_folds=1)
+    model = predictor._trainer.load_model(_bags(predictor)[0])
+    assert not model._refit_folds_fallback and model._refit_oof
+
+
+def test_a_time_limited_refit_drops_the_folds_kept_for_the_fallback(tmp_path):
+    train = _frame("binary", rows=400, seed=0)
+    refit = _timed(ag_args_ensemble={"refit_folds": True})
+    predictor = _fit(train, tmp_path, hyperparameters=refit, validation_folds=2, time_limit=120)
+    (bag,) = _bags(predictor)
+    model = predictor._trainer.load_model(bag)
+    assert not model._refit_folds_fallback and model.n_children == 1
+    assert not os.path.exists(os.path.join(model.path, "S1F2"))
+
+
+def test_the_auto_reserve_is_what_completing_the_bags_greedy_uses_takes(tmp_path, monkeypatch):
+    train = _frame("binary", rows=400, seed=0)
+    monkeypatch.setattr(AbstractTabularTrainer, "complete_bags", lambda self, *args, **kwargs: [])
+    hyperparameters = {"GBM": {"num_boost_round": 30}, "DUMMY": {}}
+    trainer = _fit(train, tmp_path / "bag", hyperparameters=hyperparameters, validation_folds=1)._trainer
+    gbm = trainer.load_model("LightGBM_BAG_L1")
+    # greedy uses the LightGBM bag (not the constant), which has three of its four folds to fit
+    needed = COMPLETION_TIME_MARGIN * gbm.fit_time * (NUM_FOLDS - 1)
+    assert trainer._completion_reserve(trainer.load_y(), time_left=10 * needed) == pytest.approx(needed, rel=1e-6)
+    # a completion that cannot fit in the time left is kept no time for: the bag keeps its first folds either way
+    assert trainer._completion_reserve(trainer.load_y(), time_left=0.5 * needed) == 0
+    # a bag refit on all rows has nothing to complete
+    refit = {"GBM": {"num_boost_round": 30, "ag_args_ensemble": {"refit_folds": True}}, "DUMMY": {}}
+    trainer = _fit(train, tmp_path / "refit", hyperparameters=refit, validation_folds=1)._trainer
+    assert trainer._completion_reserve(trainer.load_y(), time_left=1e6) == 0
+
+
+def test_a_model_is_fit_only_in_the_time_the_reserve_leaves(tmp_path, monkeypatch):
+    # once a model is fit, the reserve takes every second left: the next model is not fit
+    monkeypatch.setattr(
+        AbstractTabularTrainer,
+        "_completion_reserve",
+        lambda self, y, time_left: time_left if self.get_model_names(level=1) else 0.0,
+    )
+    hyperparameters = {"GBM": {"num_boost_round": 30}, "LR": {}}
+    predictor = _fit(
+        _frame("binary", rows=400, seed=0),
+        tmp_path,
+        hyperparameters=hyperparameters,
+        validation_folds=1,
+        time_limit=120,
+    )
+    assert len(_bags(predictor)) == 1

@@ -27,6 +27,7 @@ from autogluon.core.callbacks import AbstractCallback
 from autogluon.core.constants import BINARY, MULTICLASS, QUANTILE, REFIT_FULL_NAME, REGRESSION, SOFTCLASS
 from autogluon.core.data.label_cleaner import LabelCleaner, LabelCleanerMulticlassToBinary
 from autogluon.core.metrics import Scorer, compute_metric, get_metric
+from autogluon.core.models.greedy_ensemble.ensemble_selection import EnsembleSelection
 from autogluon.core.models import (
     AbstractModel,
     BaggedEnsembleModel,
@@ -74,6 +75,15 @@ from .group_views import (
 )
 
 logger = logging.getLogger(__name__)
+
+#: `complete_bags` completes a bag only if this multiple of its projected time (its remaining folds at the mean fit
+#: time of the folds it has) fits in the time left.
+COMPLETION_TIME_MARGIN = 1.2
+#: `complete_bags` gives each remaining fold at least this multiple of that mean fit time.
+COMPLETION_FOLD_TIME_FLOOR = 1.5
+#: Greedy ensemble selection's size when `validation_folds_time_reserve="auto"` estimates which bags the weighted
+#: ensemble will use (the weighted ensemble's default).
+COMPLETION_RESERVE_ENSEMBLE_SIZE = 25
 
 
 class AmbiguousModelBestError(AssertionError):
@@ -197,6 +207,10 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         #: During a fit with `validation_folds` (see `TabularPredictor.fit`), the number of folds each bagged model
         #: fits before the weighted ensemble; `complete_bags` fits the rest of the bags the best model uses.
         self._validation_folds: int | None = None
+        #: During a fit with `validation_folds`, how time is kept for `complete_bags`: "auto" (`_completion_reserve`
+        #: before each model) or a share of the time limit (see `TabularPredictor.fit`'s
+        #: `validation_folds_time_reserve`).
+        self._validation_folds_time_reserve: float | str = 0.0
         #: When False, nothing is written to ``path`` during fit: the trainer keeps every model in memory (as
         #: ``low_memory=False`` does) and skips its own pickle, so the fitted trainer lives only in this process.
         self.save_to_disk: bool = save_to_disk
@@ -4138,6 +4152,21 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             self._num_rows_test = len(X_test)
         self._num_cols_train = len(list(X.columns))
         time_start = time.time()
+        time_limit_first = time_limit
+        reserve = self._validation_folds_time_reserve
+        if (
+            self._validation_folds is not None
+            and time_limit is not None
+            and isinstance(reserve, float)
+            and reserve > 0
+        ):
+            # The rest is kept for completing the bags the best model uses, with what the first folds leave unused.
+            time_limit_first = time_limit * (1 - reserve)
+            logger.log(
+                20,
+                f"validation_folds: fitting the first folds within {time_limit_first:.0f}s, keeping "
+                f"{time_limit - time_limit_first:.0f}s of the {time_limit:.0f}s for completing the bags the best model uses.",
+            )
         model_names_fit = self.train_multi_levels(
             X,
             y,
@@ -4149,7 +4178,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             X_unlabeled=X_unlabeled,
             level_start=1,
             level_end=num_stack_levels + 1,
-            time_limit=time_limit,
+            time_limit=time_limit_first,
             **kwargs,
         )
         if self._validation_folds is not None:
@@ -4487,8 +4516,15 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         `models` defaults to the models the best model depends on. Each bag continues with the same splits, so the
         out-of-fold predictions then cover every row and its predictions average every fold. Its validation score stays
         the one on the rows of the folds it fit first, so it stays comparable with the bags that keep only those folds
-        and with the weighted ensemble, whose weights were chosen on the same rows and are kept. `kwargs` go to
-        `_train_single_full` (e.g. `total_resources`, `label_cleaner`). Returns the completed models.
+        and with the weighted ensemble, whose weights were chosen on the same rows and are kept.
+
+        With a time limit, a bag is completed only if its projected time (its remaining folds at the mean fit time of
+        the folds it has) times `COMPLETION_TIME_MARGIN` fits in the time left, and each of its remaining folds then
+        gets at least `COMPLETION_FOLD_TIME_FLOOR` times that mean (more when fit with fewer CPUs), so they train as
+        long as its first folds did. A bag that does not fit keeps its first folds, which are what the ensemble chose
+        its weights on. The bags are taken by their weight in the best model per projected second. A `refit_folds`
+        bag whose refit did not fit in time keeps its folds too. `kwargs` go to `_train_single_full` (e.g.
+        `total_resources`, `label_cleaner`). Returns the completed models.
         """
         if models is None:
             if self.model_best is None:
@@ -4497,13 +4533,29 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         pending = [m for m in models if self.get_model_attribute(m, "folds_pending", default=False)]
         if not pending:
             return []
-        logger.log(20, f"Fitting the remaining folds of the {len(pending)} bagged model(s) the best model uses ...")
+        weights = self._model_weights(self.model_best) if self.model_best is not None else {}
+        plan = []
+        for name in pending:
+            model = self.load_model(name)
+            if model._refit_folds_fallback:
+                logger.log(20, f"\t{name} keeps its first folds: its refit on all rows did not fit in time.")
+                continue
+            folds_left = model._k - model._k_fold_end
+            projected = model.fit_time / model.n_children * folds_left if model.fit_time and model.n_children else 0.0
+            plan.append((name, projected, weights.get(name, 0.0)))
+        # the most weight per projected second first, then the cheapest
+        plan.sort(key=lambda p: (-p[2] / max(p[1], 1e-9), p[1]))
+        logger.log(20, f"Fitting the remaining folds of the {len(plan)} bagged model(s) the best model uses ...")
         time_start = time.time()
         completed = []
-        for name in pending:
+        for name, projected, _ in plan:
             time_left = None if time_limit is None else time_limit - (time.time() - time_start)
-            if time_left is not None and time_left <= 0:
-                logger.log(20, f"\tNo time left to complete {name}: it keeps the folds it has.")
+            if time_left is not None and (time_left <= 0 or COMPLETION_TIME_MARGIN * projected > time_left):
+                logger.log(
+                    20,
+                    f"\t{name} keeps its first folds: completing it would take about {projected:.0f}s, "
+                    f"{max(time_left, 0):.0f}s are left.",
+                )
                 continue
             model = self.load_model(name)
             base_models = self.get_base_model_names(name)
@@ -4523,6 +4575,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                 fit_kwargs=dict(
                     num_classes=self.num_classes,
                     feature_metadata=self.get_feature_metadata(use_orig_features=True, base_models=base_models),
+                    fold_time_floor=None if time_left is None else COMPLETION_FOLD_TIME_FLOOR,
                 ),
                 **kwargs,
             )
@@ -4532,6 +4585,58 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                 self.save_model(model=model)
                 self._update_model_attr(name, val_score=val_score)
         return completed
+
+    def _completion_reserve(self, y: pd.Series, time_left: float) -> float:
+        """The time `validation_folds_time_reserve="auto"` keeps back from the `time_left` before the next model's
+        first folds.
+
+        Greedy ensemble selection over the models fit so far, on the rows their first folds cover, picks the bags the
+        ensemble would use now. Completing one takes `COMPLETION_TIME_MARGIN` times its remaining folds at the mean fit
+        time of the folds it has; taken by weight per projected second, as `complete_bags` takes them, the bags whose
+        completion fits in what is left are kept time for. A bag whose completion cannot fit keeps its first folds
+        either way, so no time is kept for it. Bags with nothing to complete (refit on all rows, or with every fold)
+        need none. 0 before a model is fit.
+        """
+        y = np.asarray(y)
+        names, oofs = [], []
+        for name in self.get_model_names(level=1):
+            oof = self.get_model_oof(name)
+            if len(oof) == len(y):
+                names.append(name)
+                oofs.append(oof)
+        if not oofs:
+            return 0.0
+        covered = np.logical_and.reduce([~np.isnan(oof.reshape(len(y), -1)).any(axis=1) for oof in oofs])
+        if not covered.any():
+            return 0.0
+        selector = EnsembleSelection(
+            ensemble_size=COMPLETION_RESERVE_ENSEMBLE_SIZE,
+            problem_type=self.problem_type,
+            metric=self.eval_metric,
+            random_state=np.random.RandomState(0),
+        )
+        selector.fit(predictions=[oof[covered] for oof in oofs], labels=y[covered])
+        plan = []
+        for name, weight in zip(names, selector.weights_, strict=True):
+            if weight <= 0 or not self.get_model_attribute(name, "folds_pending", default=False):
+                continue
+            model = self.load_model(name)
+            if model._refit_folds_fallback or not model.n_children or not model.fit_time:
+                continue
+            cost = COMPLETION_TIME_MARGIN * model.fit_time / model.n_children * (model._k - model._k_fold_end)
+            plan.append((weight, cost))
+        reserve = 0.0
+        for _, cost in sorted(plan, key=lambda p: (-p[0] / max(p[1], 1e-9), p[1])):
+            if reserve + cost <= time_left:
+                reserve += cost
+        return reserve
+
+    def _model_weights(self, model: str) -> dict[str, float]:
+        """`model`'s weight per base model when it is a weighted ensemble; empty otherwise."""
+        ensemble = self.load_model(model)
+        if isinstance(ensemble, WeightedEnsembleModel):
+            return {name: float(w) for name, w in ensemble._get_model_weights().items()}
+        return {}
 
     def models_with_refit_pending(self) -> list[str]:
         """Bagged models fit with `refit_folds="after_ensemble"`: their folds are gone and they
@@ -5714,6 +5819,20 @@ def _detached_train_multi_fold(
         else:
             time_start_model = time.time()
             time_left = time_limit - (time_start_model - time_start)
+            if (
+                not is_ray_worker
+                and _self._validation_folds is not None
+                and _self._validation_folds_time_reserve == "auto"
+            ):
+                # The time completing the bags the ensemble would use now takes is not this model's.
+                reserve = _self._completion_reserve(y, time_left=time_left)
+                if reserve > 0:
+                    logger.log(
+                        20,
+                        f"Keeping {reserve:.0f}s of the {time_left:.0f}s left for completing the bags the ensemble "
+                        f"would use so far; {model.name} gets the rest.",
+                    )
+                time_left -= reserve
 
     model_name_trained_lst = _self._train_single_full(
         X,

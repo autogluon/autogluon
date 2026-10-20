@@ -63,6 +63,7 @@ class AutoTrainer(AbstractTabularTrainer):
         ensemble_weights_missing: str = "error",
         ensemble_hyperparameters: dict | None = None,
         validation_folds: int | None = None,
+        validation_folds_time_reserve: float | str = 0.0,
         callbacks: list[callable] = None,
         label_cleaner=None,
         **kwargs,
@@ -188,6 +189,7 @@ class AutoTrainer(AbstractTabularTrainer):
             aux_kwargs["ensemble_hyperparameters"] = ensemble_hyperparameters
         partial = validation_folds is not None and self.bagged_mode and validation_folds < self.k_fold
         self._validation_folds = validation_folds if partial else None
+        self._validation_folds_time_reserve = validation_folds_time_reserve if partial else 0.0
         if self._validation_folds is not None:
             logger.log(
                 20,
