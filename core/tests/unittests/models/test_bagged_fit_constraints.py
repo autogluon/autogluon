@@ -59,6 +59,47 @@ def test_min_rows_above_full_size_still_rejected(tmp_path):
         bag.validate_fit_args(X=X, y=y)
 
 
+def _make_multiclass_bag(tmp_path, max_classes: int) -> BaggedEnsembleModel:
+    base = DummyModel(
+        path=str(tmp_path),
+        name="Dummy",
+        problem_type="multiclass",
+        eval_metric="accuracy",
+        hyperparameters={"ag.max_classes": max_classes},
+    )
+    return BaggedEnsembleModel(
+        model_base=base,
+        path=str(tmp_path),
+        name="Dummy_BAG",
+        hyperparameters={"use_child_oof": False, "save_bag_folds": True},
+    )
+
+
+def _make_multiclass_data(n: int, n_classes: int):
+    rng = np.random.default_rng(0)
+    X = pd.DataFrame({"a": rng.normal(size=n)})
+    y = pd.Series(np.arange(n) % n_classes)
+    return X, y
+
+
+def test_max_classes_below_the_data_rejects_the_bag(tmp_path):
+    """The child template is validated before it is initialized, so it must count the classes in
+    the data: 3 classes > max_classes 2 rejects the bag, both when validated and when fit."""
+    X, y = _make_multiclass_data(60, n_classes=3)
+    with pytest.raises(ConstraintViolationError, match="found 3 classes"):
+        _make_multiclass_bag(tmp_path, max_classes=2).validate_fit_args(X=X, y=y)
+    with pytest.raises(ConstraintViolationError, match="found 3 classes"):
+        _make_multiclass_bag(tmp_path, max_classes=2).fit(X=X, y=y, k_fold=2)
+
+
+def test_max_classes_at_the_data_fits_the_bag(tmp_path):
+    X, y = _make_multiclass_data(60, n_classes=3)
+    bag = _make_multiclass_bag(tmp_path, max_classes=3)
+    bag.validate_fit_args(X=X, y=y)
+    bag.fit(X=X, y=y, k_fold=2)
+    assert bag.n_children == 2
+
+
 def test_flag_survives_the_fold_copy(tmp_path):
     """Fold models are deepcopies of the model base, so the upstream-validation flag set by the
     bag must carry over to them."""
