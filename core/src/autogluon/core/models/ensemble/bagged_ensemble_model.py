@@ -523,6 +523,7 @@ class BaggedEnsembleModel(AbstractModel):
                 save_folds=save_bag_folds,
                 groups=groups,
                 fold_time_floor=fold_time_floor,
+                refit=bool(refit_folds) or self._refit_folds_pending,
                 **kwargs,
             )
             # FIXME: Cleanup self
@@ -1092,6 +1093,7 @@ class BaggedEnsembleModel(AbstractModel):
         num_cpus: int = None,
         num_gpus: float = None,
         fold_time_floor: float | None = None,
+        refit: bool = False,
         **kwargs,
     ):
         # This bag's `validate_fit_args` already validated the fit constraints against the full
@@ -1162,6 +1164,9 @@ class BaggedEnsembleModel(AbstractModel):
             fold_fitting_strategy_args["num_jobs"] = num_folds
             fold_fitting_strategy_args["num_folds_parallel"] = num_folds_parallel
         fold_fitting_strategy: FoldFittingStrategy = fold_fitting_strategy_cls(**fold_fitting_strategy_args)
+        if refit:
+            # the bag refits on all rows after its folds (`refit_folds`): a refit that cannot fit skips the model now
+            fold_fitting_strategy.validate_refit_gpu_memory_usage()
 
         if isinstance(fold_fitting_strategy, ParallelFoldFittingStrategy):
             num_parallel_jobs = fold_fitting_strategy.num_parallel_jobs

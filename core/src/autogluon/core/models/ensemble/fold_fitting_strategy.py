@@ -211,6 +211,15 @@ class FoldFittingStrategy(AbstractFoldFittingStrategy):
         """
         return 1.0 if self.model_base.can_estimate_fit_time_static() else self.time_limit_fold_ratio
 
+    def validate_refit_gpu_memory_usage(self):
+        """The GPU memory check of the bag's refit on all rows, before any fold is fit.
+
+        Each fold model checks its own (k-1)/k slice, so a bag that refits on all rows would
+        otherwise fit every fold and only then skip the model, when the refit fails its check.
+        Raises NotEnoughCudaMemoryError like the refit's own check.
+        """
+        self._initialized_model_base._validate_fit_gpu_memory_usage(X=self.X, num_gpus=self.num_gpus)
+
     def _validate_user_specified_resources(self):
         # User specified value through ag_args_fit means they want this individual model to use this amount of resources
         user_ensemble_resources = None
