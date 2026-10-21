@@ -1,10 +1,66 @@
 from __future__ import annotations
 
+import math
 from typing import ClassVar
 
 import pandas as pd
 
 from .tabpfnv2_5_model import TabPFNModel
+
+
+def estimate_fit_time_v3(
+    *,
+    n_train: int,
+    n_val: int,
+    n_features: int,
+    n_estimators: int | str,
+    max_batch_size: int | None,
+    num_gpus: int | float,
+    fit_mode: str = "fit_preprocessors",
+) -> float | None:
+    """Seconds a TabPFN-3 / 3.5 estimator takes to fit on ``n_train`` rows and predict ``n_val`` rows on GPU.
+
+    As TabPFN-3.5's checkpoints run it: ``n_estimators="auto"`` is 8, and each estimator sees at most
+    768 features plus one column the library adds. A prediction runs the network over the training
+    rows and the predicted rows, in which every row attends to the training rows, so each chunk of
+    ``max_batch_size`` predicted rows costs a pass over the training rows. Per estimator and row
+    passed: ``1.9e-7 s`` per column, ``2.7e-10 s`` per training row and ``3.3e-6 s``, plus ``0.17 s``
+    per prediction. Preprocessing costs ``4.8e-8 s`` per training cell and estimator.
+
+    ``fit_mode`` decides where the work falls, so it matters for a fit without validation rows (a
+    refit): ``"fit_preprocessors"`` preprocesses at fit, ``"low_memory"`` keeps the data at fit and
+    preprocesses at each prediction, and ``"fit_with_cache"`` also runs the training rows' pass at fit,
+    once, so predictions pass only the predicted rows. A fit plus a prediction costs the same in the
+    first two; ``"fit_with_cache"`` was not measured.
+
+    Calibrated on BeyondArena's hosted TabPFN-3.5 run (2,010 splits up to 1M rows and 22k features,
+    8-fold bags on one RTX PRO 6000; each split's train and test time, each size band weighed the
+    same): predicted / measured train time has a median of 0.96-1.07 per size band, and 0.99-1.03
+    (10th-90th percentile) above 300k rows. Estimators are spread over the GPUs. None on CPU, which
+    it is not calibrated for.
+    """
+    if not num_gpus or isinstance(num_gpus, str):
+        return None
+    if n_estimators == "auto":
+        n_estimators = 8
+    columns_per_estimator = min(n_features, 768) + 1
+    estimators_per_gpu = math.ceil(n_estimators / max(1, min(int(num_gpus), n_estimators)))
+    preprocess_time = 4.8e-8 * n_train * columns_per_estimator * n_estimators
+    per_row = 1.9e-7 * columns_per_estimator + 2.7e-10 * n_train + 3.3e-6
+    fit_time = 0.07 if fit_mode == "low_memory" else preprocess_time + 0.07
+    if fit_mode == "fit_with_cache":
+        fit_time += estimators_per_gpu * n_train * per_row
+    if n_val == 0:
+        return fit_time
+    if fit_mode == "fit_with_cache":
+        rows_passed = n_val
+    else:
+        n_chunks = 1 if max_batch_size is None else math.ceil(n_val / max_batch_size)
+        rows_passed = n_chunks * n_train + n_val
+    predict_time = estimators_per_gpu * rows_passed * per_row + 0.17
+    if fit_mode == "low_memory":
+        predict_time += preprocess_time
+    return fit_time + predict_time
 
 
 class TabPFN3Model(TabPFNModel):
@@ -86,6 +142,32 @@ class TabPFN3Model(TabPFNModel):
         baseline_mem_est = 2.8e9
         preprocessing_mem_est = 10 * 8 * (n_train + n_test) * min(n_features, 500)
         return int(baseline_mem_est + preprocessing_mem_est)
+
+    @classmethod
+    def _estimate_fit_time_static(
+        cls,
+        *,
+        X: pd.DataFrame,
+        X_val: pd.DataFrame | None = None,
+        hyperparameters: dict | None = None,
+        num_gpus: int | float = 0,
+        **kwargs,
+    ) -> float | None:
+        """Seconds to fit and predict the validation rows on GPU; see `estimate_fit_time_v3`."""
+        hyperparameters = hyperparameters or {}
+        n_train, n_features = X.shape
+        max_batch_size = hyperparameters.get("ag.max_batch_size", "auto")
+        if max_batch_size == "auto":
+            max_batch_size = cls._resolve_auto_max_batch_size(n_train=n_train)
+        return estimate_fit_time_v3(
+            n_train=n_train,
+            n_val=0 if X_val is None else len(X_val),
+            n_features=n_features,
+            n_estimators=hyperparameters.get("n_estimators", "auto"),
+            max_batch_size=max_batch_size,
+            num_gpus=num_gpus,
+            fit_mode=hyperparameters.get("fit_mode", "fit_preprocessors"),
+        )
 
     @classmethod
     def _estimate_gpu_memory_usage_static(

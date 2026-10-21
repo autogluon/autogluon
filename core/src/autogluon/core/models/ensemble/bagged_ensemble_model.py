@@ -500,8 +500,12 @@ class BaggedEnsembleModel(AbstractModel):
                     fold_start = n_repeat_start * k_fold + k_fold_start
                     fold_end = (n_repeats - 1) * k_fold + k_fold_end
                     folds_to_fit = fold_end - fold_start
-                    # Reserve time for final refit model
-                    kwargs["time_limit"] = kwargs["time_limit"] * folds_to_fit / (folds_to_fit + 1.2)
+                    # Reserve time for final refit model: its estimate when the child has one, else 1.2 folds' share
+                    refit_time = self._estimate_refit_time(X=X, y=y, num_gpus=kwargs.get("num_gpus"))
+                    if refit_time is None:
+                        kwargs["time_limit"] = kwargs["time_limit"] * folds_to_fit / (folds_to_fit + 1.2)
+                    else:
+                        kwargs["time_limit"] = kwargs["time_limit"] - refit_time
                     # The refit gets the time the folds leave and may not fit in it: the folds are kept until it has,
                     # so a bag whose refit runs out of time predicts from its folds.
                     save_bag_folds = time_limit_refit_folds is not None
@@ -562,6 +566,23 @@ class BaggedEnsembleModel(AbstractModel):
                 return refit_template
             else:
                 return self
+
+    def _estimate_refit_time(self, X: pd.DataFrame, y: pd.Series, num_gpus=None) -> float | None:
+        """Seconds the refit on all of `X` (`refit_folds`) is estimated to take, None when the child defines no
+        fit-time estimate (see `AbstractModel.estimate_fit_time`). The refit predicts nothing during its fit."""
+        model_base = self._get_model_base()
+        if not model_base.can_estimate_fit_time_static():
+            return None
+        hyperparameters = copy.deepcopy(model_base.get_params()["hyperparameters"])
+        model_base._apply_refit_hyperparameters(hyperparameters)
+        return model_base.estimate_fit_time_static(
+            X=X,
+            y=y,
+            hyperparameters=hyperparameters,
+            problem_type=self.problem_type,
+            num_classes=self.num_classes,
+            num_gpus=num_gpus,
+        )
 
     def get_oof_fold_val_idx(self, X: pd.DataFrame, y: pd.Series) -> list[np.ndarray]:
         """Validation rows behind this model's OOF predictions, one entry per child.

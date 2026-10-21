@@ -202,6 +202,15 @@ class FoldFittingStrategy(AbstractFoldFittingStrategy):
     def after_all_folds_scheduled(self):
         raise NotImplementedError
 
+    @property
+    def _fold_time_limit_ratio(self) -> float:
+        """The share of a fold's time its model is given to fit, the rest left for its out-of-fold predictions.
+
+        A model with a fit-time estimate is checked on its fit and its out-of-fold predictions together
+        (`AbstractModel._validate_fit_time`), so it is given the whole share.
+        """
+        return 1.0 if self.model_base.can_estimate_fit_time_static() else self.time_limit_fold_ratio
+
     def _validate_user_specified_resources(self):
         # User specified value through ag_args_fit means they want this individual model to use this amount of resources
         user_ensemble_resources = None
@@ -268,7 +277,7 @@ class FoldFittingStrategy(AbstractFoldFittingStrategy):
         if self.time_limit is not None:
             time_left = self.time_limit - time_elapsed
             required_time_per_fold = time_left / folds_left
-            time_limit_fold = required_time_per_fold * self.time_limit_fold_ratio
+            time_limit_fold = required_time_per_fold * self._fold_time_limit_ratio
             if folds_finished > 0:
                 expected_time_required = time_elapsed * folds_to_fit / folds_finished
                 expected_remaining_time_required = expected_time_required * folds_left / folds_to_fit
@@ -1222,7 +1231,7 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
         if self.time_limit is not None:
             time_left = self.time_limit - time_elapsed
             required_time_per_fold = time_left / self.batches
-            time_limit_fold = required_time_per_fold * self.time_limit_fold_ratio
+            time_limit_fold = required_time_per_fold * self._fold_time_limit_ratio
             if time_left <= 0:
                 raise TimeLimitExceeded
             time_limit_fold = self._floored_fold_time_limit(

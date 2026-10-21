@@ -1480,6 +1480,9 @@ class AbstractModel(ModelBase, Tunable):
 
         self._register_fit_metadata(**kwargs)
         self.validate_fit_resources(**kwargs)
+        if kwargs.get("time_limit") is not None:
+            # before the memory checks, which can cost a preprocessing pass on the data
+            self._validate_fit_time(**{**kwargs, "time_limit": kwargs["time_limit"] - (time.time() - time_start)})
         approx_mem_size_req, available_mem = self._validate_fit_memory_usage(
             approx_mem_size_req=approx_mem_size_req, **kwargs
         )
@@ -3236,6 +3239,108 @@ class AbstractModel(ModelBase, Tunable):
     ) -> int:
         raise NotImplementedError
 
+    def estimate_fit_time(self, X: pd.DataFrame, X_val: pd.DataFrame | None = None, **kwargs) -> float | None:
+        """
+        Estimates the seconds the model takes to fit on `X` and then predict `X_val`.
+
+        The time counterpart of `estimate_gpu_memory_usage`, for models that cannot stop early
+        to honor their time limit, such as in-context models whose fit is one fixed computation.
+        Returns None when the model defines no estimate (the default); fit-time checks are then
+        skipped.
+
+        Parameters
+        ----------
+        X: pd.DataFrame
+            The training data features
+        X_val: pd.DataFrame, optional
+            The validation data features, predicted after the fit (a bagged fold's out-of-fold rows)
+
+        Returns
+        -------
+        float | None: estimated seconds to fit and predict `X_val`, or None if the model defines no estimate
+        """
+        assert self.is_initialized(), "Only estimate fit time after the model is initialized."
+        return self._estimate_fit_time(X=X, X_val=X_val, **kwargs)
+
+    def _estimate_fit_time(self, X: pd.DataFrame, X_val: pd.DataFrame | None = None, **kwargs) -> float | None:
+        """
+        Estimates the seconds to fit on `X` and predict `X_val`.
+
+        Defaults to this model's static estimate when it defines one, else None (no estimate;
+        fit-time checks are skipped). Implementing `_estimate_fit_time_static` is enough to enable
+        the check; override this method only when a fitted instance can estimate better.
+        """
+        if not self.can_estimate_fit_time_static():
+            return None
+        return self.estimate_fit_time_static(
+            X=X,
+            X_val=X_val,
+            problem_type=self.problem_type,
+            num_classes=self.num_classes,
+            hyperparameters=self._get_model_params(),
+            **kwargs,
+        )
+
+    @classmethod
+    def can_estimate_fit_time_static(cls) -> bool:
+        """
+        True if `estimate_fit_time_static` is implemented for this model.
+        If False, calling `estimate_fit_time_static` will raise a NotImplementedError.
+
+        Derived from whether the model implements `_estimate_fit_time_static`.
+        """
+        return cls._overrides("_estimate_fit_time_static")
+
+    @classmethod
+    def estimate_fit_time_static(
+        cls,
+        *,
+        X: pd.DataFrame,
+        X_val: pd.DataFrame | None = None,
+        y: pd.Series = None,
+        hyperparameters: dict = None,
+        problem_type: str = "infer",
+        num_classes: int | None | str = "infer",
+        **kwargs,
+    ) -> float | None:
+        """
+        Estimates the seconds the model takes to fit on `X` and predict `X_val`, without having to
+        initialize the model. The time counterpart of `estimate_gpu_memory_usage_static`.
+
+        `**kwargs` carries the fit arguments, such as `num_gpus`; an estimate may return None for a
+        setting it is not calibrated for.
+        """
+        if problem_type == "infer":
+            problem_type = cls._infer_problem_type(y=y)
+        if isinstance(num_classes, str) and num_classes == "infer":
+            num_classes = cls._infer_num_classes(y=y, problem_type=problem_type)
+        if hyperparameters is None:
+            hyperparameters = {}
+        hyperparameters = cls._get_model_params_static(
+            hyperparameters=hyperparameters, convert_search_spaces_to_default=True
+        )
+        return cls._estimate_fit_time_static(
+            X=X,
+            X_val=X_val,
+            y=y,
+            hyperparameters=hyperparameters,
+            problem_type=problem_type,
+            num_classes=num_classes,
+            **kwargs,
+        )
+
+    @classmethod
+    def _estimate_fit_time_static(
+        cls,
+        *,
+        X: pd.DataFrame,
+        X_val: pd.DataFrame | None = None,
+        hyperparameters: dict = None,
+        num_classes: int = 1,
+        **kwargs,
+    ) -> float | None:
+        raise NotImplementedError
+
     def estimate_memory_usage_static_child(
         self,
         *,
@@ -3539,6 +3644,36 @@ class AbstractModel(ModelBase, Tunable):
             logger.warning(f"\tWarning: Potentially not enough GPU memory to safely train model. {log_user_guideline}")
 
         return approx_mem_size_req, available_mem
+
+    def _validate_fit_time(self, time_limit: float | None = None, **kwargs) -> float | None:
+        """
+        Asserts that the model is expected to fit within `time_limit`.
+
+        The check runs only when there is a time limit AND the model defines a fit-time estimate
+        (`estimate_fit_time` returns non-None); otherwise it is skipped. Raises TimeLimitExceeded,
+        which the trainer handles as a graceful model skip, when the estimate exceeds
+        `time_limit` times the `params_aux` hyperparameter `max_estimated_time_ratio` (default 1.0;
+        None skips the check), so that a model which cannot stop early is not started.
+
+        Returns
+        -------
+        float | None
+            The estimated seconds to fit (None = not calculated / no estimate).
+        """
+        max_estimated_time_ratio = self.params_aux["max_estimated_time_ratio"]
+        if max_estimated_time_ratio is None or time_limit is None:
+            return None
+        time_estimate = self.estimate_fit_time(**kwargs)
+        if time_estimate is None:
+            return None
+        if time_estimate > time_limit * max_estimated_time_ratio:
+            logger.warning(
+                f"\tWarning: Not enough time to train model. Estimated to require {time_estimate:.1f}s "
+                f"of the {time_limit:.1f}s left... ({max_estimated_time_ratio:.2f}x the time left is the "
+                f'max, set by the model hyperparameter "ag.max_estimated_time_ratio")'
+            )
+            raise TimeLimitExceeded
+        return time_estimate
 
     def reduce_memory_size(
         self, remove_fit: bool = True, remove_info: bool = False, requires_save: bool = True, **kwargs
