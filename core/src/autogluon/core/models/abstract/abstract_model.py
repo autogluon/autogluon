@@ -2373,8 +2373,22 @@ class AbstractModel(ModelBase, Tunable):
             features = list(features)
 
         # NOTE: Needed as bagged models 'features' attribute is not the same as childrens' 'features' attributes
-        banned_features = [feature for feature in features if feature not in self.get_features()]
-        features_to_check = [feature for feature in features if feature not in banned_features]
+        model_features = set(self.get_features())
+        banned_features = []
+        features_to_check = []
+        for feature in features:
+            if isinstance(feature, tuple):
+                # A (feature_name, feature_list) group is permuted jointly, so only its members the model uses matter
+                feature_name, feature_list = feature
+                feature_list = [f for f in feature_list if f in model_features]
+                if feature_list:
+                    features_to_check.append((feature_name, feature_list))
+                else:
+                    banned_features.append(feature_name)
+            elif feature in model_features:
+                features_to_check.append(feature)
+            else:
+                banned_features.append(feature)
 
         if features_to_check:
             fi_df = self._compute_permutation_importance(
