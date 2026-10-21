@@ -308,6 +308,33 @@ def resolve_validation_folds(
     return resolve_size_curve(overrides.validation_folds, effective_size), True
 
 
+def resolve_validation_folds_time_reserve(
+    reserve: float | str | None,
+    *,
+    validation_folds: int | None,
+) -> float | str:
+    """How a ``validation_folds`` fit keeps time for completing the bags the best model uses.
+
+    ``"auto"``, kept as is: before each model of the first folds, the trainer keeps what completing the bags that
+    greedy ensemble selection over the models fit so far uses would take. A number in ``[0, 1)`` is a fixed share of the
+    time limit; ``None`` keeps nothing back. Without ``validation_folds`` nothing is completed and the share is 0.
+    """
+    if isinstance(reserve, str):
+        if reserve != "auto":
+            raise ValueError(
+                f"validation_folds_time_reserve must be 'auto', None or a number in [0, 1), got {reserve!r}."
+            )
+    elif reserve is not None and (
+        isinstance(reserve, bool) or not isinstance(reserve, (int, float)) or not 0 <= reserve < 1
+    ):
+        raise ValueError(f"validation_folds_time_reserve must be 'auto', None or a number in [0, 1), got {reserve!r}.")
+    if validation_folds is None or reserve is None:
+        return 0.0
+    if reserve == "auto":
+        return "auto"
+    return float(reserve)
+
+
 def validate_validation_folds(
     validation_folds: int | None,
     *,

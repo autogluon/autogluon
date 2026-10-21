@@ -106,6 +106,11 @@ class FoldFittingStrategy(AbstractFoldFittingStrategy):
         time_limit_fold_ratio: float, default=0.8
             The ratio of max time limit for each fold.
             If the estimated time required exceeds this ratio, will raise TimeLimitExceed error
+        time_limit_fold_min: float, default=None
+            A floor on each fold's time limit, in seconds, for a fold fit with `time_limit_fold_min_num_cpus` CPUs: a
+            fold fit with fewer CPUs gets proportionally more. The limit never exceeds the time left.
+        time_limit_fold_min_num_cpus: int, default=None
+            The CPUs `time_limit_fold_min` is given for; None leaves the floor unscaled.
     Attributes
     ----------
         X : DataFrame
@@ -152,6 +157,8 @@ class FoldFittingStrategy(AbstractFoldFittingStrategy):
         num_cpus: int,
         num_gpus: Union[int, float],
         time_limit_fold_ratio=0.8,
+        time_limit_fold_min: float | None = None,
+        time_limit_fold_min_num_cpus: int | None = None,
         **kwargs,
     ):
         self.model_base = model_base
@@ -170,6 +177,8 @@ class FoldFittingStrategy(AbstractFoldFittingStrategy):
         self.jobs = []
         self.save_folds = save_folds
         self.time_limit_fold_ratio = time_limit_fold_ratio
+        self.time_limit_fold_min = time_limit_fold_min
+        self.time_limit_fold_min_num_cpus = time_limit_fold_min_num_cpus
         self.num_cpus = num_cpus
         self.num_gpus = num_gpus
         logger.debug(f"Upper level total_num_cpus, num_gpus {self.num_cpus} | {self.num_gpus}")
@@ -179,6 +188,16 @@ class FoldFittingStrategy(AbstractFoldFittingStrategy):
 
     def schedule_fold_model_fit(self, fold_ctx):
         raise NotImplementedError
+
+    def _floored_fold_time_limit(self, time_limit_fold: float, time_left: float, num_cpus: int | None) -> float:
+        """`time_limit_fold` raised to `time_limit_fold_min` (scaled up for a fold fit with fewer CPUs), at most
+        `time_left`."""
+        if self.time_limit_fold_min is None:
+            return time_limit_fold
+        floor = self.time_limit_fold_min
+        if self.time_limit_fold_min_num_cpus and num_cpus:
+            floor *= max(1.0, self.time_limit_fold_min_num_cpus / num_cpus)
+        return min(max(time_limit_fold, floor), time_left)
 
     def after_all_folds_scheduled(self):
         raise NotImplementedError
@@ -257,6 +276,7 @@ class FoldFittingStrategy(AbstractFoldFittingStrategy):
                     raise TimeLimitExceeded
             if time_left <= 0:
                 raise TimeLimitExceeded
+            time_limit_fold = self._floored_fold_time_limit(time_limit_fold, time_left, self.resources["num_cpus"])
         else:
             time_limit_fold = None
         return time_limit_fold
@@ -1205,6 +1225,9 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
             time_limit_fold = required_time_per_fold * self.time_limit_fold_ratio
             if time_left <= 0:
                 raise TimeLimitExceeded
+            time_limit_fold = self._floored_fold_time_limit(
+                time_limit_fold, time_left, self.resources_model["num_cpus"]
+            )
         else:
             time_limit_fold = None
         return time_limit_fold
