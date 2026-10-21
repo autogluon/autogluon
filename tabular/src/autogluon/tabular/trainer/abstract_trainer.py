@@ -27,7 +27,6 @@ from autogluon.core.callbacks import AbstractCallback
 from autogluon.core.constants import BINARY, MULTICLASS, QUANTILE, REFIT_FULL_NAME, REGRESSION, SOFTCLASS
 from autogluon.core.data.label_cleaner import LabelCleaner, LabelCleanerMulticlassToBinary
 from autogluon.core.metrics import Scorer, compute_metric, get_metric
-from autogluon.core.models.greedy_ensemble.ensemble_selection import EnsembleSelection
 from autogluon.core.models import (
     AbstractModel,
     BaggedEnsembleModel,
@@ -36,6 +35,7 @@ from autogluon.core.models import (
     StackerEnsembleModel,
     WeightedEnsembleModel,
 )
+from autogluon.core.models.greedy_ensemble.ensemble_selection import EnsembleSelection
 from autogluon.core.pseudolabeling.pseudolabeling import assert_pseudo_column_match
 from autogluon.core.ray.distributed_jobs_managers import ParallelFitManager, gpu_parallel_fit_enabled
 from autogluon.core.trainer import AbstractTrainer
