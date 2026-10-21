@@ -177,14 +177,16 @@ def test__estimate_fit_time_v3__scaling():
     assert estimate_fit_time_v3(n_estimators=1, **kwargs) < auto / 4
     # each chunk of predicted rows passes over the training rows again
     assert estimate_fit_time_v3(n_estimators=8, **{**kwargs, "max_batch_size": 2_500}) > 3 * auto
-    # each estimator sees at most 768 features
-    wide = dict(kwargs, n_features=768)
-    assert estimate_fit_time_v3(n_estimators=8, **{**wide, "n_features": 10_000}) == estimate_fit_time_v3(
-        n_estimators=8, **wide
-    )
-    assert estimate_fit_time_v3(n_estimators=8, **{**wide, "n_features": 500}) < estimate_fit_time_v3(
-        n_estimators=8, **wide
-    )
+
+    # each estimator's network sees at most 768 features; fitting preprocesses every feature
+    def predict_time(n_features):
+        estimate = dict(kwargs, n_estimators=8, n_features=n_features)
+        return estimate_fit_time_v3(**estimate) - estimate_fit_time_v3(**{**estimate, "n_val": 0})
+
+    assert predict_time(10_000) == pytest.approx(predict_time(768))
+    assert predict_time(500) < predict_time(768)
+    fit = dict(kwargs, n_estimators=8, n_val=0)
+    assert estimate_fit_time_v3(**{**fit, "n_features": 10_000}) > estimate_fit_time_v3(**{**fit, "n_features": 768})
     # estimators spread over the GPUs
     assert estimate_fit_time_v3(n_estimators=8, **{**kwargs, "num_gpus": 2}) < 0.6 * auto
     # no validation rows: the fit alone
@@ -192,22 +194,25 @@ def test__estimate_fit_time_v3__scaling():
 
 
 def test__estimate_fit_time_v3__fit_mode():
-    """A refit (no validation rows) in "low_memory" only keeps the data; a fit and a prediction cost the same in
-    "fit_preprocessors" and "low_memory"; "fit_with_cache" passes the training rows once."""
+    """ "low_memory" fits faster and predicts as fast as "fit_preprocessors"; "fit_with_cache" passes the
+    training rows once, at fit."""
     kwargs = dict(n_train=500_000, n_features=200, n_estimators=8, max_batch_size=None, num_gpus=1)
     refit = {
         mode: estimate_fit_time_v3(n_val=0, fit_mode=mode, **kwargs) for mode in ("fit_preprocessors", "low_memory")
     }
-    assert refit["low_memory"] < 1 < refit["fit_preprocessors"]
+    assert refit["low_memory"] == pytest.approx(0.07 + 0.6 * (refit["fit_preprocessors"] - 0.07))
     fold = {
         mode: estimate_fit_time_v3(n_val=50_000, fit_mode=mode, **kwargs)
         for mode in ("fit_preprocessors", "low_memory")
     }
-    assert fold["low_memory"] == pytest.approx(fold["fit_preprocessors"])
+    assert fold["low_memory"] - refit["low_memory"] == pytest.approx(
+        fold["fit_preprocessors"] - refit["fit_preprocessors"]
+    )
     chunked = dict(kwargs, max_batch_size=10_000)
     assert estimate_fit_time_v3(n_val=50_000, fit_mode="fit_with_cache", **chunked) < estimate_fit_time_v3(
         n_val=50_000, **chunked
     )
+    assert estimate_fit_time_v3(n_val=0, fit_mode="fit_with_cache", **kwargs) > 10 * refit["fit_preprocessors"]
 
 
 def test__estimate_fit_time_v3__none_on_cpu():

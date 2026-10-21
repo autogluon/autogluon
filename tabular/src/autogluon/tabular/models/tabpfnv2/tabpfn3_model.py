@@ -24,20 +24,20 @@ def estimate_fit_time_v3(
     768 features plus one column the library adds. A prediction runs the network over the training
     rows and the predicted rows, in which every row attends to the training rows, so each chunk of
     ``max_batch_size`` predicted rows costs a pass over the training rows. Per estimator and row
-    passed: ``1.9e-7 s`` per column, ``2.7e-10 s`` per training row and ``3.3e-6 s``, plus ``0.17 s``
-    per prediction. Preprocessing costs ``4.8e-8 s`` per training cell and estimator.
+    passed: ``2.1e-7 s`` per column, ``2.75e-10 s`` per training row and ``3.3e-6 s``, plus ``0.165 s``
+    per prediction. Fitting preprocesses every feature: ``4.2e-8 s`` per training cell up to 1,000
+    features and half that beyond, times ``n_estimators ** 0.53``, plus ``0.07 s``.
 
-    ``fit_mode`` decides where the work falls, so it matters for a fit without validation rows (a
-    refit): ``"fit_preprocessors"`` preprocesses at fit, ``"low_memory"`` keeps the data at fit and
-    preprocesses at each prediction, and ``"fit_with_cache"`` also runs the training rows' pass at fit,
-    once, so predictions pass only the predicted rows. A fit plus a prediction costs the same in the
-    first two; ``"fit_with_cache"`` was not measured.
+    ``fit_mode`` decides where the work falls: ``"low_memory"`` fits in 0.6 of that time and predicts
+    in the same time, and ``"fit_with_cache"`` runs the training rows' pass once, at fit, so
+    predictions pass only the predicted rows (not measured).
 
     Calibrated on BeyondArena's hosted TabPFN-3.5 run (2,010 splits up to 1M rows and 22k features,
-    8-fold bags on one RTX PRO 6000; each split's train and test time, each size band weighed the
-    same): predicted / measured train time has a median of 0.96-1.07 per size band, and 0.99-1.03
-    (10th-90th percentile) above 300k rows. Estimators are spread over the GPUs. None on CPU, which
-    it is not calibrated for.
+    8-fold bags; each split's train and test time, each size band weighed the same) and on fits and
+    predictions measured up to 1M training rows, 1M predicted rows and 9,284 features, all on one
+    RTX PRO 6000: predicted / measured train time has a median of 0.93-1.02 per size band and
+    0.98-1.01 (10th-90th percentile) above 300k rows; measured fits 0.84-1.16, predictions 0.95-1.03
+    above 400k rows. Estimators are spread over the GPUs. None on CPU, which it is not calibrated for.
     """
     if not num_gpus or isinstance(num_gpus, str):
         return None
@@ -45,9 +45,9 @@ def estimate_fit_time_v3(
         n_estimators = 8
     columns_per_estimator = min(n_features, 768) + 1
     estimators_per_gpu = math.ceil(n_estimators / max(1, min(int(num_gpus), n_estimators)))
-    preprocess_time = 4.8e-8 * n_train * columns_per_estimator * n_estimators
-    per_row = 1.9e-7 * columns_per_estimator + 2.7e-10 * n_train + 3.3e-6
-    fit_time = 0.07 if fit_mode == "low_memory" else preprocess_time + 0.07
+    cells = n_train * (4.2e-8 * min(n_features, 1000) + 2.1e-8 * max(n_features - 1000, 0))
+    fit_time = 0.07 + cells * n_estimators**0.53 * (0.6 if fit_mode == "low_memory" else 1.0)
+    per_row = 2.1e-7 * columns_per_estimator + 2.75e-10 * n_train + 3.3e-6
     if fit_mode == "fit_with_cache":
         fit_time += estimators_per_gpu * n_train * per_row
     if n_val == 0:
@@ -57,10 +57,7 @@ def estimate_fit_time_v3(
     else:
         n_chunks = 1 if max_batch_size is None else math.ceil(n_val / max_batch_size)
         rows_passed = n_chunks * n_train + n_val
-    predict_time = estimators_per_gpu * rows_passed * per_row + 0.17
-    if fit_mode == "low_memory":
-        predict_time += preprocess_time
-    return fit_time + predict_time
+    return fit_time + estimators_per_gpu * rows_passed * per_row + 0.165
 
 
 class TabPFN3Model(TabPFNModel):
