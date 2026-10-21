@@ -1299,7 +1299,6 @@ class BaggedEnsembleModel(AbstractModel):
                 X, y, features=features, time_limit=time_limit, silent=silent, **kwargs
             )
         fi_fold_list = []
-        model_index = 0
         if time_limit is not None:
             time_limit_per_child = time_limit / self.n_children
         else:
@@ -1311,47 +1310,45 @@ class BaggedEnsembleModel(AbstractModel):
             logger.log(20, logging_message)
 
         time_start = time.time()
-        early_stop = False
         children_completed = 0
         log_final_suffix = ""
-        for n_repeat, k in enumerate(self._k_per_n_repeat):
-            if is_oof:
-                if not self.can_infer_oof:
-                    raise AssertionError(
-                        "Model trained with no validation data cannot get feature importance on training data, please specify new test data to compute feature importances (model=%s)"
-                        % self.name
-                    )
-                kfolds = self._cv_splitters[n_repeat].split(X=X, y=y)
-                cur_kfolds = kfolds[n_repeat * k : (n_repeat + 1) * k]
-            else:
-                cur_kfolds = [(None, list(range(len(X))))] * k
-            for i, fold in enumerate(cur_kfolds):
-                _, test_index = fold
-                model = self.load_child(self.models[model_index + i])
-                fi_fold = model.compute_feature_importance(
-                    X=X.iloc[test_index, :],
-                    y=y.iloc[test_index],
-                    features=features,
-                    time_limit=time_limit_per_child,
-                    silent=silent,
-                    log_prefix="\t",
-                    importance_as_list=True,
-                    **kwargs,
+        if is_oof:
+            if not self.can_infer_oof:
+                raise AssertionError(
+                    "Model trained with no validation data cannot get feature importance on training data, please specify new test data to compute feature importances (model=%s)"
+                    % self.name
                 )
-                fi_fold_list.append(fi_fold)
+            # The rows each child validated on, as for the OOF predictions. This includes the children of a bagging set
+            # that was not completed, e.g. a bag that `validation_folds` left at its first folds.
+            test_indices = self.get_oof_fold_val_idx(X=X, y=y)
+        else:
+            test_indices = [np.arange(len(X))] * len(self.models)
+        if len(test_indices) != len(self.models):
+            raise AssertionError(
+                f"Expected the validation rows of {len(self.models)} children, got {len(test_indices)} (model={self.name})"
+            )
+        for child, test_index in zip(self.models, test_indices):
+            model = self.load_child(child)
+            fi_fold = model.compute_feature_importance(
+                X=X.iloc[test_index, :],
+                y=y.iloc[test_index],
+                features=features,
+                time_limit=time_limit_per_child,
+                silent=silent,
+                log_prefix="\t",
+                importance_as_list=True,
+                **kwargs,
+            )
+            fi_fold_list.append(fi_fold)
 
-                children_completed += 1
-                if time_limit is not None and children_completed != self.n_children:
-                    time_now = time.time()
-                    time_left = time_limit - (time_now - time_start)
-                    time_child_average = (time_now - time_start) / children_completed
-                    if time_left < (time_child_average * 1.1):
-                        log_final_suffix = f" (Early stopping due to lack of time...)"
-                        early_stop = True
-                        break
-            if early_stop:
-                break
-            model_index += k
+            children_completed += 1
+            if time_limit is not None and children_completed != self.n_children:
+                time_now = time.time()
+                time_left = time_limit - (time_now - time_start)
+                time_child_average = (time_now - time_start) / children_completed
+                if time_left < (time_child_average * 1.1):
+                    log_final_suffix = f" (Early stopping due to lack of time...)"
+                    break
         # TODO: DON'T THROW AWAY SAMPLES! USE LARGER N
         fi_list_dict = dict()
         for val in fi_fold_list:
