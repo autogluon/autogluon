@@ -152,3 +152,29 @@ def test_category_feature_generator_fillna_rare_object_categories():
 def test_category_feature_generator_invalid_fillna():
     with pytest.raises(ValueError, match="is not a valid value"):
         CategoryFeatureGenerator(fillna="not_a_method")
+
+
+def test_category_feature_generator_mixed_type_categories():
+    """Categories of mixed types are ranked without comparing their values, which raised a TypeError.
+
+    A boolean column with missing values, as `pd.read_csv` returns for True/False/empty cells, has such categories once
+    `FillNaFeatureGenerator` fills the missing values with "".
+    """
+    values = [True, False, "", True, False, "", True, ""]
+    input_data = pd.DataFrame({"flag": pd.Series(values, dtype=object)})
+
+    output_data = CategoryFeatureGenerator(minimize_memory=False).fit_transform(input_data)
+
+    assert list(output_data["flag"].astype(object)) == values
+
+
+def test_category_feature_generator_count_ties_keep_category_order():
+    """Categories with the same count are ranked in the order of their categories, not of their values."""
+    categories = ["d", "c", "b", "a"]
+    input_data = pd.DataFrame({"cat": pd.Categorical(["b", "a", "b", "a", "c", "c", "d"], categories=categories)})
+
+    generator = CategoryFeatureGenerator(minimum_cat_count=None, maximum_num_cat=2, minimize_memory=False)
+    output_data = generator.fit_transform(input_data)
+
+    # c, b and a all occur twice: the last two in category order are kept
+    assert list(output_data["cat"].cat.categories) == ["b", "a"]
