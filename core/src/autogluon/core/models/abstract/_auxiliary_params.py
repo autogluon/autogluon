@@ -61,6 +61,11 @@ class AuxiliaryParams:
     """GPU counterpart of max_memory_usage_ratio: ratio of available VRAM the model is allowed to use.
     Only checked for models that define a GPU memory estimate (see `_estimate_gpu_memory_usage`).
     If None, GPU memory checks are skipped."""
+    max_estimated_time_ratio: float | None = 1.0
+    """Ratio of the time left that a model's estimated fit time may take: a model whose estimate
+    exceeds `time_limit * max_estimated_time_ratio` is skipped before it starts. Only checked for
+    models that define a fit-time estimate (see `_estimate_fit_time`), typically models that cannot
+    stop early. If None, fit-time checks are skipped."""
     max_time_limit_ratio: float = 1.0
     """Ratio of given time_limit to use during fit(). If time_limit == 10 and max_time_limit_ratio=0.3,
     time_limit would be changed to 3."""

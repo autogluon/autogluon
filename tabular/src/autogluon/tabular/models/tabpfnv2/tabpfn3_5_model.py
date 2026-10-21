@@ -4,6 +4,7 @@ from typing import ClassVar
 
 import pandas as pd
 
+from .tabpfn3_model import estimate_fit_time_v3
 from .tabpfnv2_5_model import TabPFNModel
 
 
@@ -84,6 +85,32 @@ class TabPFN35Model(TabPFNModel):
         baseline_mem_est = 3.6e9
         preprocessing_mem_est = 10 * 8 * (n_train + n_test) * min(n_features, 2000)
         return int(baseline_mem_est + preprocessing_mem_est)
+
+    @classmethod
+    def _estimate_fit_time_static(
+        cls,
+        *,
+        X: pd.DataFrame,
+        X_val: pd.DataFrame | None = None,
+        hyperparameters: dict | None = None,
+        num_gpus: int | float = 0,
+        **kwargs,
+    ) -> float | None:
+        """Seconds to fit and predict the validation rows on GPU; see `estimate_fit_time_v3`."""
+        hyperparameters = hyperparameters or {}
+        n_train, n_features = X.shape
+        max_batch_size = hyperparameters.get("ag.max_batch_size", "auto")
+        if max_batch_size == "auto":
+            max_batch_size = cls._resolve_auto_max_batch_size(n_train=n_train)
+        return estimate_fit_time_v3(
+            n_train=n_train,
+            n_val=0 if X_val is None else len(X_val),
+            n_features=n_features,
+            n_estimators=hyperparameters.get("n_estimators", "auto"),
+            max_batch_size=max_batch_size,
+            num_gpus=num_gpus,
+            fit_mode=hyperparameters.get("fit_mode", "fit_preprocessors"),
+        )
 
     @classmethod
     def _estimate_gpu_memory_usage_static(
