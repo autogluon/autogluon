@@ -5,6 +5,7 @@ R_FLOAT = "float"
 R_OBJECT = "object"
 R_CATEGORY = "category"
 R_DATETIME = "datetime"
+R_TIMEDELTA = "timedelta"
 R_BOOL = "bool"  # TODO: R_BOOL/R_BOOLEAN?
 # TODO: R_FLOAT_SPARSE/R_INT_SPARSE/R_CATEGORY_SPARSE?
 

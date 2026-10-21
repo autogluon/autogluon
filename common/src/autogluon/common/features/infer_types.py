@@ -45,6 +45,8 @@ def _get_type_family_raw(dtype) -> tuple[str, bool]:
             return "category", cacheable
         if "datetime" in dtype.name:
             return "datetime", cacheable
+        if dtype.kind == "m":  # timedelta64 is a subtype of np.integer, so it has to be caught first
+            return "timedelta", cacheable
         if "string" in dtype.name:
             return "object", cacheable
         elif np.issubdtype(dtype, np.integer):
