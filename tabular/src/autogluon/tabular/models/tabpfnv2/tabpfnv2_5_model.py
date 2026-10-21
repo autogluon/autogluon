@@ -172,6 +172,8 @@ class TabPFNModel(AbstractTorchModel):
         self._cat_indices = None
         # `ag.max_batch_size="auto"` resolved against the training size during `_fit`.
         self._max_batch_size_resolved: int | None = None
+        #: Rows of the training context, set during `_fit`.
+        self._n_train_fit: int | None = None
 
     def _default_model_map(self) -> dict[str, str | None]:
         fallback = {
@@ -224,6 +226,7 @@ class TabPFNModel(AbstractTorchModel):
         # "auto" prediction chunking resolves against the training size (see
         # `_resolve_auto_max_batch_size`). None disables chunking entirely. The resolved
         # value is fit state (read via `_get_max_batch_size`), not a params_aux mutation.
+        self._n_train_fit = len(X)
         if self.aux_params.max_batch_size == "auto":
             self._max_batch_size_resolved = self._resolve_auto_max_batch_size(n_train=len(X))
 
@@ -411,6 +414,10 @@ class TabPFNModel(AbstractTorchModel):
         if max_batch_size == "auto":
             return self._max_batch_size_resolved
         return max_batch_size
+
+    def _estimate_gpu_memory_usage(self, X: pd.DataFrame, **kwargs) -> int | None:
+        # The prediction batch sizes the estimate, and `_get_model_params()` leaves out the `ag.` parameters.
+        return super()._estimate_gpu_memory_usage(X=X, max_batch_size=self.aux_params.max_batch_size, **kwargs)
 
     def get_device(self) -> str:
         return self.model.devices_[0].type

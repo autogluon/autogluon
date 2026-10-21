@@ -4,7 +4,12 @@ from typing import ClassVar
 
 import pandas as pd
 
-from .tabpfn3_model import estimate_fit_time_v3
+from .tabpfn3_model import (
+    estimate_fit_time_v3,
+    estimate_gpu_memory_v3_5,
+    n_pred_for_gpu_memory_estimate_v3,
+    prediction_batch_size_v3,
+)
 from .tabpfnv2_5_model import TabPFNModel
 
 
@@ -36,7 +41,9 @@ class TabPFN35Model(TabPFNModel):
     """Every prediction chunk re-runs the forward pass over the whole training
     context, so a chunk costs about as much as a predict on the training set even
     when it holds a few rows; chunks smaller than the training set multiply predict
-    time while saving little memory."""
+    time while saving little memory.
+    The GPU memory check covers a prediction batch of this size (or the training size,
+    if smaller), the smallest batch "auto" settles for when the free memory is short."""
 
     max_batch_size_slack: int = 100_000
     """A held-out fold of a two-fold bag is at most one row, or a few group or time
@@ -56,7 +63,8 @@ class TabPFN35Model(TabPFNModel):
         "max_classes": 160,
         # max_batch_size (prediction chunking) is the model's only bound on
         # test-side VRAM (peak grows linearly in unchunked prediction rows);
-        # "auto" resolves at fit time to min(1M, n_train + 100k).
+        # "auto" predicts in the largest batch that fits the free GPU memory, at most
+        # min(1M, n_train + 100k) rows.
         "max_batch_size": "auto",
         "model_telemetry": False,
     }
@@ -119,30 +127,40 @@ class TabPFN35Model(TabPFNModel):
         X: pd.DataFrame,
         hyperparameters: dict | None = None,
         problem_type: str | None = None,
+        X_val: pd.DataFrame | None = None,
         **kwargs,
     ) -> int:
-        """Peak VRAM (reserved + CUDA context) across fit and prediction.
-
-        Train rows persist as attention context (~50 KB/row for classification, ~40 KB/row
-        for regression) while prediction rows are transient and bounded by the fit-time
-        prediction batch (see :meth:`_n_test_for_memory_estimate`). A prediction row costs
-        ~30 KB for classification and ~180 KB for regression, whose distributional output
-        dominates at large prediction batches. Features cost ~17 MB each, saturating at ~1000
-        where internal subsampling caps the cost.
-
-        Calibrated on synthetic measurements up to 300k train rows / 300k prediction rows /
-        20k features, including prediction batches smaller than the training set: 1.06-1.43x
-        of measured, no underestimates.
-        """
+        """Peak VRAM of the fit and the prediction batch it is checked on; see `estimate_gpu_memory_v3` and
+        `n_pred_for_gpu_memory_estimate_v3`."""
+        hyperparameters = hyperparameters or {}
         n_train, n_features = X.shape
-        n_test = cls._n_test_for_memory_estimate(n_train=n_train, hyperparameters=hyperparameters)
-        if problem_type in ("regression", "quantile"):
-            floor_mem_est, train_row_mem_est, test_row_mem_est = 2.0e9, 40e3, 180e3
-        else:
-            floor_mem_est, train_row_mem_est, test_row_mem_est = 1.8e9, 50e3, 30e3
-        return int(
-            floor_mem_est  # CUDA context + model weights floor
-            + train_row_mem_est * n_train
-            + test_row_mem_est * n_test
-            + 17e6 * min(n_features, 1000)
+        n_pred = n_pred_for_gpu_memory_estimate_v3(
+            n_train=n_train,
+            n_val=None if X_val is None else len(X_val),
+            max_batch_size=kwargs.get("max_batch_size", hyperparameters.get("ag.max_batch_size", "auto")),
+            batch_min=cls.max_batch_size_min,
         )
+        return cls._estimate_gpu_memory_for_batch(
+            n_train=n_train,
+            n_pred=n_pred,
+            n_features=n_features,
+            hyperparameters=hyperparameters,
+            problem_type=problem_type,
+        )
+
+    @classmethod
+    def _estimate_gpu_memory_for_batch(
+        cls, *, n_train: int, n_pred: int, n_features: int, hyperparameters: dict, problem_type: str | None
+    ) -> int:
+        """Peak VRAM of a fit on ``n_train`` rows that predicts a batch of ``n_pred`` rows; see
+        `estimate_gpu_memory_v3_5`."""
+        return estimate_gpu_memory_v3_5(
+            n_train=n_train,
+            n_pred=n_pred,
+            n_features=n_features,
+            n_estimators=hyperparameters.get("n_estimators", "auto"),
+            problem_type=problem_type,
+        )
+
+    def _get_max_batch_size(self) -> int | None:
+        return prediction_batch_size_v3(self, super()._get_max_batch_size())
