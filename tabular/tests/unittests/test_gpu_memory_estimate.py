@@ -5,6 +5,7 @@ import pandas as pd
 import pytest
 
 from autogluon.common.utils.resource_utils import ResourceManager
+from autogluon.core.models import BaggedEnsembleModel
 from autogluon.core.models.dummy.dummy_model import DummyModel
 from autogluon.core.utils.exceptions import NotEnoughCudaMemoryError
 
@@ -72,3 +73,50 @@ def test__estimate_gpu_memory_usage_static__not_implemented_by_default():
 def test__get_available_vram__returns_bytes_or_none():
     vram = ResourceManager.get_available_vram()
     assert vram is None or (isinstance(vram, float) and vram > 0)
+
+
+class RefitVramDummyModel(DummyModel):
+    """Fails its GPU memory check on more than 15 training rows, with or without GPUs, and counts its fits."""
+
+    fits: list[int] = []
+
+    def _validate_fit_gpu_memory_usage(self, X: pd.DataFrame | None = None, **kwargs):
+        if X is not None and len(X) > 15:
+            raise NotEnoughCudaMemoryError
+        return None, None
+
+    def _fit(self, X: pd.DataFrame, **kwargs):
+        type(self).fits.append(len(X))
+        return super()._fit(X=X, **kwargs)
+
+    def _more_tags(self) -> dict:
+        return {"can_refit_full": True}
+
+
+def _refit_bag(tmp_path, refit_folds) -> BaggedEnsembleModel:
+    RefitVramDummyModel.fits = []
+    base = RefitVramDummyModel(path=str(tmp_path), name="Dummy", problem_type="binary", eval_metric="accuracy")
+    return BaggedEnsembleModel(
+        model_base=base,
+        path=str(tmp_path),
+        name="Dummy_BAG",
+        hyperparameters={"fold_fitting_strategy": "sequential_local", "refit_folds": refit_folds},
+    )
+
+
+@pytest.mark.parametrize("refit_folds", [True, "after_ensemble"])
+def test__bagged_refit__gpu_memory_checked_before_the_folds(tmp_path, refit_folds):
+    """Each fold (10 of 20 rows) passes its own check, but the refit on all 20 rows would not: the
+    bag is skipped before it fits a fold, not after fitting them all."""
+    X = pd.DataFrame({"a": np.arange(20.0)})
+    y = pd.Series([0, 1] * 10)
+    with pytest.raises(NotEnoughCudaMemoryError):
+        _refit_bag(tmp_path, refit_folds).fit(X=X, y=y, k_fold=2)
+    assert RefitVramDummyModel.fits == []
+
+
+def test__bagged_without_refit__folds_check_their_own_rows(tmp_path):
+    X = pd.DataFrame({"a": np.arange(20.0)})
+    y = pd.Series([0, 1] * 10)
+    _refit_bag(tmp_path, False).fit(X=X, y=y, k_fold=2)
+    assert RefitVramDummyModel.fits == [10, 10]
