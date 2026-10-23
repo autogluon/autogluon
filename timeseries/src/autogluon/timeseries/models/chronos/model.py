@@ -529,6 +529,10 @@ class ChronosModel(AbstractTimeSeriesModel):
 
             fine_tune_trainer_kwargs = model_params["fine_tune_trainer_kwargs"]
             fine_tune_trainer_kwargs["use_cpu"] = str(self.model_pipeline.inner_model.device) == "cpu"
+            if "seed" not in fine_tune_trainer_kwargs:
+                # transformers.Trainer reseeds all RNGs with `seed` (42 by default), so derive it from the current
+                # random state. Otherwise fine-tuning gives the same result for every random_seed.
+                fine_tune_trainer_kwargs["seed"] = int(np.random.randint(np.iinfo(np.int32).max))
 
             if fine_tune_trainer_kwargs["use_cpu"]:
                 logger.info(

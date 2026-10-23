@@ -5,6 +5,7 @@ import pytest
 import torch
 
 from autogluon.common import space
+from autogluon.common.utils.utils import seed_everything
 from autogluon.core.utils.exceptions import TimeLimitExceeded
 from autogluon.timeseries import TimeSeriesPredictor
 from autogluon.timeseries.models import ChronosModel
@@ -492,6 +493,31 @@ def test_when_chronos_bolt_fine_tuned_with_custom_quantiles_then_loaded_model_ha
     predictions = loaded_model.predict(DUMMY_TS_DATAFRAME)
     assert not predictions.isna().any().any()
     assert predictions.columns.tolist() == ["mean"] + [str(q) for q in custom_quantiles]
+
+
+def _fine_tune_and_predict_with_seed(seed: int, path: str) -> np.ndarray:
+    seed_everything(seed)
+    model = ChronosModel(
+        path=path,
+        hyperparameters={
+            "model_path": CHRONOS_BOLT_MODEL_PATH,
+            "fine_tune": True,
+            "fine_tune_steps": 3,
+            "fine_tune_batch_size": 4,
+            "device": "cpu",
+        },
+    )
+    model.fit(DUMMY_TS_DATAFRAME)
+    return model.predict(DUMMY_TS_DATAFRAME).values
+
+
+def test_when_fine_tuned_with_different_random_seeds_then_predictions_differ(tmp_path):
+    predictions_seed_1 = _fine_tune_and_predict_with_seed(1, str(tmp_path / "seed_1"))
+    predictions_seed_1_again = _fine_tune_and_predict_with_seed(1, str(tmp_path / "seed_1_again"))
+    predictions_seed_2 = _fine_tune_and_predict_with_seed(2, str(tmp_path / "seed_2"))
+
+    assert np.allclose(predictions_seed_1, predictions_seed_1_again)
+    assert not np.allclose(predictions_seed_1, predictions_seed_2)
 
 
 def test_when_chronos_bolt_no_fine_tune_with_custom_quantiles_then_original_quantiles_preserved():
