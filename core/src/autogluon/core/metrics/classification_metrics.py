@@ -230,7 +230,8 @@ def pac(solution, prediction):
                     f"classification problem"
                 )
             elif prediction.shape[1] == 2:
-                prediction = prediction[:, 1]
+                # (n, 1) like `solution`: as 1-D, `solution * log(prediction)` broadcast to (n, n)
+                prediction = prediction[:, 1].reshape((-1, 1))
             else:
                 # Prediction will be copied into a new binary array - no copy
                 prediction = prediction.reshape((-1, 1))
