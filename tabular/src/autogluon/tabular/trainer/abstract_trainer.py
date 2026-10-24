@@ -5742,7 +5742,11 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         return calibrate_decision_threshold(
             y=y,
             y_pred_proba=y_pred_proba,
-            metric=lambda y, y_pred: self.score_with_y_pred(y=y, y_pred=y_pred, weights=weights, metric=metric),
+            # The weights go through `sample_weight` so they are subsampled with `y` (`subsample_size`)
+            metric=lambda y, y_pred, sample_weight=None: self.score_with_y_pred(
+                y=y, y_pred=y_pred, weights=sample_weight, metric=metric
+            ),
+            sample_weight=weights,
             decision_thresholds=decision_thresholds,
             secondary_decision_thresholds=secondary_decision_thresholds,
             metric_name=metric.name,

@@ -103,6 +103,9 @@ class EnsembleSelection(AbstractWeightedEnsemble):
             labels = labels[subsample_indices]
             # rebuild rather than assign into `predictions`, which would mutate the caller's list
             predictions = [pred[subsample_indices] for pred in predictions]
+            if sample_weight is not None:
+                # full-length weights do not match the subsampled labels, and `compute_metric` then scores unweighted
+                sample_weight = np.asarray(sample_weight)[subsample_indices]
 
         # if self.sorted_initialization:
         #     n_best = 20
