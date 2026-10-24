@@ -459,3 +459,50 @@ def test_get_metric_raw_callable_fails_fast():
 
     # Valid: `metric=None` means "use the default" and must keep passing through.
     assert get_metric(None, problem_type=REGRESSION, metric_type="eval_metric") is None
+
+
+_Y_TRUE_BINARY = np.array([0, 1, 1, 0, 1, 0, 1, 1])
+# 0.5 is a tie, which is class 0 both for the 2-column form (argmax picks the first column) and for `get_pred_from_proba`
+_Y_PRED_PROBA_BINARY = np.array([0.2, 0.9, 0.4, 0.1, 0.8, 0.6, 0.7, 0.5])
+_custom_class_metric = make_scorer(
+    "custom_accuracy", lambda y_true, y_pred: float(np.mean(y_true == y_pred)), needs_class=True
+)
+
+
+@pytest.mark.parametrize(
+    "scorer",
+    [METRICS[BINARY][metric] for metric in METRICS_NEEDS_CLASS[BINARY]] + [_custom_class_metric],
+    ids=METRICS_NEEDS_CLASS[BINARY] + ["custom_accuracy"],
+)
+def test_class_metrics_single_column_predictions(scorer):
+    """An (n, 1) column of classes scores like the same classes in 1-D.
+
+    Compared with the 1-D `y_true`, the column broadcast to an (n, n) matrix: `quadratic_kappa` returned NaN and an
+    accuracy written with `y_true == y_pred` scored 0.53 instead of 0.75.
+    """
+    y_pred = (_Y_PRED_PROBA_BINARY > 0.5).astype(int)
+    assert isclose(scorer(_Y_TRUE_BINARY, y_pred.reshape(-1, 1)), scorer(_Y_TRUE_BINARY, y_pred))
+
+
+@pytest.mark.parametrize(
+    "scorer",
+    [METRICS[BINARY][metric] for metric in METRICS_NEEDS_CLASS[BINARY]] + [_custom_class_metric],
+    ids=METRICS_NEEDS_CLASS[BINARY] + ["custom_accuracy"],
+)
+def test_class_metrics_binary_positive_class_proba(scorer):
+    """1-D positive-class probabilities score like the 2-column probabilities, and like the classes they imply."""
+    expected = scorer(_Y_TRUE_BINARY, (_Y_PRED_PROBA_BINARY > 0.5).astype(int))
+    y_pred_proba_2d = np.stack([1 - _Y_PRED_PROBA_BINARY, _Y_PRED_PROBA_BINARY], axis=1)
+    assert isclose(scorer(_Y_TRUE_BINARY, y_pred_proba_2d), expected)
+    assert isclose(scorer(_Y_TRUE_BINARY, _Y_PRED_PROBA_BINARY), expected)
+    assert isclose(scorer(_Y_TRUE_BINARY, _Y_PRED_PROBA_BINARY.reshape(-1, 1)), expected)
+
+
+@pytest.mark.parametrize("metric", REGRESSION_METRICS, ids=REGRESSION_METRICS)
+def test_regression_metrics_single_column_predictions(metric: str):
+    """An (n, 1) column of predictions scores like the same predictions in 1-D (`root_mean_squared_error` returned a
+    ~10x larger error, as the column broadcast against `y_true` to an (n, n) matrix)."""
+    scorer = METRICS[REGRESSION][metric]
+    y_true = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
+    y_pred = np.array([1.1, 1.9, 3.2, 3.8, 5.3])
+    assert isclose(scorer(y_true, y_pred.reshape(-1, 1)), scorer(y_true, y_pred))
