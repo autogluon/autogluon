@@ -255,7 +255,7 @@ def mousover_plot(
     TOOLS = "crosshair,pan,wheel_zoom,box_zoom,reset,hover,save"
     p = figure(title=plot_title, tools=TOOLS)
     if attr_x_is_string:
-        circ = p.circle(
+        circ = p.scatter(
             attr_x2,
             attr_y,
             line_color=default_color,
@@ -263,10 +263,11 @@ def mousover_plot(
             fill_color=default_color,
             fill_alpha=point_transparency,
             size=point_size,
+            marker="circle",
             source=source,
         )
     else:
-        circ = p.circle(
+        circ = p.scatter(
             attr_x,
             attr_y,
             line_color=default_color,
@@ -274,6 +275,7 @@ def mousover_plot(
             fill_color=default_color,
             fill_alpha=point_transparency,
             size=point_size,
+            marker="circle",
             source=source,
         )
     hover = p.select(dict(type=HoverTool))
