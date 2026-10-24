@@ -248,7 +248,9 @@ def test_datetime_feature_generator_permuted_index_fill_value(data_helper):
     generator = DatetimeFeatureGenerator()
     generator.fit_transform(permuted)
 
-    good = pd.to_datetime(pd.Series([v for v in values if v != "not-a-date"]), utc=True).astype(np.int64)
+    good = (
+        pd.to_datetime(pd.Series([v for v in values if v != "not-a-date"]), utc=True).dt.as_unit("ns").astype(np.int64)
+    )
     assert generator._fillna_map["datetime_as_object"] == pd.to_datetime(int(good.mean()), utc=True)
 
 
@@ -268,7 +270,7 @@ def test_datetime_feature_generator_duplicate_index(data_helper):
     generator = DatetimeFeatureGenerator()
     output = generator.fit_transform(duplicated)
 
-    good = pd.to_datetime(pd.Series(values[1:]), utc=True).astype(np.int64)
+    good = pd.to_datetime(pd.Series(values[1:]), utc=True).dt.as_unit("ns").astype(np.int64)
     expected_fill = pd.to_datetime(int(good.mean()), utc=True)
     assert generator._fillna_map["datetime_as_object"] == expected_fill
     # the invalid row was filled with the mean rather than left as NaT

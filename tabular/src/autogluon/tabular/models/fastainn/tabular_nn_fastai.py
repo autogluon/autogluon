@@ -26,7 +26,7 @@ from autogluon.common.features.types import (
     S_TEXT_NGRAM,
     S_TEXT_SPECIAL,
 )
-from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
+from autogluon.common.utils.pandas_utils import fillna_without_downcast, get_approximate_df_mem_usage
 from autogluon.common.utils.random import get_numpy_seed
 from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.common.utils.try_import import try_import_fastai
@@ -260,7 +260,7 @@ class NNFastAiTabularModel(AbstractModel):
                 # TODO: Remove warning later as a follow up to https://github.com/autogluon/autogluon/pull/3734
                 with warnings.catch_warnings():
                     warnings.simplefilter(action="ignore", category=FutureWarning)
-                    df = df.fillna(column_fills, inplace=False, downcast=False)
+                    df = fillna_without_downcast(df, column_fills)
             else:
                 df = df.copy()
         else:

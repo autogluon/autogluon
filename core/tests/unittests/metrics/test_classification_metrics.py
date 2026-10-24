@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 import sklearn
 
-from autogluon.core.metrics import confusion_matrix, log_loss, quadratic_kappa, roc_auc
+from autogluon.core.metrics import confusion_matrix, log_loss, pac, quadratic_kappa, roc_auc
 from autogluon.core.metrics.softclass_metrics import soft_log_loss
 
 
@@ -241,3 +241,11 @@ def test_quadratic_kappa():
     preds = np.array([[0.8, 0.1, 0.1], [0.7, 0.1, 0.2], [0.1, 0.8, 0.1], [0.1, 0.1, 0.8]])
     value = quadratic_kappa(actuals, preds)
     assert value == 0.25
+
+
+def test_pac_does_not_write_into_y_true():
+    """`pac` binarizes the labels in place: on a read-only array, as a pandas>=3 Series provides, it raised."""
+    y_true = np.array([0, 1, 1, 0, 1])
+    y_true.setflags(write=False)
+    y_pred = np.array([0.2, 0.8, 0.7, 0.4, 0.9])
+    assert pac(y_true, y_pred) == pytest.approx(pac(y_true.copy(), y_pred))

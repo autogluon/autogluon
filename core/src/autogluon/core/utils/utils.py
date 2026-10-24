@@ -518,10 +518,14 @@ def generate_train_test_split(
                 y_split = y.drop(index=rare_indices)
                 stratify = y_split
 
+    # Split row positions and take the labels with `iloc` rather than splitting `y_split.values`: for an Arrow-backed
+    # label, the default for strings on pandas>=3 (and `string[pyarrow]` before), `.values` is an Arrow array that
+    # scikit-learn cannot index. Taking the labels from `y_split` also keeps their dtype.
+    positions = np.arange(len(y_split))
     try:
         X_train, X_test, y_train, y_test = train_test_split(
             X_split,
-            y_split.values,
+            positions,
             test_size=test_size,
             train_size=train_size,
             shuffle=True,
@@ -538,7 +542,7 @@ def generate_train_test_split(
             raise
         X_train, X_test, y_train, y_test = train_test_split(
             X_split,
-            y_split.values,
+            positions,
             test_size=test_size,
             train_size=train_size,
             shuffle=True,
@@ -548,9 +552,8 @@ def generate_train_test_split(
         if len(y_test) >= len(y_split.unique()):
             # This should never occur, otherwise the original exception is not an expected one
             raise
-    cls_y = type(y)
-    y_train = cls_y(y_train, index=X_train.index)
-    y_test = cls_y(y_test, index=X_test.index)
+    y_train = y_split.iloc[y_train]
+    y_test = y_split.iloc[y_test]
 
     if rare_indices:
         X_train = pd.concat([X_train, X.loc[rare_indices]])
@@ -639,10 +642,10 @@ def infer_problem_type(y: Series, silent=False) -> str:
     if unique_count == 2:
         problem_type = BINARY
         reason = "only two unique label-values observed"
-    elif y.dtype.name in ["object", "category", "string"]:
+    elif y.dtype.name in ["object", "category", "string", "str"]:
         problem_type = MULTICLASS
         reason = f"dtype of label-column == {y.dtype.name}"
-    elif np.issubdtype(y.dtype, np.floating):
+    elif pd.api.types.is_float_dtype(y.dtype):
         unique_ratio = unique_count / float(num_rows)
         if (unique_ratio <= regression_threshold) and (unique_count <= MULTICLASS_UPPER_LIMIT):
             try:
@@ -659,7 +662,7 @@ def infer_problem_type(y: Series, silent=False) -> str:
         else:
             problem_type = REGRESSION
             reason = "dtype of label-column == float and many unique label-values observed"
-    elif np.issubdtype(y.dtype, np.integer):
+    elif pd.api.types.is_integer_dtype(y.dtype):
         unique_ratio = unique_count / float(num_rows)
         if (unique_ratio <= regression_threshold) and (unique_count <= MULTICLASS_UPPER_LIMIT):
             problem_type = MULTICLASS  # TODO: Check if integers are from 0 to n-1 for n unique values, if they have a wide spread, it could still be regression

@@ -225,3 +225,21 @@ def test_generate_train_test_split_edgecase():
                 X_train, X_test, y_train, y_test = generate_train_test_split(
                     X=data, y=data["label"], problem_type=problem_type, test_size=test_size / len(data)
                 )
+
+
+@pytest.mark.parametrize("dtype", ["object", "string[pyarrow]", "category"])
+def test_generate_train_test_split_label_dtypes(dtype):
+    """The split works for any label dtype and keeps it.
+
+    An Arrow-backed string label, the default for strings on pandas>=3 (`string[pyarrow]` before), used to raise
+    `TypeError: only integer scalar arrays can be converted to a scalar index` in scikit-learn's indexing.
+    """
+    X = pd.DataFrame({"a": range(20)})
+    y = pd.Series(["x", "y"] * 10, dtype=dtype, name="label")
+    X_train, X_test, y_train, y_test = generate_train_test_split(X, y, problem_type="binary", test_size=0.25)
+    assert y_train.dtype == y.dtype
+    assert y_test.dtype == y.dtype
+    assert list(y_train.index) == list(X_train.index)
+    assert list(y_test.index) == list(X_test.index)
+    assert (y_train == y.loc[y_train.index]).all()
+    assert len(y_test) == 5

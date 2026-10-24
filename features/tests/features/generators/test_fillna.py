@@ -2,6 +2,7 @@ import copy
 
 import numpy as np
 
+from autogluon.common.utils.pandas_utils import PANDAS_V3_OR_NEWER
 from autogluon.features.generators import FillNaFeatureGenerator
 
 
@@ -9,18 +10,19 @@ from autogluon.features.generators import FillNaFeatureGenerator
 def test_fillna_feature_generator(generator_helper, data_helper):
     # Given
     input_data = data_helper.generate_multi_feature_full()
-    expected_output_data = input_data.fillna(
-        {
-            "int": np.nan,
-            "float": np.nan,
-            "obj": "",
-            "cat": np.nan,
-            "datetime": np.nan,
-            "text": "",
-            "datetime_as_object": "",
-        },
-        downcast=False,
-    )
+    fill_map = {
+        "int": np.nan,
+        "float": np.nan,
+        "obj": "",
+        "cat": np.nan,
+        "datetime": np.nan,
+        "text": "",
+        "datetime_as_object": "",
+    }
+    # pandas 3 removed `downcast=`; silent downcasting is off by default, so object
+    # columns stay object without it, the same intended behaviour.
+    extra_kwargs = {} if PANDAS_V3_OR_NEWER else {"downcast": False}
+    expected_output_data = input_data.fillna(fill_map, **extra_kwargs)
 
     generator = FillNaFeatureGenerator()
 
