@@ -73,6 +73,10 @@ def balanced_accuracy(solution, prediction):
 
     fn = np.sum(np.multiply(solution, (1 - prediction)), axis=0, dtype=float)
     tp = np.sum(np.multiply(solution, prediction), axis=0, dtype=float)
+    # A class with no samples in `solution` has no recall, so it is left out of the average, as in sklearn's
+    # `balanced_accuracy_score`. The bounding below would give it a recall of 1: a class found only in `prediction`
+    # raised the score, so predicting a class absent from `solution` scored better than predicting a present one.
+    pos_present = (tp + fn) > 0
     # Bounding to avoid division by 0
     eps = 1e-15
     tp = np.maximum(eps, tp)
@@ -82,12 +86,16 @@ def balanced_accuracy(solution, prediction):
     if y_type in ("binary", "multilabel-indicator"):
         tn = np.sum(np.multiply((1 - solution), (1 - prediction)), axis=0, dtype=float)
         fp = np.sum(np.multiply((1 - solution), prediction), axis=0, dtype=float)
+        neg_present = (tn + fp) > 0
         tn = np.maximum(eps, tn)
         neg_num = np.maximum(eps, tn + fp)
         tnr = tn / neg_num  # true negative rate (specificity)
-        bac = 0.5 * (tpr + tnr)
+        if y_type == "binary":
+            bac = np.array([tnr, tpr])[np.array([neg_present, pos_present])]
+        else:
+            bac = 0.5 * (tpr + tnr)
     elif y_type == "multiclass":
-        bac = tpr
+        bac = tpr[pos_present]
     else:
         raise ValueError(y_type)
 
