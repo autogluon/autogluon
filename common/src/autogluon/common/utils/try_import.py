@@ -23,6 +23,18 @@ __all__ = [
 logger = logging.getLogger(__name__)
 
 
+def _maybe_ensure_macos_openmp_fixed() -> None:
+    """Best-effort dual-libomp fix on Darwin before loading native extensions.
+
+    See ``autogluon.common.utils.macos_openmp``. Never raises.
+    """
+    if sys.platform != "darwin":
+        return
+    from .macos_openmp import ensure_fixed
+
+    ensure_fixed()
+
+
 def try_import_mxboard():
     try:
         import mxboard
@@ -87,6 +99,8 @@ def try_import_catboost():
 
 
 def try_import_lightgbm():
+    # On macOS, rewrite lightgbm→torch libomp before the extension loads (AutoGluon#5793).
+    _maybe_ensure_macos_openmp_fixed()
     try:
         import lightgbm
     except ImportError as e:
@@ -96,8 +110,11 @@ def try_import_lightgbm():
         )
     except OSError as e:
         raise ImportError(
-            "`import lightgbm` failed. If you are using Mac OSX, "
-            "Please try 'brew install libomp'. Detailed info: {}".format(str(e))
+            "`import lightgbm` failed. If you are using macOS, try `brew install libomp`. "
+            "If multi-threaded torch+lightgbm training segfaults, AutoGluon attempts an automatic "
+            "OpenMP load-path fix on import; you can also run "
+            "`python -m autogluon.common.utils.macos_openmp fix` (AutoGluon#5793). "
+            "Detailed info: {}".format(str(e))
         )
 
 
@@ -154,6 +171,7 @@ def try_import_fastai():
 
 
 def try_import_torch():
+    _maybe_ensure_macos_openmp_fixed()
     try:
         import torch
     except ImportError as e:
