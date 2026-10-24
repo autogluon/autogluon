@@ -12,6 +12,11 @@ from ..common import CHRONOS2_MODEL_PATH, DEVICE_TEST_CASES
 
 
 class TestChronos2Inference:
+    def test_when_chronos2_initialized_then_allow_nan_covariates_is_true(self, tmp_path):
+        model = Chronos2Model(path=str(tmp_path), hyperparameters={"model_path": CHRONOS2_MODEL_PATH})
+        assert model._get_tags()["allow_nan_covariates"] is True
+        assert model._get_tags()["allow_nan"] is True
+
     @pytest.fixture()
     def chronos2_model(self, tmp_path_factory):
         return Chronos2Model(

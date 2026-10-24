@@ -119,12 +119,17 @@ class TimeSeriesFeatureGenerator:
 
     All covariates & static features are converted into either float or categorical dtype.
 
-    Missing values in the target column are left as-is but missing values in static features & covariates are imputed.
+    Missing values in the target column are left as-is. Missing values in static features and **categorical**
+    covariates are imputed here. Missing values in **real** dynamic covariates (past / known) are left as-is so
+    that models can handle them natively (e.g. Chronos-2) or impute in model-specific preprocessing via
+    :meth:`impute_real_covariates`.
+
     Imputation logic is as follows:
     1. For all categorical columns (static, past, known), we fill missing values with the mode of the training set.
     2. For real static features, we impute missing values with the median of the training set.
-    3. For real covariates (past, known), we ffill + bfill within each time series. If for some time series all
-        covariate values are missing, we fill them with the median of the training set.
+    3. For real covariates (past, known), missing values are preserved. Models that cannot handle NaNs should call
+       :meth:`impute_real_covariates` (ffill + bfill within each series, then train median for all-NaN series).
+       Training medians are still computed during fit for that purpose.
 
     Parameters
     ----------
@@ -271,8 +276,8 @@ class TimeSeriesFeatureGenerator:
 
         df_out = self._concat_dfs(dfs_to_concat)
         df_out.index = index
-        ts_df = TimeSeriesDataFrame(df_out, static_features=self._impute_static_features(static_features_df))
-        return self._impute_covariates(ts_df, column_names=self.covariate_metadata.covariates_real)
+        # Real dynamic covariates may contain NaNs; models impute if needed (see allow_nan_covariates tag).
+        return TimeSeriesDataFrame(df_out, static_features=self._impute_static_features(static_features_df))
 
     @staticmethod
     def _concat_dfs(dfs_to_concat: list[pd.DataFrame]) -> pd.DataFrame:
@@ -281,15 +286,46 @@ class TimeSeriesFeatureGenerator:
         else:
             return pd.concat(dfs_to_concat, axis=1, copy=False)
 
+    def impute_real_covariates(
+        self, ts_df: TimeSeriesDataFrame, column_names: list[str] | None = None
+    ) -> TimeSeriesDataFrame:
+        """Impute missing values in real-valued dynamic covariates with ffill, bfill, and train median.
+
+        Used by models that cannot handle NaNs in covariates. The unified feature generator leaves real
+        dynamic covariate NaNs in place so models with native NaN support can keep them.
+
+        Parameters
+        ----------
+        ts_df
+            Data frame whose real covariate columns may contain NaNs.
+        column_names
+            Columns to impute. Defaults to all real past/known covariates seen during fit.
+        """
+        assert self._is_fit, f"{self.__class__.__name__} has not been fit yet"
+        if column_names is None:
+            column_names = self.covariate_metadata.covariates_real
+        return self._impute_covariates(ts_df, column_names=column_names)
+
     def _impute_covariates(self, ts_df: TimeSeriesDataFrame, column_names: list[str]) -> TimeSeriesDataFrame:
-        """Impute missing values in selected columns with ffill, bfill, and median imputation."""
-        if len(column_names) > 0:
-            # ffill + bfill covariates that have at least some observed values
-            covariates_real = ts_df[column_names].fill_missing_values()
-            # If for some items covariates consist completely of NaNs, fill them with median of training data
-            if np.isnan(covariates_real.to_numpy()).any():
-                covariates_real.fillna(self._train_covariates_real_median, inplace=True)
-            ts_df[column_names] = covariates_real
+        """Impute missing values in selected columns with ffill, bfill, and median imputation.
+
+        Operates on a shallow copy so the caller's frame is not modified in place (important when multiple
+        models share the same transformed dataset).
+        """
+        if len(column_names) == 0:
+            return ts_df
+        column_names = [c for c in column_names if c in ts_df.columns]
+        if len(column_names) == 0:
+            return ts_df
+        ts_df = ts_df.copy(deep=False)
+        # ffill + bfill covariates that have at least some observed values
+        covariates_real = ts_df[column_names].fill_missing_values()
+        # If for some items covariates consist completely of NaNs, fill them with median of training data
+        if np.isnan(covariates_real.to_numpy()).any():
+            assert self._train_covariates_real_median is not None
+            covariates_real = covariates_real.fillna(self._train_covariates_real_median)
+        for col in column_names:
+            ts_df[col] = covariates_real[col]
         return ts_df
 
     def _impute_static_features(self, static_df: pd.DataFrame | None) -> pd.DataFrame | None:
@@ -337,8 +373,8 @@ class TimeSeriesFeatureGenerator:
 
         df_out = self._concat_dfs(dfs_to_concat)
         df_out.index = index
-        ts_df = TimeSeriesDataFrame(df_out, static_features=self._impute_static_features(static_features_df))
-        return self._impute_covariates(ts_df, column_names=self.covariate_metadata.covariates_real)
+        # Real dynamic covariates may contain NaNs; models impute if needed (see allow_nan_covariates tag).
+        return TimeSeriesDataFrame(df_out, static_features=self._impute_static_features(static_features_df))
 
     def transform_future_known_covariates(
         self, known_covariates: TimeSeriesDataFrame | None
@@ -349,12 +385,8 @@ class TimeSeriesFeatureGenerator:
             self._check_required_columns_are_present(
                 known_covariates, required_column_names=self.known_covariates_names, data_frame_name="known_covariates"
             )
-            known_covariates = TimeSeriesDataFrame(
-                self.known_covariates_pipeline.transform(pd.DataFrame(known_covariates))
-            )
-            return self._impute_covariates(
-                known_covariates, column_names=self.covariate_metadata.known_covariates_real
-            )
+            # Real known covariates may contain NaNs; models impute if needed.
+            return TimeSeriesDataFrame(self.known_covariates_pipeline.transform(pd.DataFrame(known_covariates)))
         else:
             return None
 
