@@ -241,6 +241,9 @@ class KNNModel(AbstractModel):
                     idx = np.random.choice(num_rows_max, size=samples, replace=False)
                 else:
                     idx = y_df.groupby("label", group_keys=False).apply(sample_func, frac=samples / num_rows_max).index
+                # Keep the rows in their original order: `_predict_proba_oof` writes the leave-one-out predictions,
+                # which follow the order the model was fit on, to the used rows in ascending position.
+                idx = np.sort(idx)
                 X_samp = X[idx, :]
                 y_samp = y.iloc[idx]
             else:
