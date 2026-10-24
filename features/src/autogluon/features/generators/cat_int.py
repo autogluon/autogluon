@@ -355,8 +355,8 @@ class CategoricalInteractionFeatureGenerator(AbstractFeatureGenerator):
                 i for i in self.candidate_cols if X[i].nunique() >= self.min_cardinality
             ]  # TODO: Make this a parameter
 
-        # FIXME: why `self.max_order` and not 2?
-        if len(self.candidate_cols) < self.max_order:
+        # Two columns are enough for an interaction, whatever `max_order` is
+        if len(self.candidate_cols) < 2:
             self.new_col_set = []
             return self
 
