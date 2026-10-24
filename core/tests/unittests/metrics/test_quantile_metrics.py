@@ -81,3 +81,11 @@ def test_multiple_predictions_with_weights():
 
     # Then
     assert np.isclose(expected_output, observed_output)
+
+
+def test_pinball_scorer_1d_predictions_raise_value_error():
+    """1-D quantile predictions get a ValueError saying predictions must be 2D, not an IndexError from the input check."""
+    from autogluon.core.metrics import pinball_loss as pinball_loss_scorer
+
+    with pytest.raises(ValueError, match="must be a 2D array"):
+        pinball_loss_scorer(np.array([1.0, 2.0]), np.array([1.1, 1.9]), quantile_levels=[0.5])
