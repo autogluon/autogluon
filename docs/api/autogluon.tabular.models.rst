@@ -278,6 +278,75 @@ Models
 .. autoclass:: MitraModel
    :members: init
 
+``MITRA`` defaults to Mitra v2 for both classification and regression:
+
+.. code-block:: python
+
+   predictor.fit(train_data, hyperparameters={"MITRA": {}}, num_bag_folds=8)
+
+Mitra uses the released HF API's default fit budget of 3,600 seconds, shared
+across the bag folds. AutoGluon's global ``time_limit`` can impose a shorter
+limit. To choose a different Mitra budget, set its model and ensemble limits;
+for example, this allows two hours:
+
+.. code-block:: python
+
+   predictor.fit(
+       train_data,
+       hyperparameters={
+           "MITRA": {
+               "ag.max_time_limit": 7200,
+               "ag.ens.ag.max_time_limit": 7200,
+           },
+       },
+       num_bag_folds=8,
+       time_limit=7200,
+   )
+
+Both checkpoint versions use the new fine-tuning recipe by default.
+``model_version`` selects the weights; ``fine_tune_recipe="1"`` explicitly
+selects the legacy settings:
+
+.. code-block:: python
+
+   predictor.fit(
+       train_data,
+       hyperparameters={"MITRA": {"model_version": "1"}},
+       num_bag_folds=8,
+   )
+   predictor.fit(
+       train_data,
+       hyperparameters={"MITRA": {"model_version": "1", "fine_tune_recipe": "1"}},
+       num_bag_folds=8,
+   )
+   predictor.fit(
+       train_data,
+       hyperparameters={"MITRA": {"model_version": "2", "hf_model": "/path/to/checkpoint"}},
+       num_bag_folds=8,
+   )
+
+The default v2 repositories are ``autogluon/mitra-classifier-2`` and
+``autogluon/mitra-regressor-2``. A local checkpoint must contain ``config.json``
+and ``model.safetensors``. Known repository IDs and an optional
+``"mitra_version": "1"`` or ``"2"`` field in ``config.json`` are checked against
+``model_version``. ``fine_tune_recipe`` can override the training defaults
+independently. AutoGluon does not infer a release from tensor dimensions: a scalar
+regression head selects MSE, and a binned head selects cross-entropy with mean
+decoding, regardless of the checkpoint version. Existing
+fitted v1 predictors retain their recipe when loaded or refitted.
+
+Bagging remains an AutoGluon fit option: use ``num_bag_folds=8`` for the released
+eight-fold recipe. The native implementation uses AutoGluon's validation and
+time-limit semantics. The unsupervised regression projection is fitted once on
+the outer training table, as in the released Hugging Face recipe. Classification
+feature selection is fitted within each training fold to keep held-out labels
+out of the selector.
+With the new recipe, bag children in the same process reuse the training context
+that fitted the same table shape, checkpoint, and device. Out-of-memory retries
+can still reduce that context when needed.
+The standalone package's benchmark results should therefore be compared using
+the same evaluation protocol before attributing them to the native API.
+
 :hidden:`TabICLModel`
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -451,4 +520,3 @@ Experimental Models
 
 .. autoclass:: FTTransformerModel
    :members: init
-
