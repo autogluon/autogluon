@@ -2163,8 +2163,10 @@ class AbstractModel(ModelBase, Tunable):
                     self._compiler.save(model=self.model, path=path)
             if self._compiler is not None and not self._compiler.save_in_pkl:
                 self.model = None  # Don't save model in pkl
-        save_pkl.save(path=file_path, object=self, verbose=verbose)
-        self.model = _model
+        try:
+            save_pkl.save(path=file_path, object=self, verbose=verbose)
+        finally:
+            self.model = _model
         return path
 
     @classmethod
@@ -2593,8 +2595,10 @@ class AbstractModel(ModelBase, Tunable):
         __name = self.name
         self.rename(self.name + REFIT_FULL_SUFFIX)
         __path_refit = self.path
-        self.save(path=self.path, verbose=False)
-        self.rename(__name)
+        try:
+            self.save(path=self.path, verbose=False)
+        finally:
+            self.rename(__name)
         return self.load(path=__path_refit, verbose=False)
 
     def get_params(self) -> dict:
