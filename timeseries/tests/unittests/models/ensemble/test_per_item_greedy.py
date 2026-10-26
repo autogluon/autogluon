@@ -1,6 +1,7 @@
 from unittest import mock
 
 import numpy as np
+import pandas as pd
 import pytest
 
 from autogluon.timeseries.models import SeasonalNaiveModel
@@ -65,6 +66,26 @@ class TestPerItemGreedyEnsemble:
         original_columns = set(model.weights_df.columns)
         model.remap_base_models({col: f"{col}_refit" for col in original_columns})
         assert set(model.weights_df.columns) == {f"{col}_refit" for col in original_columns}
+
+    @pytest.mark.parametrize(
+        "model_refit_map", [{"first": "first_FULL"}, {"first": "first_FULL", "second": "second_FULL"}]
+    )
+    def test_when_remap_base_models_called_then_unseen_item_predictions_are_preserved(self, model_refit_map):
+        model = PerItemGreedyEnsemble(prediction_length=2)
+        model.weights_df = pd.DataFrame({"first": [0.25, 0.75], "second": [0.75, 0.25]}, index=["A", "B"])
+        model.average_weight = model.weights_df.mean(axis=0)
+        data = get_data_frame_with_item_index(["A", "unseen"], data_length=2)
+        predictions = {
+            name: data.rename(columns={"target": "mean"}).assign(mean=value)
+            for name, value in [("first", 10.0), ("second", 20.0)]
+        }
+        expected = model.predict(predictions)
+
+        model.remap_base_models(model_refit_map)
+        actual = model.predict({model_refit_map.get(name, name): pred for name, pred in predictions.items()})
+
+        pd.testing.assert_frame_equal(actual, expected)
+        assert not actual.isna().any(axis=None)
 
     def test_when_n_jobs_exceeds_num_items_then_n_jobs_is_reduced(self, predictions_data_and_prediction_length):
         preds_per_window, data_per_window, _, prediction_length = predictions_data_and_prediction_length

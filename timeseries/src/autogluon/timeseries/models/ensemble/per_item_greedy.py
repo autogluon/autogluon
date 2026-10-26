@@ -170,3 +170,4 @@ class PerItemGreedyEnsemble(AbstractTimeSeriesEnsembleModel):
 
     def remap_base_models(self, model_refit_map: dict[str, str]) -> None:
         self.weights_df.rename(columns=model_refit_map, inplace=True)
+        self.average_weight.rename(index=model_refit_map, inplace=True)
