@@ -2,7 +2,7 @@ import logging
 import os
 import pathlib
 import shutil
-from typing import Dict, List, Optional, Tuple, Union
+from typing import List, Optional, Tuple, Union
 
 from ..loaders.load_s3 import list_bucket_prefix_suffix_contains_s3
 
@@ -59,13 +59,14 @@ def delete_s3_prefix(bucket: str, prefix: str):
     import boto3
 
     s3 = boto3.resource("s3")
-    objects_to_delete = s3.meta.client.list_objects(Bucket=bucket, Prefix=prefix)
-
-    delete_keys = {"Objects": []}
-    delete_keys["Objects"] = [{"Key": k} for k in [obj["Key"] for obj in objects_to_delete.get("Contents", [])]]
-
-    if len(delete_keys["Objects"]) != 0:
-        s3.meta.client.delete_objects(Bucket=bucket, Delete=delete_keys)
+    client = s3.meta.client
+    paginator = client.get_paginator("list_objects_v2")
+    for page in paginator.paginate(Bucket=bucket, Prefix=prefix, PaginationConfig={"PageSize": 1000}):
+        objects = [{"Key": obj["Key"]} for obj in page.get("Contents", [])]
+        if objects:
+            result = client.delete_objects(Bucket=bucket, Delete={"Objects": objects})
+            if result.get("Errors"):
+                raise RuntimeError(f"Failed to delete objects from s3://{bucket}/{prefix}: {result['Errors']}")
 
 
 def upload_file(*, file_name: str, bucket: str, prefix: Optional[str] = None, **kwargs):
@@ -362,8 +363,8 @@ def download_s3_file(
             )
         s3_bucket, s3_prefix = s3_path_to_bucket_prefix(s3_path=s3_path)
     else:
-        assert s3_bucket is not None, f"`s3_bucket` must be specified when `s3_path` is None."
-        assert s3_prefix is not None, f"`s3_prefix` must be specified when `s3_path` is None."
+        assert s3_bucket is not None, "`s3_bucket` must be specified when `s3_path` is None."
+        assert s3_prefix is not None, "`s3_prefix` must be specified when `s3_path` is None."
         s3_path = s3_bucket_prefix_to_path(bucket=s3_bucket, prefix=s3_prefix, version="s3")
     if dry_run:
         logger.log(20, f'Dry Run: Would download S3 file "{s3_path}" to "{local_path}"')
@@ -463,7 +464,7 @@ def _get_local_path_to_download_objs(s3_objs: List[str], prefix: str, local_path
         elif prefix != "" and not obj.startswith(prefix):
             raise ValueError(f'S3 object is missing expected prefix! Object: "{obj}" | prefix: "{prefix}"')
         elif obj == "":
-            raise ValueError(f"Cannot have empty path for an s3 object!")
+            raise ValueError("Cannot have empty path for an s3 object!")
 
     # find the local path to download objs to
     local_obj_paths = [os.path.normpath(os.path.join(local_path, os.path.relpath(obj, prefix))) for obj in s3_objs]
