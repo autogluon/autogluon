@@ -436,7 +436,8 @@ class ValidationStructure:
                 raise ValueError(f"`group_on` column {column!r} contains NaN values.")
         if len(columns) == 1:
             return X[columns[0]]
-        return X[columns].astype(str).agg("||".join, axis=1)
+        codes, _ = pd.factorize(pd.MultiIndex.from_frame(X[columns]), sort=False)
+        return pd.Series(codes, index=X.index)
 
     def _time_values(self, X: pd.DataFrame) -> pd.Series:
         if self.time_on not in X.columns:

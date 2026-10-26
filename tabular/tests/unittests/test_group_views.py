@@ -258,6 +258,20 @@ def test_group_codes_number_the_groups_of_the_frame():
         group_codes(df.assign(a=[None, "y", "x", "z"]), ["a"])
 
 
+@pytest.mark.parametrize(
+    "a,b",
+    [
+        (["a||b", "a", "a||b"], ["c", "b||c", "c"]),
+        ([1, "1", 1], ["x", "x", "x"]),
+    ],
+)
+def test_group_codes_keep_distinct_composite_keys_separate(a, b):
+    df = pd.DataFrame({"a": a, "b": b})
+    codes = group_codes(df, ["a", "b"])
+    np.testing.assert_array_equal(codes, [0, 1, 0])
+    np.testing.assert_allclose(pool_within_groups(np.array([0.0, 10.0, 2.0]), codes, "regression"), [1, 10, 1])
+
+
 def test_label_constant_within_groups():
     codes = np.array([0, 0, 1, 1])
     assert label_constant_within_groups(pd.Series([1, 1, 0, 0]), codes)
@@ -274,6 +288,16 @@ def test_group_mode_is_order_invariant_and_breaks_ties_by_the_smallest_value():
     order = np.array([5, 4, 3, 2, 1, 0])
     assert _group_mode(column.iloc[order].reset_index(drop=True), group[order], 3).tolist()[:2] == ["a", "c"]
     assert mode.dtype == column.dtype
+
+
+@pytest.mark.parametrize("dtype", ["object", "string", "boolean", "category"])
+def test_group_mode_handles_an_entirely_missing_column(dtype):
+    column = pd.Series([None, None, None], dtype=dtype, name="missing")
+    mode = _group_mode(column, np.array([0, 1, 0]), 2)
+    assert len(mode) == 2
+    assert mode.isna().all()
+    assert mode.dtype == column.dtype
+    assert mode.name == column.name
 
 
 # Ids without "regression": the test suite reserves that keyword for its opt-in regression-test marker.
