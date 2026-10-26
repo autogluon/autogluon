@@ -257,9 +257,9 @@ class TabPFNModel(AbstractTorchModel):
             hps["inference_config/PREPROCESS_TRANSFORMS"] = [
                 {
                     "name": scaler,
-                    "global_transformer_name": hps.pop("preprocessing/global", None),
-                    "categorical_name": hps.pop("preprocessing/categoricals", "numeric"),
-                    "append_original": hps.pop("preprocessing/append_original", True),
+                    "global_transformer_name": hps.get("preprocessing/global", None),
+                    "categorical_name": hps.get("preprocessing/categoricals", "numeric"),
+                    "append_original": hps.get("preprocessing/append_original", True),
                 }
                 for scaler in hps["preprocessing/scaling"]
             ]
