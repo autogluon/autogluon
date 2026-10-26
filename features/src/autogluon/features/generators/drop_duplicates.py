@@ -117,34 +117,30 @@ class DropDuplicatesFeatureGenerator(AbstractFeatureGenerator):
         - Normalizes -0.0 to +0.0 for float types.
         - Uses blake2b (fast, stable) to produce a 16-byte digest.
         """
-        # Convert to numpy array (may include float w/ NaN or pandas nullable types)
-        arr = s.to_numpy(copy=False)
-
-        # Build missing mask robustly (works for float NaN, pandas NA, etc.)
-        # Note: pd.isna on ndarray returns ndarray[bool] of same shape.
-        mask = pd.isna(arr)
-
-        # Normalize to a stable numeric dtype + stable value buffer
-        if np.issubdtype(arr.dtype, np.floating):
-            vals = np.asarray(arr, dtype=np.float64).copy()
-            # Normalize -0.0 -> +0.0 (0.0 == -0.0 but different bit pattern)
-            vals[vals == 0.0] = 0.0
-            # Zero-out missing to avoid NaN payload differences; mask preserves NA pattern
-            if mask.any():
-                vals[mask] = 0.0
+        if isinstance(s.dtype, np.dtype):
+            vals = np.asarray(s.to_numpy(copy=False), dtype=np.float64).copy()
         else:
-            # For ints / bools / nullable integer arrays that became object,
-            # coerce to float64 so NA can be represented; mask preserves NA pattern.
-            # (If you prefer strict dtype separation, change this to int64 and handle NA separately.)
-            vals = np.asarray(arr, dtype=np.float64).copy()
-            if mask.any():
-                vals[mask] = 0.0
+            # Nullable numeric arrays may contain pd.NA, which cannot be cast by np.asarray.
+            vals = s.to_numpy(dtype=np.float64, na_value=np.nan, copy=True)
+        mask = np.isnan(vals)
+        # Normalize signed zero and NaN payload differences; the mask preserves NA positions.
+        vals[vals == 0.0] = 0.0
+        vals[mask] = 0.0
 
         # Hash both: value bytes + mask bytes
         h = hashlib.blake2b(digest_size=16)
         h.update(np.ascontiguousarray(vals).view(np.uint8))
         h.update(np.ascontiguousarray(mask).view(np.uint8))
         return h.digest()
+
+    @staticmethod
+    def _numeric_series_equal(left: pd.Series, right: pd.Series) -> bool:
+        if left.dtype != right.dtype:
+            # Python numeric equality preserves integer precision across dtypes, unlike numpy's
+            # int64/float64 comparison, which rounds integers above 2**53 before comparing.
+            left = pd.Series(left.to_numpy(dtype=object, na_value=np.nan), dtype=object)
+            right = pd.Series(right.to_numpy(dtype=object, na_value=np.nan), dtype=object)
+        return left.equals(right)
 
     @classmethod
     def _drop_duplicate_features_numeric(
@@ -158,6 +154,7 @@ class DropDuplicatesFeatureGenerator(AbstractFeatureGenerator):
         Numeric duplicate detection using:
           1) summary-stat bucketing (sum, std, min, max)
           2) full-column fingerprint hash (values + missing mask)
+          3) exact comparison of the original values within fingerprint buckets
 
         Never calls pandas drop_duplicates.
 
@@ -201,8 +198,13 @@ class DropDuplicatesFeatureGenerator(AbstractFeatureGenerator):
 
         # ---- Bucket by stats ----
         bucket_map: dict[tuple[float, float, float, float], list[str]] = defaultdict(list)
-        for c, key in zip(cols, map(tuple, stats.tolist())):
+        needs_exact_comparison = set()
+        for c, dtype, key in zip(cols, X.dtypes, map(tuple, stats.tolist())):
             bucket_map[key].append(c)
+            if (dtype.kind in "iu" and (key[2] <= -(2**53) or key[3] >= 2**53)) or (
+                dtype.kind == "f" and dtype.itemsize > np.dtype(np.float64).itemsize
+            ):
+                needs_exact_comparison.add(c)
 
         # ---- Within each stats bucket, bucket by full fingerprint ----
         to_remove: list[str] = []
@@ -216,21 +218,33 @@ class DropDuplicatesFeatureGenerator(AbstractFeatureGenerator):
                 fp = cls._fingerprint_numeric_series_full(X[c])
                 fp_map[fp].append(c)
 
-            for dup_group in fp_map.values():
-                if len(dup_group) <= 1:
+            for candidates in fp_map.values():
+                if len(candidates) <= 1:
                     continue
 
-                # Deterministic ordering: preserve original column order
-                # (dup_group already follows bucket_cols order which follows cols order,
-                #  but we enforce explicitly to be safe.)
-                dup_group_sorted = sorted(dup_group, key=lambda k: cols.index(k))
+                duplicate_groups = [candidates]
+                if any(c in needs_exact_comparison for c in candidates):
+                    # Distinct int64 values above 2**53 can share a float64 fingerprint.
+                    # Only lossy conversions need an exact check of the original values.
+                    duplicate_groups = []
+                    for c in candidates:
+                        for group in duplicate_groups:
+                            if cls._numeric_series_equal(X[c], X[group[0]]):
+                                group.append(c)
+                                break
+                        else:
+                            duplicate_groups.append([c])
 
-                if keep_mode == "first":
-                    to_remove.extend(dup_group_sorted[1:])
-                elif keep_mode == "last":
-                    to_remove.extend(dup_group_sorted[:-1])
-                else:  # keep_mode is False
-                    to_remove.extend(dup_group_sorted)
+                # All buckets retain X.columns order; no sorting (or quadratic cols.index) is needed.
+                for group in duplicate_groups:
+                    if len(group) <= 1:
+                        continue
+                    if keep_mode == "first":
+                        to_remove.extend(group[1:])
+                    elif keep_mode == "last":
+                        to_remove.extend(group[:-1])
+                    else:  # keep_mode is False
+                        to_remove.extend(group)
 
         return to_remove
 
