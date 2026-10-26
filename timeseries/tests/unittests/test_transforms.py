@@ -5,6 +5,7 @@ import pandas as pd
 import pytest
 
 from autogluon.common import space
+from autogluon.timeseries import TimeSeriesDataFrame
 from autogluon.timeseries.models import NaiveModel
 from autogluon.timeseries.transforms.covariate_scaler import (
     AVAILABLE_COVARIATE_SCALERS,
@@ -52,6 +53,71 @@ def test_when_inverse_transform_applied_then_output_matches_input(scaler_name):
     data_transformed = scaler.fit_transform(data)
     data_inverse = scaler.inverse_transform(data_transformed)
     assert np.allclose(data, data_inverse, equal_nan=True)
+
+
+@pytest.mark.parametrize("values", [[-5.0, -3.0, -1.0], [-5.0, 0.0, 5.0], [1.0, 3.0, 5.0]])
+def test_when_min_max_scaler_transforms_signed_targets_then_values_are_between_zero_and_one(values):
+    index = pd.MultiIndex.from_product(
+        [["item"], pd.date_range("2020-01-01", periods=len(values))], names=["item_id", "timestamp"]
+    )
+    data = TimeSeriesDataFrame(pd.DataFrame({"target": values}, index=index))
+    scaler = LocalMinMaxScaler()
+
+    transformed = scaler.fit_transform(data)
+
+    np.testing.assert_allclose(transformed["target"], [0.0, 0.5, 1.0])
+    pd.testing.assert_frame_equal(scaler.inverse_transform(transformed), data)
+
+
+@pytest.mark.parametrize("feature_type", ["known_covariates", "past_covariates", "static_features"])
+@pytest.mark.parametrize("columns", [["binary", "skewed", "continuous"], ["skewed", "continuous", "binary"]])
+@pytest.mark.parametrize("legacy_feature_names", [False, True])
+def test_when_covariate_scaler_transforms_mixed_columns_then_feature_names_are_preserved(
+    feature_type, columns, legacy_feature_names
+):
+    features = pd.DataFrame(
+        {
+            "binary": [0.0, 1.0] * 4,
+            "skewed": [0.0] * 7 + [100.0],
+            "continuous": np.arange(8, dtype=float),
+        }
+    )[columns]
+    index = pd.MultiIndex.from_product(
+        [features.index, pd.date_range("2020-01-01", periods=1)], names=["item_id", "timestamp"]
+    )
+    data = TimeSeriesDataFrame(pd.DataFrame({"target": np.zeros(len(features))}, index=index))
+    if feature_type == "static_features":
+        data.static_features = features
+    else:
+        data[columns] = features.to_numpy()
+    metadata = CovariateMetadata(**{f"{feature_type}_real": columns})
+    scaler = GlobalCovariateScaler(covariate_metadata=metadata)
+
+    scaler.fit(data)
+    if legacy_feature_names:
+        # Transformers restored from older models retain sklearn's default prefixed output names.
+        for transformer in scaler._column_transformers.values():
+            transformer.set_params(verbose_feature_names_out=True)
+    transformed = scaler.transform(data)
+    result = transformed.static_features if feature_type == "static_features" else transformed
+
+    expected_columns = data.static_features.columns if feature_type == "static_features" else data.columns
+    assert result.columns.equals(expected_columns)
+    np.testing.assert_array_equal(result["binary"], features["binary"])
+    np.testing.assert_allclose(result["continuous"], (features["continuous"] - 3.5) / np.std(features["continuous"]))
+    assert result["skewed"].iloc[-1] > 5
+    assert (result["skewed"].iloc[:-1] < -5).all()
+    if feature_type == "known_covariates":
+        future = data[columns].copy()
+        future["continuous"] += 10
+        if legacy_feature_names:
+            scaler._column_transformers["known"].set_params(verbose_feature_names_out=True)
+        transformed_future = scaler.transform_known_covariates(future)
+        assert transformed_future.columns.equals(future.columns)
+        np.testing.assert_array_equal(transformed_future["binary"], future["binary"])
+        np.testing.assert_allclose(
+            transformed_future["continuous"], (future["continuous"] - 3.5) / np.std(features["continuous"])
+        )
 
 
 @pytest.mark.parametrize(

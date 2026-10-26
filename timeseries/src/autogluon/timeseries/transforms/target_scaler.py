@@ -90,11 +90,11 @@ class LocalMeanAbsScaler(LocalTargetScaler):
 class LocalMinMaxScaler(LocalTargetScaler):
     """Applies min/max scaling to each time series in the dataset.
 
-    The resulting affine transformation is (x - loc) / scale, where scale = max(x) - min(x), loc = min(x) / scale.
+    The resulting affine transformation is (x - loc) / scale, where scale = max(x) - min(x), loc = min(x).
     """
 
     def _compute_loc_scale(self, target_series: pd.Series) -> tuple[pd.Series, pd.Series]:
-        stats = target_series.abs().groupby(level=TimeSeriesDataFrame.ITEMID, sort=False).agg(["min", "max"])
+        stats = target_series.groupby(level=TimeSeriesDataFrame.ITEMID, sort=False).agg(["min", "max"])
         scale = (stats["max"] - stats["min"]).clip(lower=self.min_scale)
         loc = stats["min"]
         return loc, scale
