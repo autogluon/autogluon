@@ -240,7 +240,11 @@ class KNNModel(AbstractModel):
                 if self.problem_type == REGRESSION:
                     idx = np.random.choice(num_rows_max, size=samples, replace=False)
                 else:
-                    idx = y_df.groupby("label", group_keys=False).apply(sample_func, frac=samples / num_rows_max).index
+                    idx = (
+                        y_df.groupby("label", group_keys=False)["label"]
+                        .apply(sample_func, frac=samples / num_rows_max)
+                        .index
+                    )
                 X_samp = X[idx, :]
                 y_samp = y.iloc[idx]
             else:
