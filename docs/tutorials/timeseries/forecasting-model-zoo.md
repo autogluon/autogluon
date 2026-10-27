@@ -71,6 +71,7 @@ Note that some of the models' hyperparameters have names and default values that
    RecursiveTabularModel
    Chronos2Model
    ChronosModel
+   T0Model
    TotoModel
    Toto2Model
 
@@ -273,6 +274,13 @@ Deep learning models pretrained on large time series datasets, able to perform z
 
 ```{eval-rst}
 .. autoclass:: ChronosModel
+   :members: init
+
+```
+
+
+```{eval-rst}
+.. autoclass:: T0Model
    :members: init
 
 ```

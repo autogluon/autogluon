@@ -32,6 +32,12 @@ Check out the [Quick Start Tutorial](forecasting-quick-start.ipynb) to learn how
   Zero-shot forecasting with pretrained Chronos-2 time series models in AutoGluon.
 :::
 
+:::{grid-item-card} Forecasting with t0-gamma
+  :link: forecasting-t0.html
+
+  Zero-shot forecasting with numeric past and known-future covariates using t0-gamma.
+:::
+
 :::{grid-item-card} Forecasting Models
   :link: forecasting-model-zoo.html
 
@@ -68,6 +74,7 @@ hidden: true
 Quick Start <forecasting-quick-start>
 In Depth <forecasting-indepth>
 Forecasting with Chronos-2 <forecasting-chronos>
+Forecasting with t0-gamma <forecasting-t0>
 Metrics <forecasting-metrics>
 Model Zoo <model_zoo/index>
 Advanced <advanced/index>
