@@ -2957,6 +2957,9 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                 exception=exception, errors=errors, errors_ignore=errors_ignore, errors_raise=errors_raise
             ):
                 raise exception
+            # The exception's traceback holds this frame, so the local would keep the failed fit's frames and the
+            # memory they reference alive until the next garbage collection.
+            del exception
         return model_names_trained
 
     # FIXME: v1.0 Move to AbstractModel for most fields
