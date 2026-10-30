@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 import logging
 import os
+import re
 import shutil
 import time
 import traceback
@@ -84,6 +85,8 @@ COMPLETION_FOLD_TIME_FLOOR = 1.5
 #: Greedy ensemble selection's size when `validation_folds_time_reserve="auto"` estimates which bags the weighted
 #: ensemble will use (the weighted ensemble's default).
 COMPLETION_RESERVE_ENSEMBLE_SIZE = 25
+#: The directory name of a bag's fold model (`S5F3`: the 3rd fold of the 5th repeat).
+_FOLD_NAME = re.compile(r"S\d+F\d+")
 
 
 class AmbiguousModelBestError(AssertionError):
@@ -2940,6 +2943,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             )
 
             if del_model:
+                self._delete_failed_fit_files(model)
                 del model
         else:
             self._add_model(
@@ -5166,6 +5170,26 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
 
         # TODO: Delete from all the other model dicts
         self.save()
+
+    def _delete_failed_fit_files(self, model: AbstractModel):
+        """Delete what a failed fit of `model` wrote to disk.
+
+        A model the trainer does not hold loses its directory. A bag it holds (one whose remaining folds failed to fit)
+        keeps its directory and the folds it predicts with, and loses the directories of the other folds.
+        """
+        path = Path(model.path)
+        if not path.is_dir():
+            return
+        if model.name not in self.get_model_names():
+            shutil.rmtree(path, ignore_errors=True)
+            return
+        kept = self.load_model(model.name)
+        if not isinstance(kept, BaggedEnsembleModel):
+            return
+        children = {child if isinstance(child, str) else child.name for child in kept.models}
+        for child in path.iterdir():
+            if child.is_dir() and _FOLD_NAME.fullmatch(child.name) and child.name not in children:
+                shutil.rmtree(child, ignore_errors=True)
 
     def _delete_model_from_graph(self, model: str):
         self.model_graph.remove_node(model)
