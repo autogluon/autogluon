@@ -1,8 +1,84 @@
 import numpy as np
 import pandas as pd
+import pytest
 
 from autogluon.common import FeatureMetadata
 from autogluon.features.generators import DropDuplicatesFeatureGenerator
+
+
+@pytest.mark.parametrize("dtype", ["int64", "uint64", "Int64", "UInt64"])
+@pytest.mark.parametrize(
+    "keep, expected",
+    [("first", ["a_copy", "b_copy"]), ("last", ["a", "b"]), (False, ["a", "a_copy", "b", "b_copy"])],
+)
+def test_drop_duplicates_preserves_large_integers(dtype, keep, expected):
+    # The two columns have identical float64 representations, but different integer values.
+    a = pd.Series([2**53, 2**53 + 4], dtype=dtype)
+    b = pd.Series([2**53 + 1, 2**53 + 5], dtype=dtype)
+    if dtype in ["Int64", "UInt64"]:
+        a.iloc[1] = pd.NA
+        b.iloc[1] = pd.NA
+    X = pd.DataFrame({"a": a, "b": b, "a_copy": a, "b_copy": b})
+
+    dropped = DropDuplicatesFeatureGenerator._drop_duplicate_features_numeric(X, keep=keep)
+
+    assert dropped == expected
+
+
+@pytest.mark.parametrize("dtype", ["int64", "uint64", "Int64", "UInt64"])
+def test_drop_duplicates_integer_float_equality(dtype):
+    X = pd.DataFrame(
+        {
+            "exact": pd.Series([2**53, 2**53 + 4], dtype=dtype),
+            "rounded": pd.Series([2**53 + 1, 2**53 + 5], dtype=dtype),
+            "float": [float(2**53), float(2**53 + 4)],
+        }
+    )
+
+    assert DropDuplicatesFeatureGenerator._drop_duplicate_features_numeric(X) == ["float"]
+
+
+def test_drop_duplicates_signed_unsigned_limits():
+    largest_signed = np.iinfo(np.int64).max
+    largest_unsigned = np.iinfo(np.uint64).max
+    X = pd.DataFrame(
+        {
+            "signed": pd.Series([largest_signed, largest_signed - 1], dtype="int64"),
+            "same_unsigned": pd.Series([largest_signed, largest_signed - 1], dtype="uint64"),
+            "above_signed": pd.Series([largest_signed + 1, largest_signed + 2], dtype="uint64"),
+            "rounded_float": [float(largest_signed), float(largest_signed)],
+            "unsigned": pd.Series([largest_unsigned, largest_unsigned - 1], dtype="uint64"),
+            "unsigned_other": pd.Series([largest_unsigned - 2, largest_unsigned - 3], dtype="uint64"),
+        }
+    )
+
+    assert DropDuplicatesFeatureGenerator._drop_duplicate_features_numeric(X) == ["same_unsigned"]
+
+
+def test_drop_duplicates_negative_integer_limit():
+    smallest = np.iinfo(np.int64).min
+    X = pd.DataFrame(
+        {
+            "a": pd.Series([smallest, smallest + 1], dtype="int64"),
+            "b": pd.Series([smallest + 1, smallest + 2], dtype="int64"),
+            "rounded_float": [float(smallest), float(smallest)],
+        }
+    )
+
+    assert DropDuplicatesFeatureGenerator._drop_duplicate_features_numeric(X) == []
+
+
+def test_drop_duplicates_nullable_numeric_missing_values():
+    X = pd.DataFrame(
+        {
+            "nullable_int": pd.Series([1, pd.NA, 3], dtype="Int64"),
+            "nullable_float": pd.Series([1, pd.NA, 3], dtype="Float64"),
+            "float": [1.0, np.nan, 3.0],
+            "different_missing": [1.0, 3.0, np.nan],
+        }
+    )
+
+    assert DropDuplicatesFeatureGenerator._drop_duplicate_features_numeric(X) == ["nullable_float", "float"]
 
 
 def test_drop_duplicates_feature_generator(generator_helper, data_helper):
