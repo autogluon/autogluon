@@ -15,6 +15,7 @@ import pandas as pd
 from sklearn.impute import SimpleImputer
 
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
+from autogluon.core.constants import QUANTILE
 from autogluon.tabular import __version__
 from autogluon.tabular.models.abstract.abstract_torch_model import AbstractTorchModel
 
@@ -40,6 +41,9 @@ class RealMLPModel(AbstractTorchModel):
 
     RealMLP is the top performing method overall on TabArena-v0.1: https://tabarena.ai
 
+    For the quantile problem type, the network has one output per quantile level and trains and early-stops on
+    pytabkit's mean pinball loss over the levels; its predicted quantiles are sorted, so they do not cross.
+
     Paper: Better by Default: Strong Pre-Tuned MLPs and Boosted Trees on Tabular Data
     Authors: David Holzmüller, Léo Grinsztajn, Ingo Steinwart
     Codebase: https://github.com/dholzmueller/pytabkit
@@ -52,7 +56,7 @@ class RealMLPModel(AbstractTorchModel):
     ag_name = "RealMLP"
     ag_priority = 75
     seed_name = "random_state"
-    _supported_problem_types = ["binary", "multiclass", "regression"]
+    _supported_problem_types = ["binary", "multiclass", "regression", "quantile"]
     default_resources_physical_cores_only = True
     default_num_gpus = 1
 
@@ -147,9 +151,13 @@ class RealMLPModel(AbstractTorchModel):
             "mean_absolute_error": "mae",
         }
 
-        val_metric_name = metric_map.get(self.stopping_metric.name, None)
-
         init_kwargs = dict()
+        if self.problem_type == QUANTILE:
+            pinball = f"multi_pinball({','.join(str(float(q)) for q in self.quantile_levels)})"
+            metric_map["pinball_loss"] = pinball
+            init_kwargs["train_metric_name"] = pinball
+
+        val_metric_name = metric_map.get(self.stopping_metric.name, None)
 
         if val_metric_name is not None:
             init_kwargs["val_metric_name"] = val_metric_name
