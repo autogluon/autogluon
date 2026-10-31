@@ -1132,14 +1132,20 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
             Time series data to forecast with.
         known_covariates
             Future values of the known covariates.
-        record_pred_time
-            If True, will additionally return the total prediction times for all models (including the prediction time
-            for base models). If False, will only return the model predictions.
         raise_exception_if_failed
             If True, the method will raise an exception if any model crashes during prediction.
             If False, error will be logged and predictions for failed models will contain None.
         use_cache
             If False, will ignore the cache even if it's available.
+        random_seed
+            If provided, the random seed is set before each model that is not in the cache makes its predictions.
+
+        Returns
+        -------
+        model_pred_dict
+            Predictions of each model in ``model_names``.
+        pred_time_dict
+            Total prediction time of each model in ``model_names``, including the prediction time of its base models.
         """
         if use_cache:
             model_pred_dict, pred_time_dict_marginal = self.prediction_cache.get(
