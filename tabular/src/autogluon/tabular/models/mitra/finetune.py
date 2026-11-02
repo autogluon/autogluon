@@ -183,6 +183,9 @@ class MitraFinetuneMixin:
     def _get_trainer_cls(self):
         return TrainerFinetuneV2
 
+    def _load_pretrained_model(self, model_cls):
+        return model_cls.from_pretrained(self.hf_model, device=self.device, model_version=self.model_version)
+
     def _configure_pretrained_model(self, cfg, model):
         super()._configure_pretrained_model(cfg, model)
         cfg.hyperparams["dim_output"] = model.dim_output

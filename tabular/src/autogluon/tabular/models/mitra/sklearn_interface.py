@@ -202,7 +202,7 @@ class MitraBase(BaseEstimator):
                 for _ in range(self.n_estimators):
                     # `hf_model` is either a local directory holding `config.json` +
                     # `model.safetensors`, or a HuggingFace repo id.
-                    model = Tab2D.from_pretrained(self.hf_model, device=self.device, model_version=self.model_version)
+                    model = self._load_pretrained_model(Tab2D)
                     self._configure_pretrained_model(cfg, model)
                     trainer = trainer_cls(
                         cfg, model, n_classes=n_classes, device=self.device, rng=rng, verbose=self.verbose
@@ -244,6 +244,10 @@ class MitraBase(BaseEstimator):
 
     def _get_trainer_cls(self):
         return TrainerFinetune
+
+    def _load_pretrained_model(self, model_cls):
+        # Legacy custom checkpoints predate release metadata.
+        return model_cls.from_pretrained(self.hf_model, device=self.device)
 
     def _configure_pretrained_model(self, cfg, model):
         if str(model.task) != str(cfg.task):

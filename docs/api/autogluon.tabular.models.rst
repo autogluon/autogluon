@@ -72,7 +72,7 @@ Here is the mapping of keys to models, in registration order
         "TABPFN-2.6": TabPFNv26Model,
         "REALTABPFN-V2": RealTabPFNv2Model,
         "REALTABPFN-V2.5": RealTabPFNv25Model,
-        "MITRA": MitraModel,
+        "MITRA": MitraV2Model,
         "TABPFN-3": TabPFN3Model,
         "TABPFN-3.5": TabPFN35Model,
         "CAUSILO": CausiloModel,
@@ -124,7 +124,7 @@ Here is the mapping of model types to their default names when trained
         TabPFNv26Model: 'TabPFN-2.6',
         RealTabPFNv2Model: 'RealTabPFN-v2',
         RealTabPFNv25Model: 'RealTabPFN-v2.5',
-        MitraModel: 'Mitra',
+        MitraV2Model: 'Mitra',
         TabPFN3Model: 'TabPFN-3',
         TabPFN35Model: 'TabPFN-3.5',
         CausiloModel: 'Causilo',
@@ -196,6 +196,7 @@ Models
    RealMLPModel
    TabMModel
    MitraModel
+   MitraV2Model
    TabICLModel
    TabDPTModel
    TabDPTTurboModel
@@ -278,6 +279,20 @@ Models
 .. autoclass:: MitraModel
    :members: init
 
+The original v1 API keeps its class and saved-model format. Select it explicitly:
+
+.. code-block:: python
+
+   from autogluon.tabular.models import MitraModel
+
+   predictor.fit(train_data, hyperparameters={MitraModel: {}}, num_bag_folds=8)
+
+:hidden:`MitraV2Model`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: MitraV2Model
+   :members: init
+
 ``MITRA`` defaults to Mitra v2 for both classification and regression:
 
 .. code-block:: python
@@ -303,9 +318,9 @@ for example, this allows two hours:
        time_limit=7200,
    )
 
-Both checkpoint versions use the new fine-tuning recipe by default.
-``model_version`` selects the weights; ``fine_tune_recipe="1"`` explicitly
-selects the legacy settings:
+``MitraV2Model`` uses the new fine-tuning method for both checkpoint versions.
+``model_version`` selects the weights. The legacy v1 API is the separate
+``MitraModel`` class shown above:
 
 .. code-block:: python
 
@@ -316,24 +331,19 @@ selects the legacy settings:
    )
    predictor.fit(
        train_data,
-       hyperparameters={"MITRA": {"model_version": "1", "fine_tune_recipe": "1"}},
-       num_bag_folds=8,
-   )
-   predictor.fit(
-       train_data,
        hyperparameters={"MITRA": {"model_version": "2", "hf_model": "/path/to/checkpoint"}},
        num_bag_folds=8,
    )
 
 The default v2 repositories are ``autogluon/mitra-classifier-2`` and
 ``autogluon/mitra-regressor-2``. A local checkpoint must contain ``config.json``
-and ``model.safetensors``. Known repository IDs and an optional
-``"mitra_version": "1"`` or ``"2"`` field in ``config.json`` are checked against
-``model_version``. ``fine_tune_recipe`` can override the training defaults
-independently. AutoGluon does not infer a release from tensor dimensions: a scalar
+and ``model.safetensors``. Custom checkpoints must declare
+``"mitra_version": "1"`` or ``"2"`` in ``config.json``. This metadata and known
+repository IDs are checked against ``model_version``. AutoGluon does not infer
+a release from tensor dimensions: a scalar
 regression head selects MSE, and a binned head selects cross-entropy with mean
 decoding, regardless of the checkpoint version. Existing
-fitted v1 predictors retain their recipe when loaded or refitted.
+fitted v1 predictors keep the original ``MitraModel`` class when loaded or refitted.
 
 Bagging remains an AutoGluon fit option: use ``num_bag_folds=8`` for the released
 eight-fold recipe. The native implementation uses AutoGluon's validation and
