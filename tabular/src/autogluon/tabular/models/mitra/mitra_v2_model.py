@@ -40,8 +40,8 @@ class MitraV2Model(MitraModel):
     ``max_features=256`` controls feature reduction independently of the
     ``ag.max_features`` fit constraint. Set ``feature_reduction=None`` to disable
     reduction or choose ``"select"`` / ``"svd"``; ``"auto"`` is the default.
-    Regression fits the unsupervised projection once before bagging;
-    classification fits supervised selection within each training fold.
+    Feature reduction is fitted once on the outer training table before
+    bagging, matching the released HF classification and regression recipes.
     """
 
     ag_key = "MITRA"
@@ -82,13 +82,14 @@ class MitraV2Model(MitraModel):
         if not self._fit_constraints_validated_upstream:
             self._num_samples_total = len(X)
             self._fit_context_memo = FitContextMemo()
-            # The released regression recipe fits its unsupervised projection
-            # before bagging. The existing template-validation hook supplies
-            # the outer training table without changing AutoGluon's fold code.
+            # HF fits both supervised selection and the regression projection
+            # before bagging. This hook receives the outer training data and
+            # labels; fold children reuse the fitted reducer.
             reducer = self._make_feature_reducer(X)
-            if self.problem_type == "regression" and reducer.method in ("auto", "svd"):
-                reducer.fit(X, y=None, cache_training=True)
-                if reducer.projection is not None:
+            y = kwargs.get("y")
+            if y is not None or (self.problem_type == "regression" and reducer.method in ("auto", "svd")):
+                reducer.fit(X, y=y, cache_training=True)
+                if reducer.projection is not None or reducer.columns is not None:
                     self._feature_reducer = reducer
                     self._feature_reduction_fitted_upstream = True
 
@@ -170,10 +171,9 @@ class MitraV2Model(MitraModel):
         if method == "svd":
             return min(max_features, n_rows, n_features)
         if problem_type != "regression":
-            # Classification selection is supervised and refitted inside
-            # every bag fold. A rare continuous value can disappear from one
-            # fold and make that reducer retain the original table width.
-            # Estimate the safe shape instead of assuming all folds reduce.
+            # Classification can retain the original width when the
+            # continuous-feature gate rejects selection. Memory estimation
+            # precedes fitting the reducer, so keep the conservative bound.
             return n_features
         return min(max_features, n_features)
 

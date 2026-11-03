@@ -1017,6 +1017,53 @@ def test_memory_feature_gate_ignores_nonfinite_values():
     )
 
 
+@pytest.mark.parametrize("problem_type,n_classes", [("binary", 2), ("multiclass", 3)])
+def test_bagged_classification_matches_released_selection(checkpoint_factory, tmp_path, problem_type, n_classes):
+    from sklearn.feature_selection import f_classif
+
+    from autogluon.tabular.models.mitra.finetune import MitraFinetuneClassifier
+
+    rng = np.random.RandomState(17)
+    X = pd.DataFrame(rng.normal(size=(48, 12)), columns=range(12))
+    y = pd.Series(np.arange(len(X)) % n_classes)
+    scores, _ = f_classif(X.to_numpy(), y.to_numpy())
+    columns = X.columns[np.argsort(scores)[::-1][:3]]
+    expected = X.loc[:, columns]
+    bag = BaggedEnsembleModel(
+        model_base=MitraV2Model(
+            problem_type=problem_type,
+            hyperparameters={
+                "hf_model": checkpoint_factory(version="2"),
+                "fine_tune": False,
+                "max_features": 3,
+            },
+        ),
+        path=str(tmp_path / "selection_bag"),
+        hyperparameters={"fold_fitting_strategy": "sequential_local"},
+    )
+    original_fit = MitraFinetuneClassifier.fit
+    folds_seen = []
+
+    def fit(estimator, X, y, X_val=None, y_val=None, **kwargs):
+        np.testing.assert_array_equal(X.to_numpy(), expected.loc[X.index].to_numpy())
+        np.testing.assert_array_equal(X_val.to_numpy(), expected.loc[X_val.index].to_numpy())
+        folds_seen.append(X.index.tolist())
+        return original_fit(estimator, X, y, X_val=X_val, y_val=y_val, **kwargs)
+
+    with mock.patch.object(MitraFinetuneClassifier, "fit", fit):
+        bag.fit(X=X, y=y, k_fold=2, num_cpus=1, num_gpus=0)
+    assert len(folds_seen) == 2
+    assert np.isfinite(bag.predict_proba_oof()).all()
+    assert bag.load_model_base()._feature_reducer.columns == columns.tolist()
+    query = X.iloc[:4] + 100
+    for child_name in bag.models:
+        child = bag.load_child(child_name)
+        np.testing.assert_array_equal(child.preprocess(query).to_numpy(), query.loc[:, columns].to_numpy())
+        child.save()
+        restored = MitraV2Model.load(child.path)
+        np.testing.assert_array_equal(restored.preprocess(query).to_numpy(), query.loc[:, columns].to_numpy())
+
+
 def test_bagged_regression_matches_released_projection(checkpoint_factory, tmp_path):
     from sklearn.decomposition import PCA
     from sklearn.impute import SimpleImputer
