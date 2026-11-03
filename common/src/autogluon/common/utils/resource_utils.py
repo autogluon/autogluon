@@ -8,6 +8,7 @@ from autogluon.common.utils.try_import import try_import_ray
 
 from .cpu_utils import get_available_cpu_count
 from .distribute_utils import DistributedContext
+from .memory_utils import get_cgroup_memory_limit
 from .utils import bytes_to_mega_bytes
 
 logger = logging.getLogger(__name__)
@@ -242,7 +243,11 @@ class ResourceManager:
 
         import psutil
 
-        return psutil.virtual_memory().total
+        host_total = psutil.virtual_memory().total
+        cgroup_limit = get_cgroup_memory_limit()
+        if cgroup_limit is not None:
+            return min(host_total, cgroup_limit)
+        return host_total
 
     @staticmethod
     def _get_memory_rss() -> float:
@@ -257,7 +262,14 @@ class ResourceManager:
             p = psutil.Process()
             return total_memory - p.memory_info().rss
 
-        return psutil.virtual_memory().available
+        host_available = psutil.virtual_memory().available
+        cgroup_limit = get_cgroup_memory_limit()
+        if cgroup_limit is not None:
+            # Available memory within the cgroup is the limit minus what this process already uses.
+            # Cap by the host-available value so we never over-report.
+            cgroup_available = cgroup_limit - psutil.Process().memory_info().rss
+            return max(min(host_available, cgroup_available), 0)
+        return host_available
 
 
 class RayResourceManager:
