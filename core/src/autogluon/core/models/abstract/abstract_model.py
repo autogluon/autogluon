@@ -265,6 +265,12 @@ class AbstractModel(ModelBase, Tunable):
     model_file_name = "model.pkl"
     model_tensors_file_name = "model_tensors.pt"
     """The torch tensors of the fitted model, which `save` writes beside `model_file_name` instead of into the pickle."""
+    pin_tensors_on_load: ClassVar[bool] = False
+    """Whether `load` puts the model's CPU tensors into pinned memory when CUDA is available.
+
+    For a model that keeps a large state on the CPU and streams it to the GPU when it predicts, such as an in-context
+    model's offloaded context cache. Each storage is copied from the memory-mapped tensor file straight into pinned
+    memory, so it never exists twice in RAM, and tensors that shared a storage keep sharing it."""
     model_info_name = "info.pkl"
     model_info_json_name = "info.json"
     learning_curve_file_name = "curves.json"
@@ -2201,7 +2207,7 @@ class AbstractModel(ModelBase, Tunable):
         model = _tensor_pickle.load(
             path=file_path,
             tensors_path=os.path.join(path, cls.model_tensors_file_name),
-            mmap=cls._get_class_tags().get("mmap_tensors_on_load", False),
+            pin=cls.pin_tensors_on_load,
             verbose=verbose,
         )
         model._apply_settings_snapshots()

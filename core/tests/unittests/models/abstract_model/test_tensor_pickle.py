@@ -18,10 +18,8 @@ class _Model(AbstractModel):
     pass
 
 
-class _MappedModel(AbstractModel):
-    @classmethod
-    def _class_tags(cls) -> dict:
-        return {"mmap_tensors_on_load": True}
+class _PinnedModel(AbstractModel):
+    pin_tensors_on_load = True
 
 
 def _model(tmp_path, cls=_Model, state=None):
@@ -65,28 +63,31 @@ def test_a_model_without_tensors_writes_no_tensor_file_and_removes_a_stale_one(t
     assert _Model.load(path).model == {"cache": None}
 
 
-@pytest.mark.skipif(os.name == "nt", reason="mmap is ignored on Windows")
-def test_mmap_tag_maps_the_tensors_and_a_resave_keeps_the_mapping_valid(tmp_path, monkeypatch):
+def test_pin_tensors_on_load_pins_each_storage_once_when_cuda_is_available(tmp_path, monkeypatch):
     cache = torch.randn(1024, 32)
-    path = _model(tmp_path, cls=_MappedModel, state={"cache": cache}).save()
-    mmap_requests = []
-    torch_load = torch.load
+    state = {"cache": cache, "head": cache[:16], "other": torch.ones(3)}
+    path = _model(tmp_path, cls=_PinnedModel, state=state).save()
+    pinned = []
 
-    def recording_load(*args, **kwargs):
-        mmap_requests.append(kwargs.get("mmap"))
-        return torch_load(*args, **kwargs)
+    def fake_pin_memory(storage, *args, **kwargs):
+        pinned.append(storage.nbytes())
+        return storage.clone()
 
-    monkeypatch.setattr(torch, "load", recording_load)
-    loaded = _MappedModel.load(path)
+    monkeypatch.setattr(torch.UntypedStorage, "pin_memory", fake_pin_memory)
     _Model.load(path)
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
+    _PinnedModel.load(path)
+    assert pinned == [], "nothing is pinned without the attribute or without CUDA"
 
-    assert mmap_requests == [True, False], "only the class with the tag maps its tensors"
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+    loaded = _PinnedModel.load(path)
+
+    assert sorted(pinned) == sorted([cache.nbytes, 3 * 4]), "one pin per storage"
     assert torch.equal(loaded.model["cache"], cache)
-
-    # Saving the loaded model again replaces the file it is mapped from (refit_full re-saves a loaded model).
+    assert loaded.model["head"].untyped_storage().data_ptr() == loaded.model["cache"].untyped_storage().data_ptr()
+    # Saving the loaded model again replaces the file it was loaded from (refit_full re-saves a loaded model).
     loaded.save()
-    assert torch.equal(loaded.model["cache"], cache)
-    assert torch.equal(_MappedModel.load(path).model["cache"], cache)
+    assert torch.equal(_Model.load(path).model["cache"], cache)
 
 
 def test_pickled_size_counts_storages_once_without_serializing_tensors(monkeypatch):

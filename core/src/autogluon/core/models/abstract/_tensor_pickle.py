@@ -117,18 +117,27 @@ def save(obj: Any, path: str, tensors_path: str, verbose: bool = True) -> None:
     if not pickler.tensors:
         _remove(tensors_path)
         return
-    # Written next to the target and then swapped in: a model loaded with ``mmap`` reads its tensors
-    # from the old file, and rewriting that file in place would invalidate the mapping (SIGBUS).
+    # Written next to the target and then swapped in: a load that maps the file may still reference it,
+    # and rewriting a mapped file in place would invalidate the mapping (SIGBUS).
     tmp_path = tensors_path + ".tmp"
     torch.save(pickler.tensors, tmp_path)
     os.replace(tmp_path, tensors_path)
 
 
-def load(path: str, tensors_path: str, mmap: bool = False, verbose: bool = True) -> Any:
-    """Load what :func:`save` wrote; with ``mmap``, the tensors stay mapped from ``tensors_path``.
+def _restore_pinned(storage, location: str):
+    """``map_location`` for ``torch.load``: restore a storage where it was saved, then pin it if it is on the CPU."""
+    from torch.serialization import default_restore_location
 
-    Tensors saved on a CUDA device are loaded on the CPU when CUDA is not available. ``mmap`` is
-    ignored on Windows, where a mapped file cannot be replaced by a later save.
+    restored = default_restore_location(storage, location)
+    return restored.pin_memory() if restored.device.type == "cpu" else restored
+
+
+def load(path: str, tensors_path: str, pin: bool = False, verbose: bool = True) -> Any:
+    """Load what :func:`save` wrote.
+
+    With ``pin`` and CUDA available, every CPU storage is copied from the memory-mapped file into
+    pinned memory (once per storage, so views keep sharing it). Tensors saved on a CUDA device are
+    loaded on the CPU when CUDA is not available.
     """
     if s3_utils.is_s3_url(path) or not os.path.exists(tensors_path):
         return load_pkl.load(path=path, verbose=verbose)
@@ -136,13 +145,13 @@ def load(path: str, tensors_path: str, mmap: bool = False, verbose: bool = True)
 
     if verbose:
         logger.log(15, f"Loading: {path}")
+    pin = pin and torch.cuda.is_available()
+    if pin:
+        map_location = _restore_pinned
+    else:
+        map_location = None if torch.cuda.is_available() else "cpu"
     # The tensor file is as trusted as the pickle beside it, which is unpickled without restrictions.
-    tensors = torch.load(
-        tensors_path,
-        map_location=None if torch.cuda.is_available() else "cpu",
-        mmap=mmap and os.name != "nt",
-        weights_only=False,
-    )
+    tensors = torch.load(tensors_path, map_location=map_location, mmap=pin and os.name != "nt", weights_only=False)
     with open(path, "rb") as f:
         return _TensorUnpickler(f, tensors).load()
 
