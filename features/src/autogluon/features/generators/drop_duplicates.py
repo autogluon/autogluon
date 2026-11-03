@@ -115,7 +115,7 @@ class DropDuplicatesFeatureGenerator(AbstractFeatureGenerator):
         - Includes an isna mask, so NaN/NA positions matter.
         - Normalizes missing values by zeroing them in the value buffer (mask carries the info).
         - Normalizes -0.0 to +0.0 for float types.
-        - Uses blake2b (fast, stable) to produce a 16-byte digest.
+        - Uses SHA-256, truncated to 16 bytes, for compatibility with FIPS-enabled environments.
         """
         # Convert to numpy array (may include float w/ NaN or pandas nullable types)
         arr = s.to_numpy(copy=False)
@@ -141,10 +141,10 @@ class DropDuplicatesFeatureGenerator(AbstractFeatureGenerator):
                 vals[mask] = 0.0
 
         # Hash both: value bytes + mask bytes
-        h = hashlib.blake2b(digest_size=16)
+        h = hashlib.sha256()
         h.update(np.ascontiguousarray(vals).view(np.uint8))
         h.update(np.ascontiguousarray(mask).view(np.uint8))
-        return h.digest()
+        return h.digest()[:16]
 
     @classmethod
     def _drop_duplicate_features_numeric(

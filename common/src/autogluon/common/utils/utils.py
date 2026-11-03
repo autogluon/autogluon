@@ -7,7 +7,7 @@ import platform
 import re
 import sys
 from datetime import datetime, timezone
-from hashlib import md5
+from hashlib import sha256
 from pathlib import Path
 from typing import Any, Optional
 
@@ -376,7 +376,7 @@ def check_saved_predictor_version(
 
 
 def hash_pandas_df(df: Optional[pd.DataFrame]) -> str:
-    """Compute a hash string for a pandas DataFrame."""
+    """Compute a 64-character SHA-256 hash string for a pandas DataFrame."""
     if df is not None:
         # Convert in case TimeSeriesDataFrame object is passed
         df = pd.DataFrame(df, copy=True)
@@ -385,7 +385,7 @@ def hash_pandas_df(df: Optional[pd.DataFrame]) -> str:
         hashable_object = pd.util.hash_pandas_object(df).values
     else:
         hashable_object = "0".encode("utf-8")
-    return md5(hashable_object).hexdigest()
+    return sha256(hashable_object).hexdigest()
 
 
 def seed_everything(seed: int) -> None:
