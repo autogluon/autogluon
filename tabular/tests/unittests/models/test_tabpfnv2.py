@@ -216,10 +216,9 @@ def test_tabpfn_registry_capacity_bounds_the_shared_networks(tmp_path):
 
 def test_tabpfn_share_weights_off_loads_and_pickles_its_own_network(tmp_path, monkeypatch):
     """`model_class_settings={"REALTABPFN-V2": {"share_weights": False}}` restores tabpfn's own load
-    for that version only: no registry entry, the network in the pickle, a CPU round trip on save.
+    for that version only: no registry entry, the network saved with the model, a CPU round trip on save.
     """
     import os
-    import pickle
 
     import numpy as np
 
@@ -238,8 +237,9 @@ def test_tabpfn_share_weights_off_loads_and_pickles_its_own_network(tmp_path, mo
     assert isinstance(owned.model.model_path, str), "tabpfn's own load ran from the checkpoint path"
     expected = owned.predict_proba(X)
     saved_path = owned.save()
-    with open(os.path.join(saved_path, RealTabPFNv2Model.model_file_name), "rb") as f:
-        assert pickle.load(f).model.models_, "the network is in the pickle"
+    network_bytes = sum(t.numel() * t.element_size() for m in owned.model.models_ for t in m.state_dict().values())
+    tensors_path = os.path.join(saved_path, RealTabPFNv2Model.model_tensors_file_name)
+    assert os.path.getsize(tensors_path) >= network_bytes, "the network is saved with the model"
     loaded = RealTabPFNv2Model.load(saved_path)
     assert loaded.model.models_[0] is not owned.model.models_[0]
     np.testing.assert_allclose(loaded.predict_proba(X), expected, rtol=1e-5, atol=1e-6)

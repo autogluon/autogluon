@@ -37,4 +37,9 @@ _DEFAULT_CLASS_TAGS = {
     # For large datasets, it is much faster to get a memory estimate using this technique rather than having to first initialize the model
     # For example, going from 15s -> 0.1s, approximately a 100x speedup.
     "can_estimate_memory_usage_static": False,
+    # Whether `load` memory-maps the torch tensors that `save` wrote beside the pickle (`model_tensors.pt`)
+    # instead of reading them into RAM. A mapped tensor's pages are read from the file when first touched.
+    # Useful for a large fitted state that the model copies after loading anyway (for example a context cache it
+    # moves into pinned memory), which then never exists twice in RAM. Ignored on Windows.
+    "mmap_tensors_on_load": False,
 }

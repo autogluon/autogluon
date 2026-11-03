@@ -349,8 +349,6 @@ class TabPFNModel(AbstractTorchModel):
         count does not.
 
         A fit that shares its network is measured by the base class (its pickle is weightless already).
-        The base implementation collects garbage first to make room for a pickle that holds the weights;
-        the weightless pickle here is small, so that pass is skipped.
         """
         estimator = self.model
         if estimator is None or self._shared_state is not None:
