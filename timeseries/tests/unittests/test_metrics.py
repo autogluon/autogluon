@@ -187,6 +187,23 @@ def test_given_missing_target_values_when_metric_evaluated_then_metric_is_not_na
     assert not pd.isna(score)
 
 
+@pytest.mark.parametrize("metric_name", ["MASE", "RMSSE", "SQL"])
+def test_when_seasonal_period_passed_to_call_then_warning_is_raised_and_value_matches_init(metric_name):
+    # Before horizon_weight support, seasonal_period was an argument of __call__. Passing it there should
+    # still work, with a deprecation warning like prediction_length, instead of raising a TypeError.
+    prediction_length = 5
+    train, test = DUMMY_TS_DATAFRAME.train_test_split(prediction_length)
+    predictions = get_prediction_for_df(train, prediction_length)
+    expected = check_get_evaluation_metric(metric_name, prediction_length=prediction_length, seasonal_period=3)(
+        test, predictions
+    )
+
+    metric = check_get_evaluation_metric(metric_name, prediction_length=prediction_length)
+    with pytest.warns(FutureWarning, match="seasonal_period"):
+        score = metric(test, predictions, seasonal_period=3)
+    assert np.isclose(score, expected)
+
+
 def test_when_no_missing_values_then_mql_equals_wql_times_mean_abs_target():
     # MQL and WQL share the same per-entry quantile loss; MQL averages it while WQL divides by the sum of |y_true|.
     # Therefore MQL == WQL * mean(|y_true|) as long as the target contains no missing values.
