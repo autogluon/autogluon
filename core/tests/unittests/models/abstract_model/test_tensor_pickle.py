@@ -125,3 +125,69 @@ def test_an_object_without_tensors_pickles_as_before(tmp_path):
     with open(path, "rb") as f:
         assert f.read() == pickle.dumps(obj, protocol=_tensor_pickle.PROTOCOL)
     assert _tensor_pickle.pickled_size(obj) == len(pickle.dumps(obj, protocol=_tensor_pickle.PROTOCOL))
+
+
+def test_a_failed_resave_keeps_the_previous_pair_loadable(tmp_path, monkeypatch):
+    model = _model(tmp_path, state={"weights": torch.zeros(3), "bias": torch.ones(2)})
+    path = model.save()
+    model.model = {"bias": torch.full((2,), 5.0), "weights": torch.full((3,), 7.0)}
+
+    def failing_save(*args, **kwargs):
+        raise OSError("No space left on device")
+
+    monkeypatch.setattr(torch, "save", failing_save)
+    with pytest.raises(OSError):
+        model.save()
+    monkeypatch.undo()
+
+    loaded = _Model.load(path).model
+    assert torch.equal(loaded["weights"], torch.zeros(3)) and torch.equal(loaded["bias"], torch.ones(2))
+    assert _files(path) == {_Model.model_file_name, _Model.model_tensors_file_name}, "no temporary file is left"
+
+
+def test_a_tensor_file_from_another_save_is_refused(tmp_path):
+    first = _model(tmp_path / "a", state={"weights": torch.zeros(3)}).save()
+    second = _model(tmp_path / "b", state={"weights": torch.ones(3)}).save()
+    os.replace(
+        os.path.join(second, _Model.model_tensors_file_name), os.path.join(first, _Model.model_tensors_file_name)
+    )
+
+    with pytest.raises(pickle.UnpicklingError, match="different save"):
+        _Model.load(first)
+
+
+def test_a_missing_tensor_file_and_a_plain_unpickle_fail_clearly(tmp_path):
+    path = _model(tmp_path, state={"weights": torch.zeros(3)}).save()
+    with open(os.path.join(path, _Model.model_file_name), "rb") as f:
+        with pytest.raises(pickle.UnpicklingError, match="model_tensors.pt"):
+            pickle.load(f)
+
+    os.remove(os.path.join(path, _Model.model_tensors_file_name))
+    with pytest.raises(FileNotFoundError, match="tensor file is missing"):
+        _Model.load(path)
+
+
+def test_a_pickle_without_tensor_references_never_reads_the_tensor_file(tmp_path):
+    path = _model(tmp_path, state={"weights": np.zeros(3)}).save()
+    with open(os.path.join(path, _Model.model_tensors_file_name), "wb") as f:
+        f.write(b"not a tensor file")
+
+    np.testing.assert_array_equal(_Model.load(path).model["weights"], np.zeros(3))
+
+
+def test_cuda_storages_load_on_the_cpu_without_cuda(monkeypatch):
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
+    storage = torch.ones(4).untyped_storage()
+
+    restored = _tensor_pickle._map_location(pin=False)(storage, "cuda:0")
+
+    assert restored.device.type == "cpu"
+
+
+def test_pickled_size_counts_sparse_and_meta_tensors_as_written():
+    sparse = torch.sparse_coo_tensor(
+        torch.tensor([[0], [0]]), torch.tensor([1.0]), (100_000, 100_000), check_invariants=True
+    )
+    meta = torch.empty(10_000_000, device="meta")
+
+    assert _tensor_pickle.pickled_size({"sparse": sparse, "meta": meta}) < 10_000

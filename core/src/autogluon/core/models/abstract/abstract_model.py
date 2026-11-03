@@ -2959,7 +2959,7 @@ class AbstractModel(ModelBase, Tunable):
         Will raise an exception if `self` cannot be pickled.
 
         The pickle is streamed into a byte counter rather than held in memory, and torch tensors are counted at
-        the size of their storage without being serialized, so measuring a model does not copy it.
+        the size of their storage without being serialized.
 
         Parameters
         ----------
