@@ -4621,6 +4621,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             problem_type=self.problem_type,
             metric=self.eval_metric,
             random_state=np.random.RandomState(0),
+            quantile_levels=self.quantile_levels,
         )
         selector.fit(predictions=[oof[covered] for oof in oofs], labels=y[covered])
         plan = []

@@ -382,3 +382,26 @@ def test_a_model_is_fit_only_in_the_time_the_reserve_leaves(tmp_path, monkeypatc
         time_limit=120,
     )
     assert len(_bags(predictor)) == 1
+
+
+def test_the_auto_reserve_of_a_quantile_fit(tmp_path):
+    # greedy over the quantile bags fit so far scores them with the fit's quantile levels
+    predictor = TabularPredictor(
+        label="label",
+        problem_type="quantile",
+        quantile_levels=[0.1, 0.5, 0.9],
+        path=str(tmp_path / "predictor"),
+        verbosity=0,
+    ).fit(
+        _frame("regression", rows=400, seed=0),
+        num_bag_folds=NUM_FOLDS,
+        num_bag_sets=1,
+        num_stack_levels=0,
+        hyperparameters={"RF": {"n_estimators": 20}, "XT": {"n_estimators": 20}},
+        validation_folds=1,
+        time_limit=120,
+        num_gpus=0,
+        dynamic_stacking=False,
+        raise_on_model_failure=True,
+    )
+    assert len(_bags(predictor)) == 2
