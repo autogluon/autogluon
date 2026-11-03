@@ -287,31 +287,47 @@ def test_explicit_recipe_overrides_and_time_budget():
     assert cfg.hyperparams["budget"] == 250
 
 
+@pytest.mark.parametrize("version", ["1", "2"])
+@pytest.mark.parametrize("metric_setting", ["default", "none", "explicit"])
 @pytest.mark.parametrize(
-    "problem_type,eval_metric,expected",
+    "problem_type,n_classes,eval_metric,default_metric,explicit_metric",
     [
-        ("binary", "accuracy", "accuracy"),
-        ("binary", "f1", "f1"),
-        ("multiclass", "f1_weighted", "f1"),
-        ("multiclass", "roc_auc_ovo_macro", "auc"),
-        ("regression", "root_mean_squared_error", "rmse"),
-        ("regression", "mean_squared_error", "mse"),
-        ("regression", "mean_absolute_error", "mae"),
-        ("regression", "r2", "r2"),
+        ("binary", 2, "roc_auc", "log_loss", "auc"),
+        ("multiclass", 3, "f1_weighted", "log_loss", "f1"),
+        ("regression", 0, "root_mean_squared_error", "mse", "mae"),
     ],
 )
-def test_eval_metric_controls_fine_tuning_metric(problem_type, eval_metric, expected):
-    model = MitraV2Model(problem_type=problem_type, eval_metric=eval_metric)
-    hyperparameters = {}
-    model._set_fine_tune_metric(hyperparameters)
-    assert hyperparameters["metric"] == expected
-
-
-def test_explicit_fine_tuning_metric_takes_precedence():
-    model = MitraV2Model(problem_type="binary", eval_metric="f1")
-    hyperparameters = {"metric": "log_loss"}
-    model._set_fine_tune_metric(hyperparameters)
-    assert hyperparameters["metric"] == "log_loss"
+def test_fine_tuning_metric_is_independent_of_eval_metric(
+    checkpoint_factory,
+    tmp_path,
+    version,
+    metric_setting,
+    problem_type,
+    n_classes,
+    eval_metric,
+    default_metric,
+    explicit_metric,
+):
+    task = "REGRESSION" if problem_type == "regression" else "CLASSIFICATION"
+    output = (7 if version == "2" else 1) if problem_type == "regression" else 10
+    checkpoint = checkpoint_factory(task=task, dim_output=output, version=version)
+    hyperparameters = {"hf_model": checkpoint, "model_version": version, "fine_tune_steps": 1}
+    if metric_setting != "default":
+        hyperparameters["metric"] = explicit_metric if metric_setting == "explicit" else None
+    expected = explicit_metric if metric_setting == "explicit" else default_metric
+    rng = np.random.RandomState(1)
+    X = pd.DataFrame(rng.normal(size=(48, 4)))
+    y = pd.Series(rng.normal(size=48) if n_classes == 0 else np.arange(48) % n_classes)
+    model = MitraV2Model(
+        path=str(tmp_path / "model"),
+        problem_type=problem_type,
+        eval_metric=eval_metric,
+        hyperparameters=hyperparameters,
+    )
+    model.fit(X=X.iloc[:32], y=y.iloc[:32], X_val=X.iloc[32:], y_val=y.iloc[32:], num_cpus=1, num_gpus=0)
+    assert model.eval_metric.name == eval_metric
+    assert model.model.metric == expected
+    assert model.model.trainers[0].cfg.hyperparams["metric"] == expected
 
 
 def test_f1_early_stopping_maximizes_score():

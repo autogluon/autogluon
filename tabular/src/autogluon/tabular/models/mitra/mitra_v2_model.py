@@ -33,6 +33,10 @@ class MitraV2Model(MitraModel):
     and 1e-5 otherwise. Bagging uses the outer training size for this rule.
     Held-out fold rows join inference support only after OOF scoring.
 
+    Fine-tuning selects checkpoints using ``log_loss`` for classification and
+    ``mse`` for regression, matching the released HF recipe independently of
+    AutoGluon's ``eval_metric``. Set the ``metric`` hyperparameter to override it.
+
     ``max_features=256`` controls feature reduction independently of the
     ``ag.max_features`` fit constraint. Set ``feature_reduction=None`` to disable
     reduction or choose ``"select"`` / ``"svd"``; ``"auto"`` is the default.
@@ -180,30 +184,6 @@ class MitraV2Model(MitraModel):
         )
         return validate_model_version(version)
 
-    def _set_fine_tune_metric(self, hyperparameters: dict) -> None:
-        """Use a compatible AutoGluon metric unless the user selected one explicitly."""
-        if hyperparameters.get("metric") is not None:
-            return
-        classification_metrics = {
-            "accuracy": "accuracy",
-            "f1": "f1",
-            "f1_weighted": "f1",
-            "log_loss": "log_loss",
-            "roc_auc": "auc",
-            "roc_auc_ovo": "auc",
-            "roc_auc_ovo_macro": "auc",
-        }
-        regression_metrics = {
-            "mean_absolute_error": "mae",
-            "mean_squared_error": "mse",
-            "r2": "r2",
-            "root_mean_squared_error": "rmse",
-        }
-        metrics = regression_metrics if self.problem_type == "regression" else classification_metrics
-        metric = metrics.get(self.eval_metric.name)
-        if metric is not None:
-            hyperparameters["metric"] = metric
-
     def get_model_cls(self):
         self._get_model_version()
         self._validate_fine_tune_recipe()
@@ -275,7 +255,6 @@ class MitraV2Model(MitraModel):
         model_version = self._get_model_version()
         hyp["model_version"] = model_version
         hyp.pop("fine_tune_recipe", None)
-        self._set_fine_tune_metric(hyp)
         hyp.pop("max_features", None)
         hyp.pop("feature_reduction", None)
 
