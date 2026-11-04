@@ -4,12 +4,82 @@ from pickle import PicklingError
 from unittest import mock
 
 import numpy as np
+import pandas as pd
 import pytest
+from joblib import parallel_config
+
+from autogluon.timeseries.models import PerStepTabularModel
+from autogluon.timeseries.utils.features import CovariateMetadata
 
 from ..common import DUMMY_TS_DATAFRAME, get_data_frame_with_variable_lengths
 
 DUMMY_HYPERPARAMETERS = {"model_name": "DUMMY", "n_jobs": 1}
 EVAL_METRICS = ["WAPE", "WQL"]
+
+
+@pytest.mark.parametrize("n_jobs", [-1, -2])
+def test_when_negative_n_jobs_and_time_limit_provided_then_models_can_fit_and_predict(n_jobs, tmp_path):
+    data = get_data_frame_with_variable_lengths({"A": 12, "B": 15})
+    model = PerStepTabularModel(
+        freq="D",
+        prediction_length=2,
+        eval_metric="WAPE",
+        path=str(tmp_path),
+        hyperparameters={"model_name": "DUMMY", "n_jobs": n_jobs, "target_scaler": None},
+    )
+
+    with parallel_config(backend="threading"):
+        model.fit(train_data=data, time_limit=30)
+        predictions = model.predict(data)
+
+    assert model._n_jobs == n_jobs
+    assert predictions.index.equals(model.get_forecast_horizon_index(data))
+    assert np.isfinite(predictions.to_numpy()).all()
+
+
+@pytest.mark.parametrize("feature_type", ["known_covariates", "static_features"])
+@pytest.mark.parametrize("reserved_name", ["unique_id", "ds", "y"])
+def test_when_feature_name_matches_mlforecast_column_then_per_step_model_can_fit_and_predict(
+    feature_type, reserved_name, tmp_path
+):
+    data = get_data_frame_with_variable_lengths({"A": 12, "B": 15})
+    feature_names = [reserved_name, f"__{reserved_name}"]
+    if feature_type == "static_features":
+        data.static_features = pd.DataFrame(
+            {name: [1.0 + offset, 2.0 + offset] for offset, name in enumerate(feature_names)}, index=data.item_ids
+        )
+        expected_features = data.static_features.reindex(data.index.get_level_values("item_id")).reset_index(drop=True)
+    else:
+        for offset, name in enumerate(feature_names):
+            data[name] = np.arange(1, len(data) + 1, dtype=float) + offset
+        expected_features = data[feature_names].reset_index(drop=True)
+    metadata = CovariateMetadata(**{f"{feature_type}_real": feature_names})
+    model = PerStepTabularModel(
+        freq="D",
+        prediction_length=2,
+        eval_metric="WAPE",
+        path=str(tmp_path),
+        covariate_metadata=metadata,
+        hyperparameters={"model_name": "DUMMY", "n_jobs": 1, "target_scaler": None},
+    )
+    original = data.copy()
+
+    train_df = model._get_train_df(data, max_num_items=None, max_num_samples=None)
+    assert train_df.columns.is_unique
+    converted_features = train_df.drop(columns=["unique_id", "ds", "y"])
+    assert converted_features.shape[1] == len(feature_names)
+    np.testing.assert_array_equal(converted_features[f"__{reserved_name}"], expected_features[f"__{reserved_name}"])
+    renamed_column = converted_features.columns.drop(f"__{reserved_name}")[0]
+    np.testing.assert_array_equal(converted_features[renamed_column], expected_features[reserved_name])
+    model.fit(train_data=data)
+    past, known_covariates = data.get_model_inputs_for_scoring(
+        model.prediction_length, known_covariates_names=metadata.known_covariates
+    )
+    predictions = model.predict(past, known_covariates=known_covariates)
+
+    assert predictions.index.equals(model.get_forecast_horizon_index(past))
+    assert np.isfinite(predictions.to_numpy()).all()
+    pd.testing.assert_frame_equal(data, original)
 
 
 @pytest.mark.parametrize(
