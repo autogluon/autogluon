@@ -844,7 +844,7 @@ dependencies = [
     { name = "autogluon-common" },
     { name = "autogluon-core" },
     { name = "autogluon-features" },
-    { name = "autogluon-tabular", extra = ["catboost", "lightgbm", "xgboost"] },
+    { name = "autogluon-tabular", extra = ["lightgbm", "xgboost"] },
     { name = "chronos-forecasting" },
     { name = "coreforecast" },
     { name = "einops" },
@@ -873,6 +873,10 @@ dependencies = [
 [package.optional-dependencies]
 all = [
     { name = "autogluon-core", extra = ["raytune"] },
+    { name = "autogluon-tabular", extra = ["catboost"] },
+]
+catboost = [
+    { name = "autogluon-tabular", extra = ["catboost"] },
 ]
 ray = [
     { name = "autogluon-core", extra = ["raytune"] },
@@ -892,7 +896,9 @@ requires-dist = [
     { name = "autogluon-core", extras = ["raytune"], marker = "extra == 'all'", editable = "core" },
     { name = "autogluon-core", extras = ["raytune"], marker = "extra == 'ray'", editable = "core" },
     { name = "autogluon-features", editable = "features" },
-    { name = "autogluon-tabular", extras = ["catboost", "lightgbm", "xgboost"], editable = "tabular" },
+    { name = "autogluon-tabular", extras = ["lightgbm", "xgboost"], editable = "tabular" },
+    { name = "autogluon-tabular", extras = ["catboost"], marker = "extra == 'all'", editable = "tabular" },
+    { name = "autogluon-tabular", extras = ["catboost"], marker = "extra == 'catboost'", editable = "tabular" },
     { name = "chronos-forecasting", specifier = ">=2.3.1,<2.4" },
     { name = "coreforecast", specifier = ">=0.0.12,<0.0.19" },
     { name = "einops", specifier = ">=0.7,<1" },
@@ -920,7 +926,7 @@ requires-dist = [
     { name = "transformers", extras = ["sentencepiece"], specifier = ">=5.3,<5.15" },
     { name = "utilsforecast", specifier = ">=0.2.3,<0.2.12" },
 ]
-provides-extras = ["tests", "ray", "all"]
+provides-extras = ["catboost", "tests", "ray", "all"]
 
 [[package]]
 name = "beartype"
