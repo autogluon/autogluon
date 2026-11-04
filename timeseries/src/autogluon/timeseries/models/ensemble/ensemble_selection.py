@@ -147,6 +147,14 @@ def fit_time_series_ensemble_selection(
         Dictionary mapping model names to their predictions for each validation window.
     ensemble_size:
         Number of iterations of the ensemble selection algorithm.
+    eval_metric:
+        Metric used to score the ensemble predictions on each validation window.
+    prediction_length:
+        Number of time steps in each forecast.
+    target:
+        Name of the target column in the data.
+    time_limit:
+        Time limit in seconds. If it runs out, ensemble selection stops early.
 
     Returns
     -------
