@@ -424,9 +424,22 @@ class TabPFNModel(AbstractTorchModel):
         return self.model.devices_[0].type
 
     def _set_device(self, device: str):
-        """Move an estimator that owns its network; a shared network is swapped by ``AbstractTorchModel.set_device``."""
-        self.model.to(device)
-        self._sync_inner_checkpoints_to_engine_devices(device=device)
+        """Move an estimator that owns its network; a shared network is swapped by ``AbstractTorchModel.set_device``.
+
+        ``AbstractTorchModel`` passes a device type (``save`` moves the model to the CPU and back, ``load``
+        to the device it was fit on), so back on ``"cuda"`` a fit spread over several GPUs gets its device
+        list again, cut to the GPUs this process sees, instead of the current GPU alone.
+        """
+        devices = self._devices_for(device)
+        self.model.to(devices)
+        self._sync_inner_checkpoints_to_engine_devices(device=devices if isinstance(devices, str) else devices[0])
+
+    def _devices_for(self, device: str) -> str | list[str]:
+        """tabpfn's device argument for moving to ``device``: for ``"cuda"`` the GPUs the fit was given (its
+        recorded ``num_gpus``), as many as this process sees; else ``device``."""
+        if device != "cuda":
+            return device
+        return self._get_tabpfn_device(num_gpus=max(1, self._fit_metadata.get("num_gpus") or 0))
 
     def _sync_inner_checkpoints_to_engine_devices(self, device: str) -> None:
         """Point `models_` back at the checkpoints the inference engine just moved.
