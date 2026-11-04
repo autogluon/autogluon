@@ -54,7 +54,7 @@ def weighted_percentile(a, q, weights=None, sorter=None, is_filtered=False):
     ----------
     a: array-like, shape=(n_samples,)
         samples at which the quantile.
-    q: int
+    q: float
         quantile between 0 and 100.
     weights: array-like, shape=(n_samples,)
         weights[i] is the weight given to point a[i] while computing the
@@ -85,7 +85,7 @@ def weighted_percentile(a, q, weights=None, sorter=None, is_filtered=False):
     if weights is None:
         weights = np.ones_like(a)
     if q > 100 or q < 0:
-        raise ValueError("q should be in-between 0 and 100, got %d" % q)
+        raise ValueError(f"q should be in-between 0 and 100, got {q}")
 
     a = np.asarray(a, dtype=np.float32)
     weights = np.asarray(weights, dtype=np.float32)
@@ -454,7 +454,7 @@ def get_quantiles(neighbors_df, quantile_levels):
         result.append(
             weighted_percentile(
                 neighbors_df.y,
-                int(q * 100),
+                q * 100,  # not int(): that truncates 0.025 to 2 and 0.29 (28.999...) to 28
                 neighbors_df.weight,
                 sorter=slice(None),  # targets are already sorted, so no sorting required
                 is_filtered=True,

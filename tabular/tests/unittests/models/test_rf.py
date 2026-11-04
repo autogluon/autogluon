@@ -5,6 +5,7 @@ import pandas as pd
 import pytest
 
 from autogluon.tabular.models.rf.rf_model import RFModel
+from autogluon.tabular.models.rf.rf_quantile import ExtraTreesQuantileRegressor, RandomForestQuantileRegressor
 from autogluon.tabular.testing import FitHelper
 
 toy_model_params = {"n_estimators": 10}
@@ -92,3 +93,22 @@ def test_label_encode_categoricals_leaves_caller_frame_untouched(preserve_missin
     assert list(X.dtypes) == list(X_before.dtypes)
     # the untouched column is shared rather than copied, which is the point of the above
     assert np.shares_memory(X["num"].to_numpy(), encoded["num"].to_numpy())
+
+
+@pytest.mark.parametrize("model_cls", [RandomForestQuantileRegressor, ExtraTreesQuantileRegressor])
+def test_quantile_forest_predicts_the_requested_levels(model_cls):
+    """Each quantile level is predicted as given rather than truncated to a whole percent.
+
+    The levels used to be passed as `int(q * 100)`, so 0.025 was predicted as 0.02 and 0.29
+    (`0.29 * 100 == 28.999...`) as 0.28.
+    """
+    rng = np.random.default_rng(0)
+    X = rng.normal(size=(500, 3))
+    y = X[:, 0] + rng.normal(size=500)
+    model = model_cls(n_estimators=10, min_samples_leaf=5, random_state=0).fit(X, y)
+
+    pred = model.predict(X[:100], quantile_levels=[0.02, 0.025, 0.28, 0.29])
+
+    for lower, higher in [(0, 1), (2, 3)]:
+        assert (pred[:, higher] >= pred[:, lower]).all()
+        assert (pred[:, higher] > pred[:, lower]).any()
