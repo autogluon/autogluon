@@ -174,6 +174,8 @@ class TabPFNModel(AbstractTorchModel):
         self._max_batch_size_resolved: int | None = None
         #: Rows of the training context, set during `_fit`.
         self._n_train_fit: int | None = None
+        #: The GPUs a fit spread over several of them was given, set during `_fit`.
+        self._fit_devices: list[str] | None = None
 
     def _default_model_map(self) -> dict[str, str | None]:
         fallback = {
@@ -238,6 +240,7 @@ class TabPFNModel(AbstractTorchModel):
 
         self._resolve_fit_device(num_gpus=num_gpus)  # CPU-fallback warning + CUDA availability check
         device = self._get_tabpfn_device(num_gpus=num_gpus)
+        self._fit_devices = device if isinstance(device, list) else None
 
         if verbosity >= 2:
             # logs "Built with PriorLabs-TabPFN"
@@ -424,9 +427,22 @@ class TabPFNModel(AbstractTorchModel):
         return self.model.devices_[0].type
 
     def _set_device(self, device: str):
-        """Move an estimator that owns its network; a shared network is swapped by ``AbstractTorchModel.set_device``."""
-        self.model.to(device)
-        self._sync_inner_checkpoints_to_engine_devices(device=device)
+        """Move an estimator that owns its network; a shared network is swapped by ``AbstractTorchModel.set_device``.
+
+        ``AbstractTorchModel`` passes a device type (``save`` moves the model to the CPU and back, ``load``
+        to the device it was fit on), so back on ``"cuda"`` a fit spread over several GPUs gets its device
+        list again, cut to the GPUs this process sees, instead of the current GPU alone.
+        """
+        devices = self._devices_for(device)
+        self.model.to(devices)
+        self._sync_inner_checkpoints_to_engine_devices(device=devices if isinstance(devices, str) else devices[0])
+
+    def _devices_for(self, device: str) -> str | list[str]:
+        """tabpfn's device argument for moving to ``device``: the fit's GPUs for ``"cuda"``, else ``device``."""
+        fit_devices = getattr(self, "_fit_devices", None)  # a model pickled before it was recorded has none
+        if device != "cuda" or not fit_devices:
+            return device
+        return self._get_tabpfn_device(num_gpus=len(fit_devices))
 
     def _sync_inner_checkpoints_to_engine_devices(self, device: str) -> None:
         """Point `models_` back at the checkpoints the inference engine just moved.

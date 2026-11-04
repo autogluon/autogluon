@@ -66,6 +66,7 @@ def test_tabpfn_set_device_moves_inner_checkpoints():
     )
     model = predictor._trainer.load_model(predictor.model_names()[0])
     assert model.get_device() == "cuda", "expected a GPU fit"
+    assert len(model.model.devices_) > 1, "the save and the load put the fit back on all its GPUs"
 
     model.set_device("cpu")
 
@@ -83,6 +84,39 @@ def test_tabpfn_set_device_moves_inner_checkpoints():
     assert cached == {id(inner_model) for inner_model in model.model.models_}, (
         "models_ must reference the inference engine's cached checkpoints, not duplicates"
     )
+
+
+class _MovedEstimator:
+    """Records the device argument of every move."""
+
+    def __init__(self):
+        self.moves = []
+        self.models_ = []
+
+    def to(self, device):
+        self.moves.append(device)
+
+
+@pytest.mark.parametrize(
+    "fit_devices, visible, back_on_cuda",
+    [
+        (["cuda:0", "cuda:1", "cuda:2"], 3, ["cuda:0", "cuda:1", "cuda:2"]),
+        (["cuda:0", "cuda:1", "cuda:2"], 2, ["cuda:0", "cuda:1"]),
+        (["cuda:0", "cuda:1"], 1, "cuda"),
+        (None, 4, "cuda"),
+    ],
+)
+def test_tabpfn_set_device_returns_a_multi_gpu_fit_to_its_gpus(monkeypatch, fit_devices, visible, back_on_cuda):
+    """``save`` moves the model to the CPU and back to ``"cuda"``, and ``load`` to ``"cuda"``: a fit spread over
+    several GPUs goes back to as many of them as this process sees, not to the current GPU alone."""
+    monkeypatch.setattr(torch.cuda, "device_count", lambda: visible)
+    model = RealTabPFNv2Model(problem_type="binary", eval_metric=None)
+    model.model, model._fit_devices = _MovedEstimator(), fit_devices
+
+    model._set_device("cpu")
+    model._set_device("cuda")
+
+    assert model.model.moves == ["cpu", back_on_cuda]
 
 
 def _fit_tabpfn(tmp_path, name, X, y, *, problem_type="binary", eval_metric="log_loss", hyperparameters=None):
