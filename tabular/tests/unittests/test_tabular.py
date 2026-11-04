@@ -922,3 +922,32 @@ def test_tabular_log_to_file():
 
     with pytest.raises(AssertionError):
         TabularPredictor.load_log()
+
+
+def test_calibrate_decision_threshold_subsample_keeps_sample_weights(caplog, tmp_path):
+    """With `weight_evaluation=True`, subsampling for threshold calibration keeps each row's weight.
+
+    The weights used to be bound into the metric at full length, so once `subsample_size` took effect they no longer
+    matched the labels and the metric was computed unweighted, logging that it "does not support sample weights".
+    """
+    import logging
+
+    rng = np.random.default_rng(0)
+    n = 2000
+    train_data = pd.DataFrame({"a": rng.normal(size=n), "b": rng.normal(size=n), "w": rng.uniform(0.5, 2, size=n)})
+    train_data["label"] = (train_data["a"] + rng.normal(size=n) > 0).astype(int)
+    predictor = TabularPredictor(
+        label="label",
+        path=str(tmp_path),
+        eval_metric="accuracy",
+        sample_weight="w",
+        weight_evaluation=True,
+        verbosity=0,
+    ).fit(train_data, hyperparameters={"GBM": {"num_boost_round": 30}})
+
+    num_rows_val = len(predictor.load_data_internal(data="val", return_y=False)[0])
+    assert num_rows_val > 100  # so that the subsample below takes effect
+    with caplog.at_level(logging.WARNING, logger="autogluon"):
+        threshold = predictor.calibrate_decision_threshold(subsample_size=100)
+    assert 0 <= threshold <= 1
+    assert "does not support sample weights" not in caplog.text

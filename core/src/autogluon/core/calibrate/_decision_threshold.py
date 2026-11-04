@@ -26,7 +26,13 @@ def calibrate_decision_threshold(
     seed: int = 0,
     metric_name: str | None = None,
     verbose: bool = True,
+    sample_weight: np.array | None = None,
 ) -> float:
+    """
+    `sample_weight`, if specified, is passed to `metric` as `sample_weight`, subsampled along with `y` and
+    `y_pred_proba`. Pass weights this way rather than binding them into `metric`, whose weights would no longer
+    match `y` once `subsample_size` takes effect.
+    """
     assert isinstance(decision_thresholds, (int, list)), (
         f"decision_thresholds must be int or List[float] (decision_thresholds={decision_thresholds})"
     )
@@ -45,6 +51,9 @@ def calibrate_decision_threshold(
 
     num_samples_total = len(y)
     assert num_samples_total == len(y_pred_proba)
+    if sample_weight is not None:
+        sample_weight = np.asarray(sample_weight)
+        assert num_samples_total == len(sample_weight)
 
     if subsample_size is not None and subsample_size < num_samples_total:
         logger.log(20, f"Subsampling y to {subsample_size} samples to speedup threshold calibration...")
@@ -52,9 +61,13 @@ def calibrate_decision_threshold(
         subsample_indices = rng.choice(num_samples_total, subsample_size, replace=False)
         y = y[subsample_indices]
         y_pred_proba = y_pred_proba[subsample_indices]
+        if sample_weight is not None:
+            sample_weight = sample_weight[subsample_indices]
 
     if metric_kwargs is None:
         metric_kwargs = dict()
+    if sample_weight is not None:
+        metric_kwargs = dict(metric_kwargs, sample_weight=sample_weight)
 
     if isinstance(metric, Scorer):
         if metric_name is None:

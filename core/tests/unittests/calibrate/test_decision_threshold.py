@@ -159,3 +159,23 @@ def test_calibrate_decision_threshold_invalid_args():
             metric=balanced_accuracy,
             secondary_decision_thresholds=[0.2, 0.4],
         )
+
+
+def test_calibrate_decision_threshold_sample_weight_with_subsample():
+    """`sample_weight` is subsampled with `y`, so the threshold still optimizes the weighted metric."""
+    from autogluon.core.metrics import accuracy
+
+    # 50 heavy positives at 0.3 and 950 light negatives at 0.35: weighted accuracy calls for a threshold below 0.3,
+    # unweighted accuracy for predicting every row negative
+    y = np.array([1] * 50 + [0] * 950)
+    y_pred_proba = np.array([0.3] * 50 + [0.35] * 950)
+    sample_weight = np.array([100.0] * 50 + [1.0] * 950)
+
+    threshold = calibrate_decision_threshold(
+        y=y, y_pred_proba=y_pred_proba, metric=accuracy, sample_weight=sample_weight, subsample_size=500
+    )
+    assert threshold < 0.3
+    threshold_unweighted = calibrate_decision_threshold(
+        y=y, y_pred_proba=y_pred_proba, metric=accuracy, subsample_size=500
+    )
+    assert threshold_unweighted == 0.5
