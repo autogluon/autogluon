@@ -2437,11 +2437,12 @@ class AbstractModel(ModelBase, Tunable):
             X=X,
             y=y,
             features=features,
-            eval_metric=self.eval_metric,
+            eval_metric=eval_metric,
             predict_func=predict_func,
             predict_func_kwargs=predict_func_kwargs,
             transform_func=transform_func,
             transform_func_kwargs=transform_func_kwargs,
+            quantile_levels=self.quantile_levels,
             silent=silent,
             **kwargs,
         )
