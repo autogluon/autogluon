@@ -1,8 +1,12 @@
+import logging
+
 import numpy as np
+import pandas as pd
 import pytest
 
+from autogluon.core.models import BaggedEnsembleModel
 from autogluon.tabular import TabularPredictor
-from autogluon.tabular.models.lgb.lgb_model import LGBModel
+from autogluon.tabular.models.lgb.lgb_model import _NUM_BOOST_ROUND_ALIASES, LGBModel
 from autogluon.tabular.testing import FitHelper, ModelFitHelper
 
 
@@ -151,6 +155,66 @@ def test_lightgbm_binary_with_calibrate_decision_threshold_bagged_refit():
     leaderboard = predictor.leaderboard(test_data)
     lb_score = leaderboard[leaderboard["model"] == predictor.model_best].iloc[0]["score_test"]
     assert lb_score == scores["f1"]
+
+
+@pytest.mark.parametrize("alias", _NUM_BOOST_ROUND_ALIASES)
+def test_num_boost_round_alias_is_stored_as_num_boost_round(alias):
+    model = LGBModel(hyperparameters={alias: 50, "learning_rate": 0.1})
+    hyperparameters = model.get_hyperparameters_init()
+    assert hyperparameters == {"num_boost_round": 50, "learning_rate": 0.1}
+
+
+def test_num_boost_round_alias_precedence_matches_lightgbm(caplog):
+    # LightGBM uses `num_iterations` over its other aliases, and any alias in params over the `num_boost_round` argument
+    with caplog.at_level(logging.WARNING):
+        model = LGBModel(hyperparameters={"num_boost_round": 10, "n_estimators": 20, "num_iterations": 30})
+    assert model.get_hyperparameters_init() == {"num_boost_round": 30}
+    assert "received the number of boosting rounds more than once" in caplog.text
+
+
+def _make_noisy_regression_data(n: int = 2000, seed: int = 0) -> tuple[pd.DataFrame, pd.Series]:
+    rng = np.random.default_rng(seed)
+    X = pd.DataFrame(rng.normal(size=(n, 5)), columns=[f"f{i}" for i in range(5)])
+    y = pd.Series(X["f0"] * 2 + rng.normal(size=n) * 3)  # noisy, so early stopping stops long before 1000 rounds
+    return X, y
+
+
+@pytest.mark.parametrize("alias", ["num_boost_round", "n_estimators", "num_iterations"])
+def test_refit_full_trains_best_iteration_when_rounds_given_as_alias(alias, tmp_path):
+    """A refit_full model trains the best iteration found via early stopping, however the round count was named."""
+    X, y = _make_noisy_regression_data()
+    model = LGBModel(
+        path=str(tmp_path),
+        name="LightGBM",
+        problem_type="regression",
+        eval_metric="root_mean_squared_error",
+        hyperparameters={alias: 1000, "learning_rate": 0.3},
+    )
+    model.fit(X=X.iloc[:1500], y=y.iloc[:1500], X_val=X.iloc[1500:], y_val=y.iloc[1500:])
+    best_iteration = model.params_trained["num_boost_round"]
+    assert best_iteration < 1000
+
+    model_full = model.convert_to_refit_full_template()
+    model_full.fit(X=X, y=y)
+    assert model_full.model.current_iteration() == best_iteration
+
+
+def test_bagged_refit_full_trains_best_iteration_when_rounds_given_as_alias(tmp_path):
+    X, y = _make_noisy_regression_data()
+    model_base = LGBModel(
+        problem_type="regression",
+        eval_metric="root_mean_squared_error",
+        hyperparameters={"n_estimators": 1000, "learning_rate": 0.3},
+    )
+    model = BaggedEnsembleModel(model_base=model_base, path=str(tmp_path), name="LightGBM_BAG")
+    model.fit(X=X, y=y, k_fold=2)
+    num_boost_round = model._get_compressed_params_trained()["num_boost_round"]
+    assert num_boost_round < 1000
+
+    model_full = model.convert_to_refit_full_template()
+    model_full.fit(X=X, y=y, k_fold=1, _skip_oof=True)
+    child = model_full.load_child(model_full.models[0])
+    assert child.model.current_iteration() == num_boost_round
 
 
 def test_clean_column_name_replaces_expected_symbols():
