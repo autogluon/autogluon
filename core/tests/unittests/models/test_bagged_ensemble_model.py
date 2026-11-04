@@ -425,7 +425,8 @@ def test_get_memory_size_excludes_children_and_skips_gc(monkeypatch):
     """The bag measures its own pickle without the children, and without a garbage collection pass."""
     import gc
     import pickle
-    import sys
+
+    from autogluon.core.models.abstract import _tensor_pickle
 
     bag = _fit_bag({}, k_fold=3)
     collects = []
@@ -437,7 +438,7 @@ def test_get_memory_size_excludes_children_and_skips_gc(monkeypatch):
     assert bag.models and all(isinstance(model, str) for model in bag.models), "children are reattached"
     models, bag.models = bag.models, None
     try:
-        assert memory_size == sys.getsizeof(pickle.dumps(bag, protocol=4))
+        assert memory_size == len(pickle.dumps(bag, protocol=_tensor_pickle.PROTOCOL))
     finally:
         bag.models = models
 

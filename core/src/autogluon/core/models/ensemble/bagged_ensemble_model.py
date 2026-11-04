@@ -1939,12 +1939,6 @@ class BaggedEnsembleModel(AbstractModel):
         finally:
             self.models = models
 
-    def _get_memory_size(self) -> int:
-        # With the children detached the pickle holds the template, the out-of-fold predictions and
-        # bookkeeping, so the gc pass the base implementation runs to make room for a full pickle is
-        # skipped: in a loaded process it costs far more than the pickle itself.
-        return self._get_pickled_size()
-
     def validate_fit_resources(self, **kwargs):
         self._get_model_base().validate_fit_resources(**kwargs)
 
