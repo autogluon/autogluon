@@ -9,7 +9,7 @@ and the considerable model sizes make this integration a nontrivial task.
 AutoMM is dedicated to breaking these barriers 
 by substantially reducing the engineering effort and manual intervention required in data preprocessing, model selection, and fine-tuning. 
 With AutoMM, users can effortlessly adapt foundation models (from popular model zoos like
-[HuggingFace](https://github.com/huggingface/transformers), [TIMM](https://github.com/rwightman/pytorch-image-models),
+[HuggingFace](https://github.com/huggingface/transformers), [TIMM](https://github.com/huggingface/pytorch-image-models),
  [MMDetection](https://github.com/open-mmlab/mmdetection)) to their domain-specific data using just three lines of code. 
 Our toolkit accommodates various data types, including image, text, tabular, and document data, either individually or in combination. 
 It offers support for an array of tasks, encompassing classification, regression, object detection, named entity recognition, semantic matching, and image segmentation.

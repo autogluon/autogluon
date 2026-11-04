@@ -84,7 +84,7 @@ Once the script is finished, you will see a `submission.xlsx` file generate in t
 Here, we provide the example that shows how to use AutoGluon to achieve top-5 performance in
  [Mercari Price Suggestion](https://www.kaggle.com/c/mercari-price-suggestion-challenge/data).
 To run the example, you will need to configure the Kaggle API which will be documented in 
-https://github.com/Kaggle/kaggle-api and download the dataset.
+https://github.com/Kaggle/kaggle-cli and download the dataset.
 
 ```
 sudo apt install -y p7zip-full

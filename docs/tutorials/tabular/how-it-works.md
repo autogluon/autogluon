@@ -50,7 +50,7 @@ Considering both bagging and stacked ensembling, the final number of models that
 
 One key part of this whole process is deciding which models to train and ensemble. Although ensembling, in general, is a very powerful technique; choosing the right models can be the difference between mediocre and excellent performance.
 
-To answer this question, we evaluated **1,310 models** on **200 distinct datasets** to compare the performance of different combinations of algorithms and hyperparameter configurations. The evaluation is available in this [repository](https://github.com/autogluon/tabrepo/tree/main).
+To answer this question, we evaluated **1,310 models** on **200 distinct datasets** to compare the performance of different combinations of algorithms and hyperparameter configurations. The evaluation is available in this [repository](https://github.com/autogluon/tabarena/tree/main).
 
 With the results of this extensive evaluation, we chose a set of pre-defined configurations to use in AutoGluon by default[^6] based on the desired performance (e.g. "best quality", "medium quality", etc.). These presets even define the order in which models should be trained to maximize the use of training time.
 
