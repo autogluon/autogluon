@@ -1,7 +1,7 @@
 import logging
 import math
 import operator
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Optional, Union
 
 import numpy as np
 
@@ -81,6 +81,8 @@ class RankingMetrics:
         Computed score.
 
         """
+        if k <= 0:
+            raise ValueError("k must be positive")
         if isinstance(metrics, str):
             metrics = [metrics]
         if not metrics:  # no metric is provided
@@ -120,14 +122,12 @@ class RankingMetrics:
         precision, recall, mrr, mAP, ndcg = 0, 0, 0, 0, 0
         target, pred = self.results[idx][0], self.results[idx][1]
 
-        # sort the ground truth and predictions in descending order
-        sorted_target = dict(
-            sorted(
-                target.items(),
-                key=operator.itemgetter(1),
-                reverse=self.is_higher_better,
-            )
-        )
+        # Negative numbers and zero are considered as negative responses.
+        num_pos_target = sum(val > 0 for val in target.values())
+        if num_pos_target == 0:
+            return precision, recall, mrr, mAP, ndcg
+
+        # Only predictions need sorting: relevance is looked up by document ID.
         sorted_pred = dict(
             sorted(
                 pred.items(),
@@ -135,13 +135,6 @@ class RankingMetrics:
                 reverse=self.is_higher_better,
             )
         )
-        sorted_target_values = list(sorted_target.values())
-        sorted_pred_values = list(sorted_pred.values())
-
-        # number of positive relevance in target
-        # negative numbers and zero are considered as negative response
-        num_pos_target = len([val for val in sorted_target_values if val > 0])
-
         at_k = k if num_pos_target > k else num_pos_target
 
         first_k_items_list = list(sorted_pred.items())[0:k]
@@ -149,7 +142,7 @@ class RankingMetrics:
         rank = 0
         hit_rank = []  # correctly retrieved items
         for key, value in first_k_items_list:
-            if key in sorted_target and sorted_target[key] > 0:
+            if key in target and target[key] > 0:
                 hit_rank.append(rank)
             rank += 1
         count = len(hit_rank)
@@ -162,7 +155,7 @@ class RankingMetrics:
             # compute the mean reciprocal rank
             mrr = 1 / (hit_rank[0] + 1)
             # compute the mean average precision
-            mAP = np.sum([sorted_pred_values[rank] * (i + 1) / (rank + 1) for i, rank in enumerate(hit_rank)])
+            mAP = np.sum([(i + 1) / (rank + 1) for i, rank in enumerate(hit_rank)])
             # compute the discounted cumulative gain
             dcg = np.sum([1 / math.log(rank + 2, 2) for rank in hit_rank])
 
