@@ -270,7 +270,10 @@ class AbstractModel(ModelBase, Tunable):
 
     For a model that keeps a large state on the CPU and streams it to the GPU when it predicts, such as an in-context
     model's offloaded context cache. Each storage is copied from the memory-mapped tensor file straight into pinned
-    memory, so it never exists twice in RAM, and tensors that shared a storage keep sharing it."""
+    memory, without a pageable copy in between, and tensors that shared a storage keep sharing it. A storage that
+    cannot be pinned stays mapped from the file. torch's caching host allocator rounds each pinned block up to a power
+    of two and keeps freed blocks, so the pinned state can take up to twice its size; a model that pins a large state
+    caps that with `pinned_max_cached_size_mb` in `PYTORCH_CUDA_ALLOC_CONF`, set before CUDA starts."""
     model_info_name = "info.pkl"
     model_info_json_name = "info.json"
     learning_curve_file_name = "curves.json"

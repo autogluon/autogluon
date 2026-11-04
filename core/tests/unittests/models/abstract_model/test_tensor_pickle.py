@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import os
 import pickle
+import subprocess
+import sys
 
 import numpy as np
 import pytest
@@ -175,13 +177,90 @@ def test_a_pickle_without_tensor_references_never_reads_the_tensor_file(tmp_path
     np.testing.assert_array_equal(_Model.load(path).model["weights"], np.zeros(3))
 
 
-def test_cuda_storages_load_on_the_cpu_without_cuda(monkeypatch):
+@pytest.mark.parametrize("cls", [_Model, _PinnedModel])
+def test_cuda_tensors_load_on_the_cpu_without_cuda(tmp_path, monkeypatch, cls):
+    cache = torch.arange(10.0)
+    with monkeypatch.context() as patch:
+        patch.setattr(torch.serialization, "location_tag", lambda storage: "cuda:0")
+        path = _model(tmp_path, cls=cls, state={"cache": cache, "head": cache[2:5]}).save()
     monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
-    storage = torch.ones(4).untyped_storage()
 
-    restored = _tensor_pickle._map_location(pin=False)(storage, "cuda:0")
+    loaded = cls.load(path).model
 
-    assert restored.device.type == "cpu"
+    assert loaded["cache"].device.type == "cpu" and torch.equal(loaded["cache"], cache)
+    assert loaded["head"].untyped_storage().data_ptr() == loaded["cache"].untyped_storage().data_ptr()
+
+
+def test_a_load_without_pinning_or_cuda_tensors_never_asks_for_cuda(tmp_path, monkeypatch):
+    path = _model(tmp_path, state={"cache": torch.ones(8)}).save()
+
+    def refuse():
+        raise AssertionError("CUDA was initialized, which keeps a forked child from using it")
+
+    monkeypatch.setattr(torch.cuda, "is_available", refuse)
+    assert torch.equal(_Model.load(path).model["cache"], torch.ones(8))
+
+
+def test_a_storage_that_cannot_be_pinned_loads_unpinned(tmp_path, monkeypatch):
+    path = _model(tmp_path, cls=_PinnedModel, state={"cache": torch.ones(8)}).save()
+
+    def fail_to_pin(storage, *args, **kwargs):
+        raise RuntimeError("CUDA error: out of memory")
+
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+    monkeypatch.setattr(torch.UntypedStorage, "pin_memory", fail_to_pin)
+    assert torch.equal(_PinnedModel.load(path).model["cache"], torch.ones(8))
+
+
+def test_tensors_torch_save_refuses_stay_in_the_pickle(tmp_path):
+    model = _model(tmp_path, state={"cache": torch.ones(8)})
+    path = model.save()
+    values = torch.arange(4.0)
+    model.model = {"float": values, "int": values.view(torch.int32)}
+
+    model.save()
+
+    assert _files(path) == {_Model.model_file_name}, "the stale tensor file is removed"
+    loaded = _Model.load(path).model
+    assert torch.equal(loaded["float"], values) and torch.equal(loaded["int"], values.view(torch.int32))
+
+
+def test_saves_into_one_folder_at_once_never_mix_their_files(tmp_path, monkeypatch):
+    first = _model(tmp_path, state={"weights": torch.zeros(3)})
+    second = _model(tmp_path, state={"weights": torch.ones(3)})
+    replace = os.replace
+    calls = []
+
+    def replace_then_save_again(src, dst):
+        replace(src, dst)
+        calls.append(dst)
+        if len(calls) == 1:
+            second.save()  # runs between the first save's two moves
+
+    monkeypatch.setattr(_tensor_pickle.os, "replace", replace_then_save_again)
+    first.save()
+    monkeypatch.undo()
+
+    path = first.path
+    assert _files(path) == {_Model.model_file_name, _Model.model_tensors_file_name}, "no temporary file is left"
+    # The first save's pickle beside the second save's tensors: refused, never mixed.
+    with pytest.raises(pickle.UnpicklingError, match="different save"):
+        _Model.load(path)
+    second.save()
+    assert torch.equal(_Model.load(path).model["weights"], torch.ones(3))
+
+
+def test_an_object_without_tensors_never_imports_torch(tmp_path):
+    code = (
+        "import sys\n"
+        "from autogluon.core.models import AbstractModel\n"
+        f"model = AbstractModel(path={str(tmp_path)!r}, name='m')\n"
+        "model.model = {'weights': [1.0, 2.0]}\n"
+        "model.get_memory_size()\n"
+        "assert AbstractModel.load(model.save()).model == model.model\n"
+        "assert 'torch' not in sys.modules, 'torch imported'\n"
+    )
+    subprocess.run([sys.executable, "-c", code], check=True, timeout=300)  # noqa: S603
 
 
 def test_pickled_size_counts_sparse_and_meta_tensors_as_written():
