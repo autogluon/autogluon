@@ -447,6 +447,13 @@ def test_save_and_size_leave_the_estimators_tensors_on_their_device(tmp_path, da
     pickle.dumps(model)
     assert to_cpu == [False, False, True]
 
+    loaded = pickle.loads(pickle.dumps(model))
+    assert loaded._shared_state.paths, "loaded, its network not put back yet"
+    to_cpu.clear()
+    loaded._get_memory_size()
+    pickle.dumps(loaded)
+    assert to_cpu == [False, True], "its tensors are where the load restored them, a GPU for the tensor file"
+
     model.model.context_ = torch.empty(4, device="meta")  # stands for a GPU tensor: a CPU copy of it raises
     assert model._get_memory_size() > 0
 
@@ -461,6 +468,15 @@ def test_detach_shared_can_leave_tensors_where_they_are():
     assert copy["net"] is None and paths == [((("key", "net"),), 0)]
     assert copy["context"] is context and copy["owned"] is owned and copy["cpu"] is root["cpu"]
     assert sorted(moved) == [(("key", "context"),), (("key", "owned"),)], "returned to the model's device on load"
+
+
+@pytest.mark.skipif(not torch.cuda.is_available() or torch.cuda.device_count() < 2, reason="needs two GPUs")
+def test_move_to_brings_a_tensor_from_another_gpu_to_the_current_one():
+    root = {"context": torch.ones(2, device="cuda:1"), "net": _Net().to("cuda:1")}
+    with torch.cuda.device(0):
+        moved = graph.move_to(root, [(("key", "context"),), (("key", "net"),)], "cuda")
+    assert moved["context"].device == torch.device("cuda:0")
+    assert next(moved["net"].parameters()).device == torch.device("cuda:0")
 
 
 def test_info_block(tmp_path, data):

@@ -661,16 +661,23 @@ def getstate(model: Any, state: dict[str, Any]) -> dict[str, Any]:
     writes its tensors apart (``AbstractModel.save`` and the size estimate) leaves them on their device,
     which spares a copy of each: the load restores them there, or on the CPU when that device is
     missing, and :func:`ensure_network` moves them to the model's device.
+
+    A model loaded but not yet given its network back has no network to null, and its tensors are where
+    the load restored them, so a plain pickle copies them to the CPU as well.
     """
     shared = model._shared_state
-    if owns_network(model) or model.model is None or shared.paths or not shared.component_ids:
+    if owns_network(model) or model.model is None or not shared.component_ids:
         return state
-    estimator, paths, moved = graph.detach_shared(
-        model.model, shared_ids=shared.component_ids, to_cpu=not _tensor_pickle.tensors_saved_apart()
-    )
+    to_cpu = not _tensor_pickle.tensors_saved_apart()
     record = copy.copy(shared)
-    record.paths = paths
-    record.moved = moved
+    if shared.paths:
+        # The recorded ids belong to the process that saved the model, so nothing is nulled by identity.
+        estimator, _, moved = graph.detach_shared(model.model, to_cpu=to_cpu)
+        record.moved = [*shared.moved, *(path for path in moved if path not in shared.moved)]
+    else:
+        estimator, record.paths, record.moved = graph.detach_shared(
+            model.model, shared_ids=shared.component_ids, to_cpu=to_cpu
+        )
     state["model"] = _Attributes(estimator) if hasattr(estimator, "__dict__") else estimator
     state["_shared_state"] = record
     return state

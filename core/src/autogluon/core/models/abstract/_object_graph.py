@@ -249,16 +249,6 @@ class _Budget:
         return self.nodes <= MAX_NODES
 
 
-def _cpu_copy_of_module(module: torch.nn.Module) -> torch.nn.Module:
-    for tensor in module.parameters():
-        if tensor.device.type != "cpu":
-            return copy.deepcopy(module).to("cpu")
-    for tensor in module.buffers():
-        if tensor.device.type != "cpu":
-            return copy.deepcopy(module).to("cpu")
-    return module
-
-
 def detach_shared(
     root: Any, shared: Sequence[Any] = (), *, shared_ids: Sequence[int] | None = None, to_cpu: bool = True
 ) -> tuple[Any, list[tuple[Path, int]], list[Path]]:
@@ -294,11 +284,13 @@ def detach_shared(
         if index is not None:
             paths.append((path, index))
             return None
-        leaf = _cpu_leaf(obj) if to_cpu else _off_cpu_leaf(obj)
-        if leaf is not _NOT_A_LEAF:
-            if leaf is not obj or (not to_cpu and _off_cpu(obj)):
-                moved.append(path)
-            return leaf
+        if _is_tensor(obj) or _is_module(obj):
+            if not _off_cpu(obj):
+                return obj
+            moved.append(path)
+            if not to_cpu:
+                return obj
+            return obj.detach().to("cpu") if _is_tensor(obj) else copy.deepcopy(obj).to("cpu")
         key = id(obj)
         if is_leaf(obj) or depth > MAX_DEPTH or key in in_progress or not budget.take():
             return obj
@@ -323,7 +315,8 @@ def detach_shared(
 
 
 def move_to(root: Any, paths: Sequence[Path], device: str) -> Any:
-    """Move the tensor or module at every path to device type ``device`` (tensors replaced, modules in place)."""
+    """Move the tensor or module at every path to the current device of type ``device`` (tensors replaced,
+    modules in place), also from another device of that type, such as the ``cuda:1`` a tensor was saved from."""
     device_type = normalize_device(device)
     for path in paths:
         try:
@@ -332,8 +325,10 @@ def move_to(root: Any, paths: Sequence[Path], device: str) -> Any:
             continue
         if _is_module(value):
             value.to(device_type)
-        elif _is_tensor(value) and value.device.type != device_type:
-            root = assign(root, path, value.to(device_type))
+        elif _is_tensor(value):
+            placed = value.to(device_type)  # the tensor itself when it is there already
+            if placed is not value:
+                root = assign(root, path, placed)
     return root
 
 
@@ -342,20 +337,6 @@ def _off_cpu(obj: Any) -> bool:
     if _is_tensor(obj):
         return obj.device.type != "cpu"
     return any(tensor.device.type != "cpu" for tensor in (*obj.parameters(), *obj.buffers()))
-
-
-def _off_cpu_leaf(obj: Any) -> Any:
-    """A tensor or an owned module itself, ``_NOT_A_LEAF`` for anything else."""
-    return obj if _is_tensor(obj) or _is_module(obj) else _NOT_A_LEAF
-
-
-def _cpu_leaf(obj: Any) -> Any:
-    """A CPU copy for a tensor or an owned module, ``_NOT_A_LEAF`` for anything else."""
-    if _is_tensor(obj):
-        return obj.detach().to("cpu") if obj.device.type != "cpu" else obj
-    if _is_module(obj):
-        return _cpu_copy_of_module(obj)
-    return _NOT_A_LEAF
 
 
 def _transform_container(obj: Any, path: Path, depth: int, transform: Callable[[Any, Path, int], Any]) -> Any:
