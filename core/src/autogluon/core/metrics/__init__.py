@@ -394,12 +394,10 @@ class _QuantileScorer(Scorer):
         if isinstance(kwargs["quantile_levels"], list):
             kwargs["quantile_levels"] = np.array(kwargs["quantile_levels"])
 
-        type_true = type_of_target(y_true)
-
-        if len(y_pred.shape) == 2 or y_pred.shape[1] >= 1 or type_true == "continuous":
-            pass  # must be quantile regression, all other task types would return at least two probabilities
-        else:
-            raise ValueError(type_true)
+        if len(y_pred.shape) != 2:
+            raise ValueError(
+                f"quantile predictions must be a 2D array [num_samples x num_quantiles], but have shape {y_pred.shape}"
+            )
         return y_true, y_pred, kwargs
 
     @property
@@ -563,7 +561,7 @@ def make_scorer(
     if isinstance(needs_pred, bool) and needs_pred != scorer.needs_pred:
         raise ValueError(
             f"needs_pred specified by user does not match the required needs_pred value for {scorer.__class__.__name__}. (name={scorer.name}, "
-            f"actual_needs_pred={needs_pred}, expected_needs_pred={needs_pred})"
+            f"actual_needs_pred={needs_pred}, expected_needs_pred={scorer.needs_pred})"
         )
 
     return scorer
