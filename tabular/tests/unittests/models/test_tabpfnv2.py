@@ -103,20 +103,24 @@ class _MovedEstimator:
 
 
 @pytest.mark.parametrize(
-    "fit_devices, visible, back_on_cuda",
+    "fit_num_gpus, visible, back_on_cuda",
     [
-        (["cuda:0", "cuda:1", "cuda:2"], 3, ["cuda:0", "cuda:1", "cuda:2"]),
-        (["cuda:0", "cuda:1", "cuda:2"], 2, ["cuda:0", "cuda:1"]),
-        (["cuda:0", "cuda:1"], 1, "cuda"),
-        (None, 4, "cuda"),
+        (3, 3, ["cuda:0", "cuda:1", "cuda:2"]),
+        (3, 2, ["cuda:0", "cuda:1"]),
+        (2, 1, "cuda"),
+        (1, 4, "cuda"),
+        (0, 4, "cuda"),
+        (None, 4, "cuda"),  # no fit metadata recorded
     ],
 )
-def test_tabpfn_set_device_returns_a_multi_gpu_fit_to_its_gpus(monkeypatch, fit_devices, visible, back_on_cuda):
+def test_tabpfn_set_device_returns_a_multi_gpu_fit_to_its_gpus(monkeypatch, fit_num_gpus, visible, back_on_cuda):
     """``save`` moves the model to the CPU and back to ``"cuda"``, and ``load`` to ``"cuda"``: a fit spread over
     several GPUs goes back to as many of them as this process sees, not to the current GPU alone."""
     monkeypatch.setattr(torch.cuda, "device_count", lambda: visible)
     model = RealTabPFNv2Model(problem_type="binary", eval_metric=None)
-    model.model, model._fit_devices = _MovedEstimator(), fit_devices
+    model.model = _MovedEstimator()
+    if fit_num_gpus is not None:  # what `fit` records
+        model._fit_metadata, model._is_fit_metadata_registered = {"num_gpus": fit_num_gpus}, True
 
     model._set_device("cpu")
     model._set_device("cuda")
