@@ -17,7 +17,7 @@ resolution-markers = [
 ]
 
 [options]
-exclude-newer = "2026-09-19T00:00:00Z"
+exclude-newer = "2026-11-05T00:00:00Z"
 
 [manifest]
 members = [
@@ -590,7 +590,6 @@ all = [
     { name = "einops" },
     { name = "einx" },
     { name = "fastai" },
-    { name = "fastcore" },
     { name = "huggingface-hub", extra = ["torch"] },
     { name = "lightgbm" },
     { name = "loguru" },
@@ -613,7 +612,6 @@ causilo = [
 ]
 fastai = [
     { name = "fastai" },
-    { name = "fastcore" },
     { name = "plum-dispatch" },
     { name = "spacy" },
     { name = "torch", version = "2.10.0", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform == 'darwin'" },
@@ -662,7 +660,6 @@ tabarena = [
     { name = "einops" },
     { name = "einx" },
     { name = "fastai" },
-    { name = "fastcore" },
     { name = "huggingface-hub", extra = ["torch"] },
     { name = "lightgbm" },
     { name = "loguru" },
@@ -750,12 +747,9 @@ requires-dist = [
     { name = "einx", marker = "extra == 'all'" },
     { name = "einx", marker = "extra == 'mitra'" },
     { name = "einx", marker = "extra == 'tabarena'" },
-    { name = "fastai", marker = "extra == 'all'", specifier = ">=2.3.1,<2.8.8" },
-    { name = "fastai", marker = "extra == 'fastai'", specifier = ">=2.3.1,<2.8.8" },
-    { name = "fastai", marker = "extra == 'tabarena'", specifier = ">=2.3.1,<2.8.8" },
-    { name = "fastcore", marker = "extra == 'all'", specifier = "<2" },
-    { name = "fastcore", marker = "extra == 'fastai'", specifier = "<2" },
-    { name = "fastcore", marker = "extra == 'tabarena'", specifier = "<2" },
+    { name = "fastai", marker = "extra == 'all'", specifier = ">=2.8.8,<2.9" },
+    { name = "fastai", marker = "extra == 'fastai'", specifier = ">=2.8.8,<2.9" },
+    { name = "fastai", marker = "extra == 'tabarena'", specifier = ">=2.8.8,<2.9" },
     { name = "huggingface-hub", extras = ["torch"], marker = "extra == 'all'", specifier = ">=1.3,<2.0" },
     { name = "huggingface-hub", extras = ["torch"], marker = "extra == 'mitra'", specifier = ">=1.3,<2.0" },
     { name = "huggingface-hub", extras = ["torch"], marker = "extra == 'tabarena'", specifier = ">=1.3,<2.0" },
@@ -1850,7 +1844,7 @@ wheels = [
 
 [[package]]
 name = "fastai"
-version = "2.8.7"
+version = "2.8.12"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "cloudpickle" },
@@ -1875,34 +1869,31 @@ dependencies = [
     { name = "torchvision", version = "0.25.0", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform == 'darwin'" },
     { name = "torchvision", version = "0.28.0", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'darwin'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/f9/08/d54365d18d797c583599387af0b21b5e50d377a357a0d871195fbb84d271/fastai-2.8.7.tar.gz", hash = "sha256:93be109daab077a73279bb2aba27fa72a206bbf055b0f1921475afde69b7705f", size = 221121, upload-time = "2026-02-14T02:00:55.745Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/e3/79/8c47a42c1c9f14996b855a0946853037ba4bccaa15567b032182262f3685/fastai-2.8.12.tar.gz", hash = "sha256:b995efbb1ade78c99cc228e65db7493a668eb10cfa4945e21d2e348d738aba04", size = 223338, upload-time = "2026-09-09T05:54:24.979Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/49/92/9429cce6bd4048cec9e4c2458c6bdb56144327afe1e7f29341f807d97dca/fastai-2.8.7-py3-none-any.whl", hash = "sha256:840145fe563bed47d35fb5da47121f9749b9ae7deca1a7f31189b045a6a72d9d", size = 240697, upload-time = "2026-02-14T02:00:54.036Z" },
+    { url = "https://files.pythonhosted.org/packages/e1/3b/ff4f5e459ddb6797764826839e971d6b8bedb0e7d37d862fe508a29907fc/fastai-2.8.12-py3-none-any.whl", hash = "sha256:50474575768679ba7352bebd0fdf8e7d2c4ddc10242455bec79a19c964f03fd0", size = 242866, upload-time = "2026-09-09T05:54:22.905Z" },
 ]
 
 [[package]]
 name = "fastcore"
-version = "1.8.18"
+version = "2.2.37"
 source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "packaging" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/42/00/fbe2dcc7eb19b96e8228b0c30d2b95b8a00879d1b0684fe92db42c71d428/fastcore-1.8.18.tar.gz", hash = "sha256:64dc5ebad7f1c8bae71e99c602b3b27effc3c711e2db61f1d28446b1fefe502a", size = 85559, upload-time = "2025-12-13T01:41:15.423Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/9a/f1/ee137ed3155e515b71d85e01f3785b115636a423c1624844e74ab1f072d3/fastcore-2.2.37.tar.gz", hash = "sha256:ba755eae6b036c26870a8c48d2b92cc119756ff22e3574014df9c299da6ae1a9", size = 145526, upload-time = "2026-11-02T02:37:44.091Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/97/31/c7a3c1b85322a1e32accac1d52e3399b3cd8d200b8d0a6233d418b9c0318/fastcore-1.8.18-py3-none-any.whl", hash = "sha256:4697fc67f0663f8a0935fe7d6ef4f4d0269bf4e25e1b41fdf65345283a7023fe", size = 88557, upload-time = "2025-12-13T01:41:13.871Z" },
+    { url = "https://files.pythonhosted.org/packages/37/f2/a8017d3a69cf34fa7e1fb1a77a682f885df7666d41a6e7ef55e6ee6908a6/fastcore-2.2.37-py3-none-any.whl", hash = "sha256:9c1427320199ee92ccec58b5e768015d85f2d996eb9faad3f294ee911a8e1624", size = 152234, upload-time = "2026-11-02T02:37:42.225Z" },
 ]
 
 [[package]]
 name = "fastdownload"
-version = "0.0.7"
+version = "0.0.8"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "fastcore" },
     { name = "fastprogress" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/08/be/d2c2e8dc81aa88316ed27f1bd707440a83a7420c35e67c0b143fe81aeca9/fastdownload-0.0.7.tar.gz", hash = "sha256:20507edb8e89406a1fbd7775e6e2a3d81a4dd633dd506b0e9cf0e1613e831d6a", size = 16096, upload-time = "2022-07-07T18:35:53.336Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/c7/54/ac4945d94416aa4dc004bba9fb7d8e57bbe0db235439ad29252dbbbfc1bb/fastdownload-0.0.8.tar.gz", hash = "sha256:7ae6176e2e397de8a25764d4be1b304c9bbe815e7cd9ff36856f7cba9874b3f7", size = 14964, upload-time = "2026-09-07T01:48:11.608Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/47/60/ed35253a05a70b63e4f52df1daa39a6a464a3e22b0bd060b77f63e2e2b6a/fastdownload-0.0.7-py3-none-any.whl", hash = "sha256:b791fa3406a2da003ba64615f03c60e2ea041c3c555796450b9a9a601bc0bbac", size = 12803, upload-time = "2022-07-07T18:35:50.912Z" },
+    { url = "https://files.pythonhosted.org/packages/c7/bb/dd55d026077176061fc6bbc922e4570178542ffda6286d2903b7e0259a6c/fastdownload-0.0.8-py3-none-any.whl", hash = "sha256:cc2cd47f47f7b3153ea508e63e7efd4fc92877056a661ef78f8cf41043b573ed", size = 13928, upload-time = "2026-09-07T01:48:10.525Z" },
 ]
 
 [[package]]
@@ -1916,15 +1907,15 @@ wheels = [
 
 [[package]]
 name = "fasttransform"
-version = "0.0.2"
+version = "0.0.5"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "fastcore" },
     { name = "plum-dispatch" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/fe/f6/f170a877686ae6a6ff0e35a1c74ffc4e863bd72d11d12e724178d3bb90b8/fasttransform-0.0.2.tar.gz", hash = "sha256:18ea6964128be779a1c483d4775f1b5a2e452f915c2d30dfa2d91adca98453d7", size = 17740, upload-time = "2025-04-18T21:12:02.989Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/84/07/5ba1c4e155ab85d6235078f3a3f47d590ce0e9b6d9a3928ce87cf762fcf2/fasttransform-0.0.5.tar.gz", hash = "sha256:eb8f2c05b95f413df89e834dacb786de053c8280e5843108213311d0010b7bfa", size = 15721, upload-time = "2026-09-07T01:48:40.096Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/47/3d/4b85b47a7e70d5c7cc0cf7d7b2883646c9c0bd3ef54a33f23d5873aa910c/fasttransform-0.0.2-py3-none-any.whl", hash = "sha256:72fd7f5d577797370e95255a005a5fd4eb43a3d863f5dbab338562421ab660e1", size = 14576, upload-time = "2025-04-18T21:12:01.528Z" },
+    { url = "https://files.pythonhosted.org/packages/b8/d3/d66982dce7a4bb6e986eeb2b742dff6ce263b33ce40aa6cd8d706992f07a/fasttransform-0.0.5-py3-none-any.whl", hash = "sha256:c9ccda488c1f95900934e89e748ac4ec3742e39999893637b1481f0fc646474e", size = 14441, upload-time = "2026-09-07T01:48:38.97Z" },
 ]
 
 [[package]]
