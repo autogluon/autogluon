@@ -11,6 +11,12 @@ from .abstract import AbstractFeatureGenerator
 logger = logging.getLogger(__name__)
 
 
+def _as_nanoseconds(series: pd.Series) -> pd.Series:
+    """A UTC datetime series at nanosecond resolution, with the dates outside of its range set to NaT."""
+    in_range = (series >= pd.Timestamp.min.tz_localize("UTC")) & (series <= pd.Timestamp.max.tz_localize("UTC"))
+    return series.where(in_range).dt.as_unit("ns")
+
+
 class DatetimeFeatureGenerator(AbstractFeatureGenerator):
     """Transforms datetime features into numeric features.
 
@@ -55,6 +61,11 @@ class DatetimeFeatureGenerator(AbstractFeatureGenerator):
         #   Alternatives like Polars do not offer the same datetime conversion logic, and thus aren't valid to use.
         #   The runtime is approximately 0.08 seconds per 1000 rows in worst case.
         series = pd.to_datetime(X[feature].copy(), utc=True, errors="coerce", format="mixed")
+        # pandas>=3 infers the resolution (microseconds when parsing strings), where pandas<3 always used nanoseconds.
+        # Keep nanoseconds: the features are int64 timestamps, whose scale must not depend on the pandas version, as a
+        # model can be fit with one version and predict with another. Dates outside the nanosecond range (e.g. year 2700),
+        # which pandas<3 parsed to NaT and pandas>=3 parses, become NaT again and are filled below.
+        series = _as_nanoseconds(series)
         # A boolean mask rather than an index of labels. The invalid rows were only ever needed to
         # exclude them from the mean, which `isin` did by *value* -- so neither label nor positional
         # indexing was required, and mixing the two is what broke here: `broken_idx` holds labels,

@@ -259,7 +259,9 @@ def pac(solution, prediction):
     else:
         raise NotImplementedError(f"pac_score does not support task {y_type}")
 
-    solution, prediction = normalize_array(solution, prediction.copy())
+    # Copies: `normalize_array` writes into both, and `solution` can be a view of the caller's labels (read-only when
+    # they come from a pandas>=3 Series, which raised `assignment destination is read-only`)
+    solution, prediction = normalize_array(solution.copy(), prediction.copy())
 
     sample_num, _ = solution.shape
 
