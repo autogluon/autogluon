@@ -158,20 +158,16 @@ class TrainerFinetuneV2(TrainerFinetune):
             torch.cuda.empty_cache()
 
     def _forward(self, batch):
-        tensors = {name: value.to(self.device, non_blocking=True) for name, value in batch.items()}
-        support_y = tensors["y_support"]
+        x_support = batch["x_support"].to(self.device, non_blocking=True)
+        y_support = batch["y_support"].to(self.device, non_blocking=True)
+        x_query = batch["x_query"].to(self.device, non_blocking=True)
+        padding_features = batch["padding_features"].to(self.device, non_blocking=True)
+        padding_obs_support = batch["padding_obs_support"].to(self.device, non_blocking=True)
+        padding_obs_query = batch["padding_obs_query"].to(self.device, non_blocking=True)
         if self.cfg.task == "regression" and self.cfg.hyperparams["regression_loss"] == "cross_entropy":
-            support_y = (
-                (torch.bucketize(support_y, self.bins) - 1).clamp(0, self.cfg.hyperparams["dim_output"] - 1).long()
-            )
-        return self.model(
-            tensors["x_support"],
-            support_y,
-            tensors["x_query"],
-            tensors["padding_features"],
-            tensors["padding_obs_support"],
-            tensors["padding_obs_query"],
-        )
+            y_support = torch.bucketize(y_support, self.bins) - 1
+            y_support = torch.clamp(y_support, 0, self.cfg.hyperparams["dim_output"] - 1).to(torch.int64)
+        return self.model(x_support, y_support, x_query, padding_features, padding_obs_support, padding_obs_query)
 
     def _predict_transformed(self, x_support, y_support, x_query, support_cap, query_chunk, *, prediction):
         dataset_kwargs = dict(
@@ -198,15 +194,27 @@ class TrainerFinetuneV2(TrainerFinetune):
                 with torch.autocast(
                     device_type=torch.device(self.device).type, dtype=getattr(torch, self.cfg.hyperparams["precision"])
                 ):
-                    logits = self._forward(batch)
+                    # Match the released predictor's transfers and tensor
+                    # lifetimes: memory retries also consume support draws.
+                    x_s = batch["x_support"].to(self.device, non_blocking=True)
+                    y_s = batch["y_support"].to(self.device, non_blocking=True)
+                    x_q = batch["x_query"].to(self.device, non_blocking=True)
+                    padding_features = batch["padding_features"].to(self.device, non_blocking=True)
+                    padding_obs_support = batch["padding_obs_support"].to(self.device, non_blocking=True)
+                    padding_obs_query = batch["padding_obs_query"].to(self.device, non_blocking=True)
+                    if self.cfg.task == "regression" and self.cfg.hyperparams["regression_loss"] == "cross_entropy":
+                        y_s = torch.bucketize(y_s, self.bins) - 1
+                        y_s = torch.clamp(y_s, 0, self.cfg.hyperparams["dim_output"] - 1).to(torch.int64)
+                    logits = self.model(x_s, y_s, x_q, padding_features, padding_obs_support, padding_obs_query)
+                logits = logits[0].float()
+                if prediction:
+                    # Release GPU logits before the next forward, as HF does.
+                    logits = logits.cpu()
                 if self.cfg.task == "regression" and self.cfg.hyperparams["regression_loss"] == "cross_entropy":
-                    if prediction:
-                        # The released predictor decodes float32 logits on CPU.
-                        # Keep its reduction order; validation decodes on the model device.
-                        logits = logits.float().cpu()
                     logits = self._decode_regression(logits)
-                predictions.append(logits[0].float().cpu().numpy())
-        return self.preprocessor.inverse_transform_y(np.concatenate(predictions, axis=0))
+                logits = self.preprocessor.inverse_transform_y(logits.cpu().numpy())
+                predictions.append(logits)
+        return np.concatenate(predictions, axis=0)
 
     def evaluate(self, x_support, y_support, x_query, y_query):
         if not self.cfg.hyperparams["fast_loop"]:

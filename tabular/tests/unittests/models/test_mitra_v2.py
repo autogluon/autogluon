@@ -413,15 +413,24 @@ def test_regression_prediction_matches_released_cpu_mean():
             "precision": "bfloat16",
             "fast_predict": True,
             "balance_binary_support": False,
+            "dim_output": 1000,
         },
     )
     trainer.bins = torch.linspace(-0.5, 1.5, 1001, device="cuda")
     trainer.bin_width = trainer.bins[1] - trainer.bins[0]
     trainer.rng = np.random.RandomState(0)
-    trainer.model = mock.Mock()
+    trainer.model = mock.Mock(return_value=logits)
     trainer.preprocessor = SimpleNamespace(inverse_transform_y=lambda values: values)
-    trainer.make_loader = lambda dataset, training: [{}]
-    trainer._forward = lambda batch: logits
+    trainer.make_loader = lambda dataset, training: [
+        {
+            "x_support": torch.zeros((1, 2, 1)),
+            "y_support": torch.zeros((1, 2)),
+            "x_query": torch.zeros((1, 67, 1)),
+            "padding_features": torch.zeros((1, 1), dtype=torch.bool),
+            "padding_obs_support": torch.zeros((1, 2), dtype=torch.bool),
+            "padding_obs_query": torch.zeros((1, 67), dtype=torch.bool),
+        }
+    ]
 
     actual = trainer._predict_transformed(np.zeros((2, 1)), np.zeros(2), np.zeros((67, 1)), 2, 67, prediction=True)
     # The released API transfers logits before its float32 softmax and mean.
