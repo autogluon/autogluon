@@ -59,7 +59,54 @@ class LoRALayer:
         self.merge_weights = merge_weights
 
 
-class IA3LoRALinear(nn.Linear, LoRALayer):
+class _IA3LinearMixin:
+    """Share reversible IA3 merging between the linear adaptation layers."""
+
+    def _init_merge_buffers(self):
+        # Backups avoid division by a learned scale, which may be zero. They are only populated while merged.
+        self.register_buffer("_unmerged_weight", None, persistent=False)
+        self.register_buffer("_unmerged_bias", None, persistent=False)
+
+    def _get_merged_weight(self):
+        return self.weight * self.lora_b
+
+    def train(self, mode: bool = True):
+        super().train(mode)
+        if self.merge_weights:
+            with torch.no_grad():
+                if mode and self.merged:
+                    self.weight.copy_(self._unmerged_weight)
+                    if self.bias is not None:
+                        self.bias.copy_(self._unmerged_bias)
+                    self._unmerged_weight = None
+                    self._unmerged_bias = None
+                    self.merged = False
+                elif not mode and not self.merged:
+                    self._unmerged_weight = self.weight.detach().clone()
+                    if self.bias is not None:
+                        self._unmerged_bias = self.bias.detach().clone()
+                    self.weight.copy_(self._get_merged_weight())
+                    if self.bias is not None:
+                        self.bias.mul_(self.lora_b.flatten())
+                    self.merged = True
+        return self
+
+    def _save_to_state_dict(self, destination, prefix, keep_vars):
+        super()._save_to_state_dict(destination, prefix, keep_vars)
+        if self.merged:
+            # Checkpoints always contain the unmerged base parameters, independently of the current mode.
+            destination[prefix + "weight"] = self._unmerged_weight
+            if self.bias is not None:
+                destination[prefix + "bias"] = self._unmerged_bias
+
+    def _load_from_state_dict(self, *args, **kwargs):
+        training = self.training
+        self.train(True)
+        super()._load_from_state_dict(*args, **kwargs)
+        self.train(training)
+
+
+class IA3LoRALinear(_IA3LinearMixin, nn.Linear, LoRALayer):
     """
     LoRA (low-rank adaptation) followed by (IA)^3 (weight rescaling) incorporated in a Linear Layer. Weights of Linear layer are set to be frozen per default.
 
@@ -103,6 +150,9 @@ class IA3LoRALinear(nn.Linear, LoRALayer):
 
         self.scaling = self.lora_alpha / self.r
         self.reset_parameters()
+        if fan_in_fan_out:
+            self.weight.data = self.weight.data.T
+        self._init_merge_buffers()
 
     def reset_parameters(self):
         nn.Linear.reset_parameters(self)
@@ -116,32 +166,19 @@ class IA3LoRALinear(nn.Linear, LoRALayer):
 
     def forward(self, x: torch.Tensor):
         result = F.linear(x, self.T(self.weight), bias=self.bias)
+        if self.merged:
+            return result
         if self.r > 0:
             result += (self.lora_dropout(x) @ self.lora_A.T @ self.lora_B.T) * self.scaling
 
         hidden = result * self.lora_b.flatten()
         return hidden
 
-    def train(self, mode: bool = True):
-        nn.Linear.train(self, mode)
-        if self.merge_weights and self.merged:
-            # Make sure that the weights are not merged
-            if self.r > 0:
-                self.weight.data /= self.lora_b.flatten()
-                self.weight.data -= self.T(self.lora_B @ self.lora_A) * self.scaling
-            self.merged = False
-
-    def eval(self):
-        # def T(w):
-        #     return w.T if self.fan_in_fan_out else w
-        nn.Linear.eval(self)
-        if self.merge_weights and not self.merged:
-            # Merge the weights and mark it
-            if self.r > 0:
-                self.weight.data += self.T(self.lora_B @ self.lora_A) * self.scaling
-                self.weight.data *= self.lora_b.flatten()
-            self.merged = True
-        return hidden
+    def _get_merged_weight(self):
+        weight = self.T(self.weight)
+        if self.r > 0:
+            weight = weight + (self.lora_B @ self.lora_A) * self.scaling
+        return self.T(weight * self.lora_b)
 
     def extra_repr(self):
         return "in_features={}, out_features={}, bias={}".format(
@@ -149,7 +186,7 @@ class IA3LoRALinear(nn.Linear, LoRALayer):
         )
 
 
-class IA3Linear(nn.Linear, LoRALayer):
+class IA3Linear(_IA3LinearMixin, nn.Linear, LoRALayer):
     """
     (IA)^3 incorporated in a Linear Layer. Weights of Linear layer are set to be frozen per default.
 
@@ -174,7 +211,7 @@ class IA3Linear(nn.Linear, LoRALayer):
         self,
         in_features: int,
         out_features: int,
-        merge_weights: False,
+        merge_weights: bool = False,
         **kwargs,
     ):
         nn.Linear.__init__(self, in_features, out_features, **kwargs)
@@ -184,29 +221,12 @@ class IA3Linear(nn.Linear, LoRALayer):
         # In essence the $b$ parameter of LoRA.
         self.lora_b = nn.Parameter(torch.ones(out_features, 1))
         self.weight.requires_grad = False
+        self._init_merge_buffers()
 
     def forward(self, x: torch.Tensor):
         hidden = F.linear(x, self.weight, self.bias)
-        hidden = hidden * self.lora_b.flatten()
-        return hidden
-
-    def train(self, mode: bool = True):
-        nn.Linear.train(self, mode)
-        if self.merge_weights and self.merged:
-            # Make sure that the weights are not merged
-            if self.r > 0:
-                self.weight.data /= self.lora_b.flatten()
-            self.merged = False
-
-    def eval(self):
-        # def T(w):
-        #     return w.T if self.fan_in_fan_out else w
-        nn.Linear.eval(self)
-        if self.merge_weights and not self.merged:
-            # Merge the weights and mark it
-            if self.r > 0:
-                self.weight.data *= self.lora_b.flatten()
-            self.merged = True
+        if not self.merged:
+            hidden = hidden * self.lora_b.flatten()
         return hidden
 
     def extra_repr(self):
