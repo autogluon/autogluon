@@ -60,9 +60,14 @@ extras_require = {
     "ray": [
         f"autogluon.core[raytune]=={version}",
     ],
+    "t0": [
+        # t0-gamma needs 0.6.0: older releases ignore its config.json conventions and silently degrade it.
+        # Capped below the next minor release, which may change the API while tfc-t0 is pre-1.0.
+        "tfc-t0[torch]>=0.6.0,<0.7",
+    ],
 }
 
-extras_require["all"] = list(extras_require["ray"])
+extras_require["all"] = extras_require["ray"] + extras_require["t0"]
 
 install_requires = ag.get_dependency_version_ranges(install_requires)
 
