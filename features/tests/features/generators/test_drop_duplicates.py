@@ -1,8 +1,32 @@
+import hashlib
+
 import numpy as np
 import pandas as pd
+import pytest
 
 from autogluon.common import FeatureMetadata
 from autogluon.features.generators import DropDuplicatesFeatureGenerator
+
+
+@pytest.mark.parametrize(
+    "keep, expected_dropped", [("first", ["B", "E"]), ("last", ["A", "B"]), (False, ["A", "B", "E"])]
+)
+def test_drop_duplicates_numeric_without_blake2b(monkeypatch, keep, expected_dropped):
+    def disabled_blake2b(*args, **kwargs):
+        raise ValueError("BLAKE2b is unavailable in FIPS mode")
+
+    monkeypatch.setattr(hashlib, "blake2b", disabled_blake2b)
+    df = pd.DataFrame(
+        {
+            "A": [0.0, 1.0, np.nan, 3.0, 4.0],
+            "B": [-0.0, 1.0, np.nan, 3.0, 4.0],
+            "C": [4.0, 1.0, np.nan, 3.0, 0.0],
+            "D": [np.nan, 1.0, 0.0, 3.0, 4.0],
+            "E": [0.0, 1.0, np.nan, 3.0, 4.0],
+        }
+    )
+
+    assert DropDuplicatesFeatureGenerator._drop_duplicate_features_numeric(df, keep=keep) == expected_dropped
 
 
 def test_drop_duplicates_feature_generator(generator_helper, data_helper):

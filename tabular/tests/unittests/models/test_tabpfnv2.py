@@ -1,3 +1,5 @@
+import numpy as np
+import pandas as pd
 import pytest
 import torch
 
@@ -411,3 +413,26 @@ def test_tabpfn_shared_and_unshared_fits_predict_the_same(problem_type, tmp_path
     assert graph.find_shared(reloaded.model, modules), "the reloaded child does not reference the registry module"
     assert reloaded.model.models_[0] is network
     np.testing.assert_allclose(reloaded.predict_proba(X_test), shared.predict_proba(X_test))
+
+
+@pytest.mark.parametrize("problem_type", ["regression", "quantile"], ids=["point", "quantile"])
+def test_tabpfn_predicts_from_the_preprocessed_features(problem_type, monkeypatch):
+    """Point and quantile predictions both read the features after the model's preprocessing."""
+    seen = []
+
+    class _Fitted:
+        def predict(self, X, output_type="mean", quantiles=None):
+            seen.append(list(X.columns))
+            if output_type == "quantiles":
+                return [np.full(len(X), q) for q in quantiles]
+            return np.zeros(len(X))
+
+    model = RealTabPFNv2Model(problem_type=problem_type, hyperparameters={"ag.model_telemetry": True})
+    model.quantile_levels = [0.1, 0.9]
+    model.model = _Fitted()
+    monkeypatch.setattr(model, "preprocess", lambda X, **kwargs: X.rename(columns={"a": "a_preprocessed"}))
+
+    y_pred = model._predict_proba(pd.DataFrame({"a": [1.0, 2.0, 3.0]}))
+
+    assert seen == [["a_preprocessed"]]
+    assert y_pred.shape == ((3, 2) if problem_type == "quantile" else (3,))

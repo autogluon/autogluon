@@ -98,7 +98,9 @@ def test_pin_tensors_on_load_pins_each_storage_once_when_cuda_is_available(tmp_p
 def test_pickled_size_counts_storages_once_without_serializing_tensors(monkeypatch):
     cache = torch.zeros(1000, 100)
     state = {"cache": cache, "views": [cache[i] for i in range(10)], "other": torch.zeros(10, dtype=torch.int64)}
-    without_tensors = len(pickle.dumps({"cache": None, "views": [None] * 10, "other": None}, protocol=4))
+    without_tensors = len(
+        pickle.dumps({"cache": None, "views": [None] * 10, "other": None}, protocol=_tensor_pickle.PROTOCOL)
+    )
 
     def refuse(*args, **kwargs):
         raise AssertionError("a tensor was serialized")
@@ -119,6 +121,24 @@ def test_get_memory_size_matches_the_saved_files(tmp_path):
     assert abs(size - on_disk) < 0.01 * on_disk
 
 
+def test_numpy_arrays_are_saved_and_sized_without_a_copy(tmp_path):
+    """Protocol 5 hands an array's buffer to the file or the byte counter as it is; protocol 4 copies it."""
+    import tracemalloc
+
+    weights = np.ones((1_000_000, 8))  # 64 MB
+    model = _model(tmp_path, state={"weights": weights, "cache": torch.ones(4)})
+    tracemalloc.start()
+    try:
+        model.get_memory_size()
+        path = model.save()
+        peak = tracemalloc.get_traced_memory()[1]
+    finally:
+        tracemalloc.stop()
+
+    assert peak < weights.nbytes / 4, "no copy of the array"
+    np.testing.assert_array_equal(_Model.load(path).model["weights"], weights)
+
+
 def test_an_object_without_tensors_pickles_as_before(tmp_path):
     obj = {"a": np.arange(100), "b": [1, 2, 3]}
     path = str(tmp_path / "obj.pkl")
@@ -132,16 +152,27 @@ def test_an_object_without_tensors_pickles_as_before(tmp_path):
     assert _tensor_pickle.pickled_size(obj) == len(pickle.dumps(obj, protocol=_tensor_pickle.PROTOCOL))
 
 
-def test_a_failed_resave_keeps_the_previous_pair_loadable(tmp_path, monkeypatch):
+@pytest.mark.parametrize(
+    "error",
+    [OSError("No space left on device"), RuntimeError("PytorchStreamWriter failed writing file data/0")],
+    ids=["os-error", "torch-write-error"],
+)
+def test_a_failed_resave_keeps_the_previous_pair_loadable(tmp_path, monkeypatch, error):
+    """A ``torch.save`` that fails to write raises, instead of keeping the tensors in the pickle as for a
+    state it refuses."""
     model = _model(tmp_path, state={"weights": torch.zeros(3), "bias": torch.ones(2)})
     path = model.save()
     model.model = {"bias": torch.full((2,), 5.0), "weights": torch.full((3,), 7.0)}
 
-    def failing_save(*args, **kwargs):
-        raise OSError("No space left on device")
+    real_save = torch.save
+
+    def failing_save(obj, f, *args, **kwargs):
+        if isinstance(f, (str, os.PathLike)):  # the tensor file; torch pickles a tensor into a buffer
+            raise error
+        return real_save(obj, f, *args, **kwargs)
 
     monkeypatch.setattr(torch, "save", failing_save)
-    with pytest.raises(OSError):
+    with pytest.raises(type(error)):
         model.save()
     monkeypatch.undo()
 
@@ -194,13 +225,15 @@ def test_cuda_tensors_load_on_the_cpu_without_cuda(tmp_path, monkeypatch, cls):
     assert loaded["head"].untyped_storage().data_ptr() == loaded["cache"].untyped_storage().data_ptr()
 
 
-def test_tensors_of_a_cuda_device_this_machine_lacks_load_on_the_cpu(tmp_path, monkeypatch):
+@pytest.mark.parametrize("location", ["cuda:3", "mps"])
+def test_tensors_of_a_device_this_machine_lacks_load_on_the_cpu(tmp_path, monkeypatch, location):
     cache = torch.arange(10.0)
     with monkeypatch.context() as patch:
-        patch.setattr(torch.serialization, "location_tag", lambda storage: "cuda:3")
+        patch.setattr(torch.serialization, "location_tag", lambda storage: location)
         path = _model(tmp_path, state={"cache": cache}).save()
     monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
     monkeypatch.setattr(torch.cuda, "device_count", lambda: 1)
+    monkeypatch.setattr(torch.backends.mps, "is_available", lambda: False)
 
     loaded = _Model.load(path).model
 

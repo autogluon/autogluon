@@ -95,3 +95,33 @@ def test_realmlp_refit_full_stops_at_the_best_epoch():
     assert refit_child.params["stop_epoch"] == round(np.mean(child_epochs))
     assert not refit_child.get_info()["val_in_fit"]
     assert "stop_epoch" not in refit_child.params_trained  # no validation data, so no best epoch to record
+
+
+def test_realmlp_quantile_trains_on_the_pinball_loss_of_the_levels():
+    """A quantile fit trains and early-stops on the pinball loss over the levels, with one output per level, and
+    its predicted quantiles do not cross and widen where the noise does."""
+    import numpy as np
+    import pandas as pd
+
+    from autogluon.tabular import TabularPredictor
+
+    rng = np.random.default_rng(0)
+    n = 800
+    train = pd.DataFrame({"a": rng.uniform(-1, 1, size=n), "b": rng.normal(size=n)})
+    # the noise grows with |a|
+    train["label"] = train["a"] + (0.1 + np.abs(train["a"])) * rng.normal(size=n)
+    levels = [0.1, 0.5, 0.9]
+    predictor = TabularPredictor(label="label", problem_type="quantile", quantile_levels=levels, verbosity=0).fit(
+        train, hyperparameters={RealMLPModel: {"n_epochs": 32}}, fit_weighted_ensemble=False
+    )
+    model = predictor._trainer.load_model(predictor.model_names()[0])
+    config = model.model.get_config()
+    assert config["train_metric_name"] == "multi_pinball(0.1,0.5,0.9)"
+    assert config["val_metric_name"] == "multi_pinball(0.1,0.5,0.9)"
+
+    test = pd.DataFrame({"a": [-0.9, 0.0, 0.9], "b": [0.0, 0.0, 0.0]})
+    pred = predictor.predict(test).to_numpy()
+    assert pred.shape == (3, 3)
+    assert np.all(np.diff(pred, axis=1) >= 0)
+    width = pred[:, 2] - pred[:, 0]
+    assert width[1] < width[0] and width[1] < width[2]

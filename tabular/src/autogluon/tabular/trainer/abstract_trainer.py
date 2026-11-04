@@ -2946,14 +2946,14 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                 self._delete_failed_fit_files(model)
                 del model
         else:
-            self._add_model(
+            if self._add_model(
                 model=model,
                 stack_name=stack_name,
                 level=level,
                 y_pred_proba_val=y_pred_proba_val,
                 is_ray_worker=is_ray_worker,
-            )
-            model_names_trained.append(model.name)
+            ):
+                model_names_trained.append(model.name)
             if self.low_memory:
                 del model
         if exception is not None:
@@ -4621,6 +4621,7 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             problem_type=self.problem_type,
             metric=self.eval_metric,
             random_state=np.random.RandomState(0),
+            quantile_levels=self.quantile_levels,
         )
         selector.fit(predictions=[oof[covered] for oof in oofs], labels=y[covered])
         plan = []
