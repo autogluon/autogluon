@@ -65,9 +65,9 @@ from ...utils.exceptions import (
 from ...utils.loaders import load_json, load_pkl
 from ...utils.savers import save_json, save_pkl
 from ...utils.time import sample_df_for_time_func, time_func
+from . import _tensor_pickle
 from ._auxiliary_params import AuxiliaryParams, ParamsAuxDict
 from ._class_settings import ClassSettings
-from . import _tensor_pickle
 from ._mutation_deprecated_dict import ParamsDict
 from ._tags import _DEFAULT_CLASS_TAGS, _DEFAULT_TAGS
 from .model_trial import model_trial, skip_hpo
