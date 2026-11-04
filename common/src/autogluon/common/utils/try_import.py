@@ -1,7 +1,6 @@
 import logging
 import os
 import platform
-import sys
 from types import ModuleType
 
 from ..version import __version__
@@ -89,7 +88,7 @@ def try_import_catboost():
 def try_import_lightgbm():
     try:
         import lightgbm
-    except ImportError as e:
+    except ImportError:
         raise ImportError(
             "`import lightgbm` failed. "
             f"A quick tip is to install via `pip install autogluon.tabular[lightgbm]=={__version__}`."
@@ -147,16 +146,17 @@ def try_import_fastai():
         # Local star imports are not possible in-place, so separate helper packages is created
         import autogluon.tabular.models.fastainn.imports_helper
 
-    except ModuleNotFoundError as e:
+    except ImportError as e:
         raise ImportError(
-            f"Import fastai failed. A quick tip is to install via `pip install autogluon.tabular[fastai]=={__version__}`. "
-        )
+            f"Import fastai failed. Detailed info: {e}. "
+            f"A quick tip is to install via `pip install autogluon.tabular[fastai]=={__version__}`. "
+        ) from e
 
 
 def try_import_torch():
     try:
         import torch
-    except ImportError as e:
+    except ImportError:
         raise ImportError(
             "Unable to import dependency torch\n"
             "A quick tip is to install via `pip install torch`.\n"
