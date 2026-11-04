@@ -89,17 +89,21 @@ class GlobalCovariateScaler(CovariateScaler):
 
         if "known" in self._column_transformers:
             columns = self.covariate_metadata.known_covariates_real
-            data[columns] = self._column_transformers["known"].transform(data[columns])
+            # Older saved transformers retain sklearn's default prefixed output names.
+            transformer = self._column_transformers["known"].set_params(verbose_feature_names_out=False)
+            data[transformer.get_feature_names_out()] = transformer.transform(data[columns])
 
         if "past" in self._column_transformers:
             columns = self.covariate_metadata.past_covariates_real
-            data[columns] = self._column_transformers["past"].transform(data[columns])
+            transformer = self._column_transformers["past"].set_params(verbose_feature_names_out=False)
+            data[transformer.get_feature_names_out()] = transformer.transform(data[columns])
 
         if "static" in self._column_transformers:
             columns = self.covariate_metadata.static_features_real
             assert data.static_features is not None
 
-            data.static_features[columns] = self._column_transformers["static"].transform(
+            transformer = self._column_transformers["static"].set_params(verbose_feature_names_out=False)
+            data.static_features[transformer.get_feature_names_out()] = transformer.transform(
                 data.static_features[columns]
             )
         return data
@@ -114,7 +118,8 @@ class GlobalCovariateScaler(CovariateScaler):
             assert known_covariates is not None
 
             known_covariates = known_covariates.copy()
-            known_covariates[columns] = self._column_transformers["known"].transform(known_covariates[columns])
+            transformer = self._column_transformers["known"].set_params(verbose_feature_names_out=False)
+            known_covariates[transformer.get_feature_names_out()] = transformer.transform(known_covariates[columns])
         return known_covariates
 
     def _get_transformer_for_columns(self, df: pd.DataFrame, columns: list[str]) -> ColumnTransformer:
@@ -141,7 +146,10 @@ class GlobalCovariateScaler(CovariateScaler):
         if skewed_features:
             transformers.append(("skew", QuantileTransformer(output_distribution="normal"), skewed_features))
         with warning_filter():
-            column_transformer = ColumnTransformer(transformers=transformers, remainder="passthrough").fit(df[columns])
+            # Outputs are grouped by transformer, so retain the original feature names for assignment.
+            column_transformer = ColumnTransformer(
+                transformers=transformers, remainder="passthrough", verbose_feature_names_out=False
+            ).fit(df[columns])
         return column_transformer
 
 
