@@ -240,6 +240,15 @@ def test_tabpfn_share_weights_off_loads_and_pickles_its_own_network(tmp_path, mo
     network_bytes = sum(t.numel() * t.element_size() for m in owned.model.models_ for t in m.state_dict().values())
     tensors_path = os.path.join(saved_path, RealTabPFNv2Model.model_tensors_file_name)
     assert os.path.getsize(tensors_path) >= network_bytes, "the network is saved with the model"
+    saved_bytes = os.path.getsize(tensors_path) + os.path.getsize(os.path.join(saved_path, owned.model_file_name))
+
+    def refuse(*args, **kwargs):
+        raise AssertionError("sizing the model serialized a tensor")
+
+    with monkeypatch.context() as patched:
+        patched.setattr(torch, "save", refuse)
+        memory_size = owned._get_memory_size()
+    assert network_bytes < memory_size <= saved_bytes, "the size counts the network without serializing it"
     loaded = RealTabPFNv2Model.load(saved_path)
     assert loaded.model.models_[0] is not owned.model.models_[0]
     np.testing.assert_allclose(loaded.predict_proba(X), expected, rtol=1e-5, atol=1e-6)
