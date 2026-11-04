@@ -214,57 +214,53 @@ def _map_location(pin: bool) -> Callable:
 def load(path: str, tensors_path: str, pin: bool = False, verbose: bool = True) -> Any:
     """Load what :func:`save` wrote, from a local folder or from S3.
 
+    The pickle is read through ``load_pkl``, which reads one on S3 into memory. A tensor file on S3 is
+    downloaded to a temporary folder and read from there without memory-mapping, so the folder goes
+    once the tensors are loaded.
+
     The tensor file is read only when the pickle refers to it. With ``pin`` and CUDA available, every
     CPU storage is copied from the memory-mapped file into pinned memory, once per storage, so views
     keep sharing it; a storage that cannot be pinned stays mapped. Tensors saved on a CUDA device load
     on the CPU when CUDA is not available.
     """
     if s3_utils.is_s3_url(path):
-        return _load_from_s3(path=path, tensors_path=tensors_path, pin=pin, verbose=verbose)
-    if verbose:
-        logger.log(15, f"Loading: {path}")
+        if verbose:
+            load_pkl._warn_s3_pickle_load(path)
+        read_tensors = functools.partial(_read_tensors_from_s3, tensors_path, pin)
+    else:
+        read_tensors = functools.partial(_read_tensors, tensors_path, pin)
 
-    def read_tensors() -> dict:
-        import torch
+    def unpickle(file) -> Any:
+        return _TensorUnpickler(file, read_tensors=read_tensors, tensors_path=tensors_path).load()
 
-        if not os.path.exists(tensors_path):
-            raise FileNotFoundError(f"The model's tensor file is missing: {tensors_path}")
-        mmap = pin and torch.cuda.is_available() and os.name != "nt"
-        # The tensor file is as trusted as the pickle beside it, which is unpickled without restrictions.
-        return torch.load(tensors_path, map_location=_map_location(pin), mmap=mmap, weights_only=False)
-
-    with open(path, "rb") as f:
-        return _TensorUnpickler(f, read_tensors=read_tensors, tensors_path=tensors_path).load()
+    return load_pkl.load_with_fn(path, unpickle, verbose=verbose)
 
 
-def _load_from_s3(path: str, tensors_path: str, pin: bool, verbose: bool) -> Any:
-    """:func:`load` for S3: a pickle saved there holds its tensors, but a model saved to a local folder and
-    copied to S3 has its tensor file beside it, which is downloaded when the pickle refers to it."""
-    if verbose:
-        logger.log(15, f"Loading: {path}")
-        load_pkl._warn_s3_pickle_load(path)
+def _read_tensors(tensors_path: str, pin: bool, may_map: bool = True) -> dict:
+    """A local tensor file, memory-mapped when ``may_map`` and its CPU storages are copied into pinned memory."""
+    import torch
+
+    if not os.path.exists(tensors_path):
+        raise FileNotFoundError(f"The model's tensor file is missing: {tensors_path}")
+    mmap = may_map and pin and torch.cuda.is_available() and os.name != "nt"
+    # The tensor file is as trusted as the pickle beside it, which is unpickled without restrictions.
+    return torch.load(tensors_path, map_location=_map_location(pin), mmap=mmap, weights_only=False)
+
+
+def _read_tensors_from_s3(tensors_path: str, pin: bool) -> dict:
+    """A tensor file on S3, through a temporary folder; an error names the file."""
+    from botocore.exceptions import ClientError
+
     with tempfile.TemporaryDirectory() as local_dir:
-
-        def download(s3_path: str) -> str:
-            from botocore.exceptions import ClientError
-
-            local_path = os.path.join(local_dir, os.path.basename(s3_path))
-            try:
-                s3_utils.download_s3_file(local_path=local_path, s3_path=s3_path)
-            except ClientError as err:
-                if err.response.get("Error", {}).get("Code") in ("404", "NoSuchKey"):
-                    raise FileNotFoundError(f"The model's file is missing: {s3_path}") from err
-                raise
-            return local_path
-
-        def read_tensors() -> dict:
-            import torch
-
-            # Not memory-mapped, so the downloaded file can go once the tensors are read.
-            return torch.load(download(tensors_path), map_location=_map_location(pin), weights_only=False)
-
-        with open(download(path), "rb") as f:
-            return _TensorUnpickler(f, read_tensors=read_tensors, tensors_path=tensors_path).load()
+        local_path = os.path.join(local_dir, os.path.basename(tensors_path))
+        try:
+            s3_utils.download_s3_file(local_path=local_path, s3_path=tensors_path)
+        except ClientError as err:
+            # Without the permission to list the bucket, S3 answers 403 for a missing file as well.
+            if err.response.get("Error", {}).get("Code") in ("404", "NoSuchKey"):
+                raise FileNotFoundError(f"The model's tensor file is missing: {tensors_path}") from err
+            raise OSError(f"Could not download the model's tensor file {tensors_path}: {err}") from err
+        return _read_tensors(local_path, pin, may_map=False)
 
 
 def _tensors_nbytes(torch, tensors: list, protocol: int) -> int:

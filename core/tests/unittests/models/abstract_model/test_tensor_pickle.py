@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import io
 import os
 import pickle
 import shutil
 import subprocess
 import sys
+import types
 
 import numpy as np
 import pytest
@@ -273,51 +275,93 @@ def test_pickled_size_counts_sparse_and_meta_tensors_as_written():
     assert _tensor_pickle.pickled_size({"sparse": sparse, "meta": meta}) < 10_000
 
 
+class _FakeS3:
+    """S3 as boto3's resource reaches it, backed by a local folder: ``s3://bucket/<key>`` is ``<root>/<key>``."""
+
+    def __init__(self, root):
+        self.root = root
+        #: ``("get", key)`` reads an object into memory, ``("download", key, local_path)`` copies it to a file.
+        self.requests: list[tuple] = []
+        #: Keys answered with 403, as S3 answers a missing one when the caller may not list the bucket.
+        self.denied: set[str] = set()
+
+    def Bucket(self, name):
+        assert name == "bucket"
+        return self
+
+    def Object(self, key):
+        def get():
+            self.requests.append(("get", key))
+            return {"Body": io.BytesIO(self._path(key, "GetObject").read_bytes())}
+
+        return types.SimpleNamespace(get=get)
+
+    def download_file(self, key, local_path):
+        shutil.copyfile(self._path(key, "HeadObject"), local_path)  # boto3 asks for the object's head first
+        self.requests.append(("download", key, local_path))
+
+    def _path(self, key, operation):
+        from botocore.exceptions import ClientError
+
+        if key in self.denied:
+            raise ClientError({"Error": {"Code": "403", "Message": "Forbidden"}}, operation)
+        if not (self.root / key).exists():
+            raise ClientError({"Error": {"Code": "404" if operation == "HeadObject" else "NoSuchKey"}}, operation)
+        return self.root / key
+
+
 @pytest.fixture
 def fake_s3(tmp_path, monkeypatch):
-    """S3 as a local folder: ``s3://bucket/<key>`` is ``<tmp_path>/bucket/<key>``; returns the downloaded keys."""
-    from botocore.exceptions import ClientError
+    import boto3
 
-    from autogluon.common.utils import s3_utils
-
-    bucket = tmp_path / "bucket"
-    downloads = []
-
-    def download_s3_file(*, local_path, s3_path):
-        key = s3_utils.s3_path_to_bucket_prefix(s3_path)[1]
-        if not (bucket / key).exists():
-            raise ClientError({"Error": {"Code": "404", "Message": "Not Found"}}, "HeadObject")
-        downloads.append(key)
-        shutil.copyfile(bucket / key, local_path)
-
-    monkeypatch.setattr(s3_utils, "download_s3_file", download_s3_file)
-    return bucket, downloads
+    s3 = _FakeS3(tmp_path / "bucket")
+    monkeypatch.setattr(boto3, "resource", lambda service: s3)
+    return s3
 
 
 def test_a_model_saved_locally_and_copied_to_s3_loads_from_there(tmp_path, fake_s3):
-    bucket, downloads = fake_s3
     cache = torch.randn(64, 8)
-    shutil.copytree(_model(tmp_path / "local", state={"cache": cache, "head": cache[:4]}).save(), bucket / "m")
+    shutil.copytree(_model(tmp_path / "local", state={"cache": cache, "head": cache[:4]}).save(), fake_s3.root / "m")
 
     loaded = _Model.load("s3://bucket/m/").model
 
     assert torch.equal(loaded["cache"], cache)
     assert loaded["head"].untyped_storage().data_ptr() == loaded["cache"].untyped_storage().data_ptr()
-    assert downloads == ["m/model.pkl", "m/model_tensors.pt"]
+    get, download = fake_s3.requests
+    assert get == ("get", "m/model.pkl") and download[:2] == ("download", "m/model_tensors.pt")
+    assert not os.path.exists(download[2]), "the downloaded tensor file goes after the load"
 
 
-def test_a_pickle_without_tensor_references_on_s3_downloads_nothing_else(tmp_path, fake_s3):
-    bucket, downloads = fake_s3
-    shutil.copytree(_model(tmp_path / "local", state={"weights": np.arange(3)}).save(), bucket / "m")
+@pytest.mark.parametrize("tensors", [False, True], ids=["saved-locally-without-tensors", "saved-to-s3-with-tensors"])
+def test_a_pickle_on_s3_without_tensor_references_is_read_alone(tmp_path, fake_s3, tensors):
+    """A model saved to S3 keeps its tensors in the pickle, which is read into memory as before."""
+    state = {"cache": torch.randn(64, 8)} if tensors else {"weights": np.arange(3)}
+    model = _model(tmp_path / "local", state=state)
+    if tensors:  # what a save to an S3 path writes
+        (fake_s3.root / "m").mkdir(parents=True)
+        (fake_s3.root / "m" / model.model_file_name).write_bytes(pickle.dumps(model, protocol=_tensor_pickle.PROTOCOL))
+    else:
+        shutil.copytree(model.save(), fake_s3.root / "m")
 
-    np.testing.assert_array_equal(_Model.load("s3://bucket/m/").model["weights"], np.arange(3))
-    assert downloads == ["m/model.pkl"]
+    loaded = _Model.load("s3://bucket/m/").model
+
+    for name, value in state.items():
+        np.testing.assert_array_equal(np.asarray(loaded[name]), np.asarray(value))
+    assert fake_s3.requests == [("get", "m/model.pkl")]
 
 
 def test_a_missing_tensor_file_on_s3_fails_clearly(tmp_path, fake_s3):
-    bucket, _ = fake_s3
-    shutil.copytree(_model(tmp_path / "local", state={"cache": torch.ones(8)}).save(), bucket / "m")
-    os.remove(bucket / "m" / _Model.model_tensors_file_name)
+    shutil.copytree(_model(tmp_path / "local", state={"cache": torch.ones(8)}).save(), fake_s3.root / "m")
+    os.remove(fake_s3.root / "m" / _Model.model_tensors_file_name)
 
     with pytest.raises(FileNotFoundError, match="s3://bucket/m/model_tensors.pt"):
         _Model.load("s3://bucket/m/")
+
+
+def test_a_tensor_file_on_s3_that_cannot_be_read_fails_naming_it(tmp_path, fake_s3):
+    shutil.copytree(_model(tmp_path / "local", state={"cache": torch.ones(8)}).save(), fake_s3.root / "m")
+    fake_s3.denied.add("m/model_tensors.pt")
+
+    with pytest.raises(OSError, match="s3://bucket/m/model_tensors.pt.*403") as raised:
+        _Model.load("s3://bucket/m/")
+    assert not isinstance(raised.value, FileNotFoundError), "a 403 may also mean the file exists but is not readable"
