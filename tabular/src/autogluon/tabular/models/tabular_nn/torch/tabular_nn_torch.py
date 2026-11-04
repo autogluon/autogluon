@@ -1026,6 +1026,7 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
     def _class_tags(cls):
         return {
             "supports_learning_curves": True,
+            "reset_torch_threads": True,
         }
 
     def _more_tags(self):
