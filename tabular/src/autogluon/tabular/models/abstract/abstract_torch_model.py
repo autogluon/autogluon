@@ -227,6 +227,21 @@ class AbstractTorchModel(AbstractModel):
             return False
         return bool(self._get_class_tags().get("pickles_pretrained_weights", True))
 
+    def _device_for_save(self) -> str | None:
+        """The device ``save`` moves the fitted model to while it is pickled, ``None`` to leave it where it is.
+
+        By default ``set_device_on_save_to`` when the pickle carries the network, so it loads on a machine
+        without the fit's GPU. ``load`` restores the tensors of a missing CUDA device on the CPU, those in
+        ``model_tensors.pt`` as well as those kept in the pickle, and then moves the model with ``set_device``
+        (``set_device_on_load``). A model can return ``None`` when nothing else in its pickle needs that
+        device on load, which spares copying its network and any cache to the CPU and back on every save.
+        That does not hold for a library whose own ``__setstate__`` moves its network to the device it was
+        saved from (TabICL).
+        """
+        if not (self.is_fit() and self._pickles_pretrained_weights()):
+            return None
+        return self._get_class_tags().get("set_device_on_save_to", None)
+
     def _get_memory_size(self) -> int:
         shared = _shared.memory_size(self)
         return super()._get_memory_size() if shared is None else shared
@@ -238,21 +253,13 @@ class AbstractTorchModel(AbstractModel):
         return info
 
     def save(self, path: str = None, verbose=True) -> str:
-        """
-        Need to set device to CPU to be able to load on a non-GPU environment
-        """
-        reset_device = False
+        """Save the model, moved to :meth:`_device_for_save` while it is pickled and back after."""
         og_device = self.device
-
-        # Save on CPU to ensure the model can be loaded without GPU
-        if self.is_fit() and self._pickles_pretrained_weights():
-            device_save = self._get_class_tags().get("set_device_on_save_to", None)
-            if device_save is not None:
-                self.set_device(device=device_save)
-                reset_device = True
+        device_save = self._device_for_save()
+        if device_save is not None:
+            self.set_device(device=device_save)
         path = super().save(path=path, verbose=verbose)
-        # Put the model back to the device after the save
-        if reset_device:
+        if device_save is not None:
             self.set_device(device=og_device)
         return path
 
