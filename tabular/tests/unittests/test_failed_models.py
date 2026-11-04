@@ -97,3 +97,15 @@ def test_a_bag_whose_remaining_folds_fail_keeps_only_its_first_folds_on_disk(tmp
     assert [child if isinstance(child, str) else child.name for child in model.models] == ["S1F1"]
     assert sorted(p.name for p in Path(model.path).iterdir() if p.is_dir() and p.name != "utils") == ["S1F1"]
     assert np.isfinite(predictor.predict_proba(_train(50)).to_numpy()).all()
+
+
+def test_a_model_with_a_nan_validation_score_is_not_trained(tmp_path):
+    # a constant prediction has no Pearson correlation: the dummy model's validation score is NaN
+    train = _train()
+    train["label"] = train["a"] + 0.1 * train["b"]
+    predictor = TabularPredictor(
+        label="label", eval_metric="pearsonr", path=str(tmp_path / "predictor"), verbosity=0
+    ).fit(train, hyperparameters={"DUMMY": {}, "LR": {}}, num_gpus=0)
+    assert not [m for m in predictor.model_names() if m.startswith("Dummy")]
+    assert predictor.model_best.startswith("WeightedEnsemble")
+    assert np.isfinite(predictor.predict(_train(50))).all()

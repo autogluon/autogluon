@@ -369,6 +369,7 @@ class TabPFNModel(AbstractTorchModel):
             self.disable_tabpfn_telemetry()
 
         if self.problem_type == "quantile":
+            X = self.preprocess(X, **kwargs)
             y_pred = self.model.predict(
                 X,
                 output_type="quantiles",
