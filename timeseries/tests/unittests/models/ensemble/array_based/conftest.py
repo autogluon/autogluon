@@ -23,6 +23,24 @@ def ensemble_data():
 
 
 @pytest.fixture()
+def ensemble_data_with_covariates():
+    prediction_length = 5
+    df = get_data_frame_with_item_index(ITEM_INDEX)  # type: ignore
+    df["covariate"] = df["target"] * 2  # add a covariate column
+    train_split, _ = df.train_test_split(prediction_length=prediction_length)
+    preds = get_prediction_for_df(train_split, prediction_length=prediction_length)
+
+    yield {
+        "predictions_per_window": {
+            "dummy_model": [preds],
+            "dummy_model_2": [preds * 2],
+        },
+        "data_per_window": [df],
+        "model_scores": {"dummy_model": -2.5, "dummy_model_2": -1.0},
+    }
+
+
+@pytest.fixture()
 def ensemble_test_data():
     predictions = get_prediction_for_df(
         get_data_frame_with_item_index(ITEM_INDEX)  # type: ignore
