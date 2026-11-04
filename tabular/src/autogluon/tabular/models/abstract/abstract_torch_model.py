@@ -236,7 +236,8 @@ class AbstractTorchModel(AbstractModel):
         (``set_device_on_load``). A model can return ``None`` when nothing else in its pickle needs that
         device on load, which spares copying its network and any cache to the CPU and back on every save.
         That does not hold for a library whose own ``__setstate__`` moves its network to the device it was
-        saved from (TabICL).
+        saved from (TabICL). It also needs ``set_device_on_load``: without it a model loaded where its GPU is
+        missing keeps its tensors on the CPU while its own device fields still name the GPU.
         """
         if not (self.is_fit() and self._pickles_pretrained_weights()):
             return None
