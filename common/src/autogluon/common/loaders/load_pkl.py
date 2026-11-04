@@ -144,6 +144,7 @@ def load_with_fn(path, pickle_fn, format=None, verbose=True):
         import boto3
 
         if verbose:
+            _warn_s3_pickle_load(path)
             logger.log(15, "Loading: %s" % path)
         s3_bucket, s3_prefix = s3_utils.s3_path_to_bucket_prefix(s3_path=path)
         s3 = boto3.resource("s3")
