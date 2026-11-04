@@ -432,6 +432,37 @@ def test_memory_size_counts_the_shared_tensors(tmp_path, data):
     assert model._get_memory_size() == model._get_pickled_size() + registry.tensor_bytes(model.model.model_)
 
 
+def test_save_and_size_leave_the_estimators_tensors_on_their_device(tmp_path, data, monkeypatch):
+    """``save`` and the size estimate write the tensors apart, which load them back on the CPU when their
+    CUDA device is missing, so the weightless pickle copies none of them to the CPU; a plain pickle still does.
+    """
+    model = _fit(MethodModel, tmp_path, data)
+    to_cpu = []
+    detach = graph.detach_shared
+    monkeypatch.setattr(
+        graph, "detach_shared", lambda *args, **kwargs: to_cpu.append(kwargs["to_cpu"]) or detach(*args, **kwargs)
+    )
+    model._get_memory_size()
+    model.save(verbose=False)
+    pickle.dumps(model)
+    assert to_cpu == [False, False, True]
+
+    model.model.context_ = torch.empty(4, device="meta")  # stands for a GPU tensor: a CPU copy of it raises
+    assert model._get_memory_size() > 0
+
+
+def test_detach_shared_can_leave_tensors_where_they_are():
+    net = _Net()
+    context, owned = torch.empty(4, device="meta"), _Net().to("meta")
+    root = {"net": net, "context": context, "owned": owned, "cpu": torch.ones(2)}
+
+    copy, paths, moved = graph.detach_shared(root, [net], to_cpu=False)
+
+    assert copy["net"] is None and paths == [((("key", "net"),), 0)]
+    assert copy["context"] is context and copy["owned"] is owned and copy["cpu"] is root["cpu"]
+    assert sorted(moved) == [(("key", "context"),), (("key", "owned"),)], "returned to the model's device on load"
+
+
 def test_info_block(tmp_path, data):
     model = _fit(MethodModel, tmp_path, data, hyperparameters={"checkpoint": "one.ckpt"})
     block = model.get_info()["shared_weights"]

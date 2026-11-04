@@ -13,7 +13,9 @@ on a 100k-row table they take tens of GB of RAM and minutes of the fit.
 storage keep sharing it). Both files carry a token of the save that wrote them, and the pickle is
 moved into place last, so a pair from two different saves fails to load instead of mixing tensors.
 A state ``torch.save`` refuses (two views of one storage with different dtypes) keeps its tensors in
-the pickle. :func:`load` reads the tensor file only when the pickle refers to it.
+the pickle. :func:`load` reads the tensor file only when the pickle refers to it, and restores each
+tensor on the device it was saved from, or on the CPU when that CUDA device is not available, so a
+``__getstate__`` that asks :func:`tensors_saved_apart` can leave its tensors where they are.
 :func:`pickled_size` streams the pickle into a byte counter and adds every storage's bytes once,
 without serializing any tensor.
 
@@ -23,6 +25,7 @@ that never imported torch no object can hold a tensor, so torch is never importe
 
 from __future__ import annotations
 
+import contextvars
 import functools
 import logging
 import os
@@ -40,6 +43,19 @@ logger = logging.getLogger(__name__)
 
 #: The pickle protocol of ``save_pkl``, so a model's size estimate matches what ``save`` writes.
 PROTOCOL = 4
+
+
+_SAVING_APART = contextvars.ContextVar("autogluon_tensors_saved_apart", default=False)
+
+
+def tensors_saved_apart() -> bool:
+    """Whether the pickle being written keeps its tensors out of it (:func:`save`, :func:`pickled_size`).
+
+    Such a pickle need not move tensors to the CPU so that it loads without CUDA: :func:`load` restores
+    them on the CPU when their CUDA device is not available. A plain pickle written meanwhile, from
+    inside a ``__getstate__``, sees the same answer.
+    """
+    return _SAVING_APART.get()
 
 
 def _imported_torch():
@@ -68,6 +84,13 @@ class _TensorPickler(pickle.Pickler):
         self._tensor_type = tensor_type
         self.token = token
         self.tensors: list = []
+
+    def dump(self, obj: Any) -> None:
+        reset = _SAVING_APART.set(True)
+        try:
+            super().dump(obj)
+        finally:
+            _SAVING_APART.reset(reset)
 
     def reducer_override(self, obj: Any):
         if not isinstance(obj, self._tensor_type):
@@ -182,18 +205,23 @@ def _save_tensors(torch, saved: dict, path: str) -> bool:
 
 def _map_location(pin: bool) -> Callable:
     """``torch.load``'s ``map_location``: each storage where it was saved, on the CPU when its CUDA
-    device is not available, and copied into pinned memory when ``pin``, CUDA is available and it is on
-    the CPU. A storage that cannot be pinned stays as loaded."""
+    device is not available (no CUDA, or fewer devices than at the save), and copied into pinned memory
+    when ``pin``, CUDA is available and it is on the CPU. A storage that cannot be pinned stays as loaded."""
     import torch
     from torch.serialization import default_restore_location
 
     # Asking whether CUDA is available initializes the driver, after which a forked child cannot use CUDA,
     # so only a load that pins or holds CUDA storages asks.
     cuda = functools.cache(torch.cuda.is_available)
+    device_count = functools.cache(torch.cuda.device_count)
     unpinned = []
 
+    def has_device(location: str) -> bool:
+        index = location.partition(":")[2]
+        return cuda() and (not index or int(index) < device_count())
+
     def restore(storage, location: str):
-        if location.startswith("cuda") and not cuda():
+        if location.startswith("cuda") and not has_device(location):
             restored = storage  # torch hands the storage over on the CPU
         else:
             restored = default_restore_location(storage, location)
@@ -215,7 +243,7 @@ def load(path: str, tensors_path: str, pin: bool = False, verbose: bool = True) 
     The tensor file is read only when the pickle refers to it. With ``pin`` and CUDA available, every
     CPU storage is copied from the memory-mapped file into pinned memory, once per storage, so views
     keep sharing it; a storage that cannot be pinned stays mapped. Tensors saved on a CUDA device load
-    on the CPU when CUDA is not available.
+    on the CPU when that device is not available.
     """
     if s3_utils.is_s3_url(path):
         return load_pkl.load(path=path, verbose=verbose)

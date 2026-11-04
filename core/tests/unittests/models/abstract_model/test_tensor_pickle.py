@@ -191,6 +191,46 @@ def test_cuda_tensors_load_on_the_cpu_without_cuda(tmp_path, monkeypatch, cls):
     assert loaded["head"].untyped_storage().data_ptr() == loaded["cache"].untyped_storage().data_ptr()
 
 
+def test_tensors_of_a_cuda_device_this_machine_lacks_load_on_the_cpu(tmp_path, monkeypatch):
+    cache = torch.arange(10.0)
+    with monkeypatch.context() as patch:
+        patch.setattr(torch.serialization, "location_tag", lambda storage: "cuda:3")
+        path = _model(tmp_path, state={"cache": cache}).save()
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+    monkeypatch.setattr(torch.cuda, "device_count", lambda: 1)
+
+    loaded = _Model.load(path).model
+
+    assert loaded["cache"].device.type == "cpu" and torch.equal(loaded["cache"], cache)
+
+
+class _Probe:
+    """Records, each time it is pickled, whether the pickle writes its tensors apart."""
+
+    def __init__(self, tensor):
+        self.tensor = tensor
+        self.seen = []
+
+    def __getstate__(self):
+        self.seen.append(_tensor_pickle.tensors_saved_apart())
+        return {"tensor": self.tensor, "seen": []}
+
+
+def test_a_getstate_learns_whether_the_tensors_are_saved_apart(tmp_path):
+    probe = _Probe(torch.ones(2))
+    model = _model(tmp_path, state={"probe": probe})
+
+    model.save()
+    model._get_pickled_size()
+    pickle.dumps(model)
+    values = torch.arange(4.0)
+    probe.tensor = {"float": values, "int": values.view(torch.int32)}  # torch.save refuses: a plain pickle follows
+    model.save()
+
+    assert probe.seen == [True, True, False, True, False]
+    assert not _tensor_pickle.tensors_saved_apart()
+
+
 def test_a_load_without_pinning_or_cuda_tensors_never_asks_for_cuda(tmp_path, monkeypatch):
     path = _model(tmp_path, state={"cache": torch.ones(8)}).save()
 

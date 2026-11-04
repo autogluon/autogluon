@@ -260,14 +260,15 @@ def _cpu_copy_of_module(module: torch.nn.Module) -> torch.nn.Module:
 
 
 def detach_shared(
-    root: Any, shared: Sequence[Any] = (), *, shared_ids: Sequence[int] | None = None
+    root: Any, shared: Sequence[Any] = (), *, shared_ids: Sequence[int] | None = None, to_cpu: bool = True
 ) -> tuple[Any, list[tuple[Path, int]], list[Path]]:
-    """A copy of ``root``'s object graph with every reference to a ``shared`` object nulled and every tensor on the CPU.
+    """A copy of ``root``'s object graph with every reference to a ``shared`` object nulled and its tensors on the CPU.
 
     Containers on the way to a change are shallow-copied (the live estimator keeps everything);
     aliases stay aliases in the copy. Tensors are replaced by detached CPU copies, an owned module
-    with tensors off the CPU by a deep copy on the CPU. Bound methods of the root estimator (the
-    instance-level shadows a fit installs) are dropped.
+    with tensors off the CPU by a deep copy on the CPU. With ``to_cpu=False`` tensors and owned
+    modules stay as they are, for a pickle that restores them where it can. Bound methods of the
+    root estimator (the instance-level shadows a fit installs) are dropped.
 
     ``shared_ids`` names the objects by identity instead (the ids recorded when they were alive), so an
     estimator whose registry entry was evicted still pickles without its network.
@@ -275,8 +276,8 @@ def detach_shared(
     Returns:
         ``(copy, paths, moved)``: ``paths`` lists ``(path, index into shared)`` for every nulled
         reference, so :func:`attach_shared` can put another device's payload back; ``moved`` lists
-        the paths of tensors and owned modules that were on another device, so :func:`move_to`
-        can return them to the model's device after a reload.
+        the paths of tensors and owned modules that were on another device than the CPU, so
+        :func:`move_to` can return them to the model's device after a reload.
     """
     shared_ids = {
         identity: index
@@ -293,9 +294,9 @@ def detach_shared(
         if index is not None:
             paths.append((path, index))
             return None
-        leaf = _cpu_leaf(obj)
+        leaf = _cpu_leaf(obj) if to_cpu else _off_cpu_leaf(obj)
         if leaf is not _NOT_A_LEAF:
-            if leaf is not obj:
+            if leaf is not obj or (not to_cpu and _off_cpu(obj)):
                 moved.append(path)
             return leaf
         key = id(obj)
@@ -334,6 +335,18 @@ def move_to(root: Any, paths: Sequence[Path], device: str) -> Any:
         elif _is_tensor(value) and value.device.type != device_type:
             root = assign(root, path, value.to(device_type))
     return root
+
+
+def _off_cpu(obj: Any) -> bool:
+    """Whether a tensor, or a parameter or buffer of a module, is off the CPU."""
+    if _is_tensor(obj):
+        return obj.device.type != "cpu"
+    return any(tensor.device.type != "cpu" for tensor in (*obj.parameters(), *obj.buffers()))
+
+
+def _off_cpu_leaf(obj: Any) -> Any:
+    """A tensor or an owned module itself, ``_NOT_A_LEAF`` for anything else."""
+    return obj if _is_tensor(obj) or _is_module(obj) else _NOT_A_LEAF
 
 
 def _cpu_leaf(obj: Any) -> Any:
