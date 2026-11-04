@@ -174,8 +174,6 @@ class TabPFNModel(AbstractTorchModel):
         self._max_batch_size_resolved: int | None = None
         #: Rows of the training context, set during `_fit`.
         self._n_train_fit: int | None = None
-        #: The GPUs a fit spread over several of them was given, set during `_fit`.
-        self._fit_devices: list[str] | None = None
 
     def _default_model_map(self) -> dict[str, str | None]:
         fallback = {
@@ -240,7 +238,6 @@ class TabPFNModel(AbstractTorchModel):
 
         self._resolve_fit_device(num_gpus=num_gpus)  # CPU-fallback warning + CUDA availability check
         device = self._get_tabpfn_device(num_gpus=num_gpus)
-        self._fit_devices = device if isinstance(device, list) else None
 
         if verbosity >= 2:
             # logs "Built with PriorLabs-TabPFN"
@@ -438,11 +435,11 @@ class TabPFNModel(AbstractTorchModel):
         self._sync_inner_checkpoints_to_engine_devices(device=devices if isinstance(devices, str) else devices[0])
 
     def _devices_for(self, device: str) -> str | list[str]:
-        """tabpfn's device argument for moving to ``device``: the fit's GPUs for ``"cuda"``, else ``device``."""
-        fit_devices = getattr(self, "_fit_devices", None)  # a model pickled before it was recorded has none
-        if device != "cuda" or not fit_devices:
+        """tabpfn's device argument for moving to ``device``: for ``"cuda"`` the GPUs the fit was given (its
+        recorded ``num_gpus``), as many as this process sees; else ``device``."""
+        if device != "cuda":
             return device
-        return self._get_tabpfn_device(num_gpus=len(fit_devices))
+        return self._get_tabpfn_device(num_gpus=max(1, self._fit_metadata.get("num_gpus") or 0))
 
     def _sync_inner_checkpoints_to_engine_devices(self, device: str) -> None:
         """Point `models_` back at the checkpoints the inference engine just moved.
