@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 import pytest
 from packaging.version import Version
 from sklearn.feature_extraction.text import CountVectorizer
@@ -525,3 +526,16 @@ def test_add_custom_feature_generators():
     fg_main_stage = fg.generators[2]
     assert fg_main_stage[-2] == gen_1
     assert fg_main_stage[-1] == gen_2
+
+
+def test_auto_ml_pipeline_feature_generator_timedelta():
+    """A timedelta feature is kept as a numeric feature of float seconds."""
+    rng = np.random.default_rng(0)
+    seconds = rng.integers(0, 10**5, 100).astype(float)
+    input_data = pd.DataFrame({"duration": pd.to_timedelta(seconds, unit="s"), "x": rng.normal(size=100)})
+
+    generator = AutoMLPipelineFeatureGenerator()
+    output_data = generator.fit_transform(input_data)
+
+    np.testing.assert_array_equal(output_data["duration"].to_numpy(), seconds)
+    assert generator.feature_metadata.get_feature_type_raw("duration") == "float"
