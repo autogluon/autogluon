@@ -1,3 +1,4 @@
+import os
 import shutil
 
 import numpy as np
@@ -461,3 +462,85 @@ def test_dynamic_stacking_false_allows_two_groups():
     )
     assert len(predictor.predict_oof()) == len(df)
     shutil.rmtree(predictor.path)
+
+
+def _toy_binary_for_dystack(n: int = 200, seed: int = 0) -> pd.DataFrame:
+    rng = np.random.default_rng(seed)
+    f1 = rng.normal(size=n)
+    return pd.DataFrame({"f1": f1, "label": (f1 + rng.normal(size=n) > 0).astype(int)})
+
+
+def _fit_dystack_in_process(path: str, **fit_kwargs):
+    from autogluon.tabular import TabularPredictor
+
+    return TabularPredictor(label="label", path=path, verbosity=0).fit(
+        _toy_binary_for_dystack(),
+        hyperparameters={"DUMMY": {}},
+        num_bag_folds=2,
+        num_stack_levels=1,
+        dynamic_stacking=True,
+        ds_args={"enable_ray_logging": False, "memory_safe_fits": False},
+        fit_weighted_ensemble=False,
+        **fit_kwargs,
+    )
+
+
+@pytest.mark.parametrize("fails", ["after_learner_fit", "before_learner_fit"])
+def test_dynamic_stacking_failed_in_process_sub_fit_does_not_break_main_fit(fails, monkeypatch, tmp_path):
+    """A DyStack sub-fit that raises in this process must leave the predictor as it found it.
+
+    `after_learner_fit` is the common case, such as a sub-fit that trains no models (its `_post_fit` raises): the fit
+    learner was left in place, so the main fit raised "Learner is already fit.". `before_learner_fit` fails before the
+    learner fits, which sent the main fit to the sub-fit's directory instead.
+    """
+    from autogluon.tabular import TabularPredictor
+
+    original_fit = TabularPredictor._fit
+    calls = []
+
+    def fit_failing_once(self, ag_fit_kwargs, ag_post_fit_kwargs):
+        calls.append(None)
+        if len(calls) == 1:  # the DyStack sub-fit; the main fit is the second call
+            if fails == "after_learner_fit":
+                original_fit(self, ag_fit_kwargs=ag_fit_kwargs, ag_post_fit_kwargs=ag_post_fit_kwargs)
+            raise RuntimeError("simulated DyStack sub-fit failure")
+        return original_fit(self, ag_fit_kwargs=ag_fit_kwargs, ag_post_fit_kwargs=ag_post_fit_kwargs)
+
+    monkeypatch.setattr(TabularPredictor, "_fit", fit_failing_once)
+
+    path = str(tmp_path / "predictor")
+    predictor = _fit_dystack_in_process(path=path)
+
+    assert len(calls) == 2
+    assert os.path.normpath(predictor.path) == os.path.normpath(path)
+    assert predictor.model_names()
+
+
+def test_dynamic_stacking_in_process_sub_fit_restores_predictor_state(monkeypatch, tmp_path):
+    """The state a successful in-process sub-fit sets on the predictor, such as its decision threshold, is undone."""
+    import autogluon.tabular.predictor.predictor as pred_mod
+
+    def state(predictor) -> dict:
+        return dict(
+            path=predictor._learner.path,
+            trainer=getattr(predictor, "_trainer", None),
+            decision_threshold=predictor._decision_threshold,
+        )
+
+    states = []
+    original_dystack = pred_mod._dystack
+
+    def spy(predictor, *args, **kwargs):
+        state_before = state(predictor)
+        out = original_dystack(predictor, *args, **kwargs)
+        states.append((state_before, state(predictor)))
+        return out
+
+    monkeypatch.setattr(pred_mod, "_dystack", spy)
+
+    # The sub-fit calibrates the decision threshold, setting it on the predictor
+    _fit_dystack_in_process(path=str(tmp_path / "predictor"), calibrate_decision_threshold=True)
+
+    assert states, "DyStack sub-fit did not run"
+    for state_before, state_after in states:
+        assert state_after == state_before
