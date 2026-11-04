@@ -44,7 +44,9 @@ class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
         Appends CategoryFeatureGenerator() to the generator group.
     enable_datetime_features : bool, default True
         Whether to keep features of 'datetime' raw type and 'object' features identified as 'datetime_as_object' features.
-        These features will be converted to 'int' features representing milliseconds since epoch.
+        These features will be converted to 'int' features representing nanoseconds since epoch, along with 'int'
+        features for their year, month, day and day of week. Missing or unparsable dates are set to the mean date
+        of the training data.
         Appends DatetimeFeatureGenerator() to the generator group.
     enable_text_special_features : bool, default True
         Whether to use 'object' features identified as 'text' features to generate 'text_special' features such as word count,
