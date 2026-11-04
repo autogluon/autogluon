@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import contextlib
-import gc
 import time
 
 import numpy as np
@@ -218,10 +217,9 @@ class MitraBase(BaseEstimator):
                 return self
 
             except torch.cuda.OutOfMemoryError:
-                self.trainers.clear()
-                model = trainer = None
-                gc.collect()
-                torch.cuda.empty_cache()
+                # Preserve the released trainer's retry lifetime. Clearing
+                # CUDA's cache here changes later prediction OOM boundaries
+                # and therefore the support samples used for prediction.
                 if cfg.hyperparams["max_samples_support"] >= 2048:
                     cfg.hyperparams["max_samples_support"] = int(cfg.hyperparams["max_samples_support"] // 2)
                     print(
