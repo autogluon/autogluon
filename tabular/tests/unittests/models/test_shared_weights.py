@@ -458,6 +458,20 @@ def test_save_and_size_leave_the_estimators_tensors_on_their_device(tmp_path, da
     assert model._get_memory_size() > 0
 
 
+def test_save_moves_the_model_to_its_device_for_save_and_back(tmp_path, data, monkeypatch):
+    model = _fit(PlainModel, tmp_path, data, "p")
+    moves = []
+    monkeypatch.setattr(_Base, "_set_device", lambda self, device: moves.append(device))
+
+    model.save()
+    assert moves == ["cpu", "cpu"], "set_device_on_save_to, so the pickle loads without the fit's GPU"
+
+    moves.clear()
+    monkeypatch.setattr(PlainModel, "_device_for_save", lambda self: None)
+    model.save()
+    assert moves == [], "a model whose pickle loads anywhere stays where it is"
+
+
 def test_detach_shared_can_leave_tensors_where_they_are():
     net = _Net()
     context, owned = torch.empty(4, device="meta"), _Net().to("meta")
