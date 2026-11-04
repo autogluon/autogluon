@@ -47,8 +47,10 @@ from ...utils.savers import save_pkl
 
 logger = logging.getLogger(__name__)
 
-#: The pickle protocol of ``save_pkl``, so a model's size estimate matches what ``save`` writes.
-PROTOCOL = 4
+#: The pickle protocol of the model file and of its size estimate. Protocol 5 hands a NumPy array's
+#: buffer to the file, or to the byte counter, as it is; protocol 4 first copies it into a bytes object
+#: that the pickle keeps alive until the dump ends, a second copy of every array the model holds.
+PROTOCOL = 5
 
 
 _SAVING_APART = contextvars.ContextVar("autogluon_tensors_saved_apart", default=False)
@@ -218,15 +220,17 @@ def _save_tensors(torch, saved: dict, path: str) -> bool:
         with serialization_config.patch({"save.compute_crc32": False}):
             torch.save(saved, path)
     except RuntimeError as err:
-        # Such as "Cannot save multiple tensors or storages that view the same data as different types".
+        # Any other error, such as a full disk, is the save's to raise, not a reason to pickle the tensors.
+        if "view the same data as different types" not in str(err):
+            raise
         logger.log(20, f"Keeping the tensors in the pickle, since torch.save refused them: {err}")
         return False
     return True
 
 
 def _map_location(pin: bool) -> Callable:
-    """``torch.load``'s ``map_location``: each storage where it was saved, on the CPU when its CUDA
-    device is not available (no CUDA, or fewer devices than at the save), and copied into pinned memory
+    """``torch.load``'s ``map_location``: each storage where it was saved, on the CPU when its device is not
+    available (no CUDA, fewer CUDA devices than at the save, or no MPS), and copied into pinned memory
     when ``pin``, CUDA is available and it is on the CPU. A storage that cannot be pinned stays as loaded."""
     import torch
     from torch.serialization import default_restore_location
@@ -235,14 +239,18 @@ def _map_location(pin: bool) -> Callable:
     # so only a load that pins or holds CUDA storages asks.
     cuda = functools.cache(torch.cuda.is_available)
     device_count = functools.cache(torch.cuda.device_count)
-    unpinned = []
+    mps = functools.cache(torch.backends.mps.is_available)
+    warned = False
 
     def has_device(location: str) -> bool:
+        if location.startswith("mps"):
+            return mps()
         index = location.partition(":")[2]
         return cuda() and (not index or int(index) < device_count())
 
     def restore(storage, location: str):
-        if location.startswith("cuda") and not has_device(location):
+        nonlocal warned
+        if location.startswith(("cuda", "mps")) and not has_device(location):
             restored = storage  # torch hands the storage over on the CPU
         else:
             restored = default_restore_location(storage, location)
@@ -250,9 +258,9 @@ def _map_location(pin: bool) -> Callable:
             try:
                 restored = restored.pin_memory()
             except RuntimeError as err:
-                if not unpinned:
+                if not warned:
                     logger.warning(f"Could not pin the model's tensors, keeping them in pageable memory: {err}")
-                unpinned.append(restored.nbytes())
+                    warned = True
         return restored
 
     return restore
