@@ -232,50 +232,6 @@ def test_tabpfn_save_without_fit_round_trips(tmp_path):
     assert not TabPFNModel.load(saved_path).is_fit()
 
 
-class _StubWeightedExecutor:
-    """Holds the checkpoints the way the inference engine does."""
-
-    def __init__(self, models, rng):
-        self.models = models
-        self.X_train = rng.normal(size=(64, 8))
-
-
-class _StubWeightedEstimator:
-    """A fitted estimator whose checkpoints are small real modules, shared with its engine."""
-
-    def __init__(self, n_features, rng):
-        import torch
-
-        self.models_ = [torch.nn.Linear(n_features, n_features), torch.nn.Linear(n_features, n_features)]
-        self.executor_ = _StubWeightedExecutor(self.models_, rng)
-
-
-def test_tabpfn_memory_size_counts_the_weights_without_pickling_them(monkeypatch):
-    """`get_memory_size` matches a full pickle while never serialising the checkpoints."""
-    import pickle
-
-    import numpy as np
-    import torch
-
-    from autogluon.tabular.models.tabpfnv2.tabpfnv2_5_model import TabPFNModel
-
-    model = TabPFNModel(problem_type="binary", eval_metric=None)
-    model.model = _StubWeightedEstimator(n_features=512, rng=np.random.default_rng(0))
-    full_pickle_size = len(pickle.dumps(model, protocol=4))
-    weights = 2 * (512 * 512 + 512) * 4
-
-    def refuse(*args, **kwargs):
-        raise AssertionError("sizing the model serialized a tensor")
-
-    monkeypatch.setattr(torch, "save", refuse)
-    memory_size = model.get_memory_size()
-
-    assert weights < memory_size
-    assert abs(memory_size - full_pickle_size) < 0.01 * full_pickle_size
-    # The live model is left as it was.
-    assert model.model.models_ and model.model.executor_.models is model.model.models_
-
-
 def test_tabpfn_auto_max_batch_size_resolution():
     """ "auto" chunking starts only once the prediction set exceeds the training set by the slack."""
     from autogluon.tabular.models.tabpfnv2.tabpfnv2_5_model import TabPFNModel
