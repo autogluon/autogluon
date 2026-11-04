@@ -216,7 +216,7 @@ def test_tabpfn_registry_capacity_bounds_the_shared_networks(tmp_path):
 
 def test_tabpfn_share_weights_off_loads_and_pickles_its_own_network(tmp_path, monkeypatch):
     """`model_class_settings={"REALTABPFN-V2": {"share_weights": False}}` restores tabpfn's own load
-    for that version only: no registry entry, the network saved with the model, a CPU round trip on save.
+    for that version only: no registry entry, the network saved with the model.
     """
     import os
 
@@ -253,6 +253,38 @@ def test_tabpfn_share_weights_off_loads_and_pickles_its_own_network(tmp_path, mo
     assert loaded.model.models_[0] is not owned.model.models_[0]
     np.testing.assert_allclose(loaded.predict_proba(X), expected, rtol=1e-5, atol=1e-6)
     assert not registry.report()["entries"]
+
+
+def test_tabpfn_saves_a_fit_on_one_device_where_it_is(tmp_path, monkeypatch):
+    """A fit that owns its network is saved without a move to the CPU and back, and loads without the GPU it
+    was saved from; a fit spread over several devices still goes to the CPU, where the engine keeps one copy."""
+    import numpy as np
+
+    X, y = _classification_frame()
+    monkeypatch.setattr(RealTabPFNv2Model, "_class_settings", None, raising=False)
+    monkeypatch.setattr(RealTabPFNv2Model, "_class_settings_set", False, raising=False)
+    RealTabPFNv2Model.set_class_settings(share_weights=False)
+    model = _fit_tabpfn(tmp_path, "owned", X, y)
+    expected = model.predict_proba(X)
+    moves = []
+    set_device = RealTabPFNv2Model.set_device
+    monkeypatch.setattr(
+        RealTabPFNv2Model, "set_device", lambda self, device: moves.append(device) or set_device(self, device)
+    )
+
+    with monkeypatch.context() as patched:
+        patched.setattr(torch.serialization, "location_tag", lambda storage: "cuda:0")  # as if saved from a GPU
+        saved_path = model.save()
+    assert moves == [], "a fit on one device stays where it is"
+    with monkeypatch.context() as patched:
+        patched.setattr(torch.cuda, "is_available", lambda: False)
+        loaded = RealTabPFNv2Model.load(saved_path)
+    np.testing.assert_allclose(loaded.predict_proba(X), expected, rtol=1e-5, atol=1e-6)
+
+    moves.clear()
+    model.model.devices_ = (torch.device("cpu"), torch.device("cpu"))  # stands for a fit on two GPUs
+    model.save()
+    assert moves == ["cpu", "cpu"], "to the CPU for the save, and back"
 
 
 @pytest.mark.parametrize(

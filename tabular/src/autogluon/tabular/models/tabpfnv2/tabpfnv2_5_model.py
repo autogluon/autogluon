@@ -377,6 +377,17 @@ class TabPFNModel(AbstractTorchModel):
         # The prediction batch sizes the estimate, and `_get_model_params()` leaves out the `ag.` parameters.
         return super()._estimate_gpu_memory_usage(X=X, max_batch_size=self.aux_params.max_batch_size, **kwargs)
 
+    def _device_for_save(self) -> str | None:
+        """Leave a fit on one device where it is while it is saved; move one spread over several GPUs to the CPU.
+
+        tabpfn's unpickling does nothing with the device, so a single-device fit loads anywhere and is
+        moved by ``load``: its weights, and the key/value cache of ``fit_mode="fit_with_cache"``, are not
+        copied to the CPU and back on each save. With several devices the inference engine keeps a copy
+        of the weights per GPU, which a pickle would include; on the CPU it keeps one.
+        """
+        devices = getattr(self.model, "devices_", None) or ()
+        return super()._device_for_save() if len(devices) > 1 else None
+
     def get_device(self) -> str:
         return self.model.devices_[0].type
 

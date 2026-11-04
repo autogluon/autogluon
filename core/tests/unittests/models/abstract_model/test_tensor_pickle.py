@@ -268,6 +268,24 @@ def test_tensors_torch_save_refuses_stay_in_the_pickle(tmp_path):
     assert torch.equal(loaded["float"], values) and torch.equal(loaded["int"], values.view(torch.int32))
 
 
+def test_cuda_tensors_kept_in_the_pickle_load_on_the_cpu_without_cuda(tmp_path, monkeypatch):
+    """A state ``torch.save`` refuses keeps its tensors in the pickle, as a save to S3 does; they restore as
+    the tensor file's do, where torch's own unpickling restores them on the device they were saved from."""
+    values = torch.arange(4.0)
+    with monkeypatch.context() as patch:
+        patch.setattr(torch.serialization, "location_tag", lambda storage: "cuda:0")
+        path = _model(tmp_path, state={"float": values, "int": values.view(torch.int32)}).save()
+    assert _files(path) == {_Model.model_file_name}, "torch.save refused the state: one pickle"
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
+
+    with open(os.path.join(path, _Model.model_file_name), "rb") as f, pytest.raises(RuntimeError, match="CUDA"):
+        pickle.load(f)
+    loaded = _Model.load(path).model
+
+    assert loaded["float"].device.type == "cpu" and torch.equal(loaded["float"], values)
+    assert loaded["int"].device.type == "cpu" and torch.equal(loaded["int"], values.view(torch.int32))
+
+
 def test_saves_into_one_folder_at_once_never_mix_their_files(tmp_path, monkeypatch):
     first = _model(tmp_path, state={"weights": torch.zeros(3)})
     second = _model(tmp_path, state={"weights": torch.ones(3)})
