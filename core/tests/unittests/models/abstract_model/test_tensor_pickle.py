@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import pickle
+import shutil
 import subprocess
 import sys
 
@@ -270,3 +271,53 @@ def test_pickled_size_counts_sparse_and_meta_tensors_as_written():
     meta = torch.empty(10_000_000, device="meta")
 
     assert _tensor_pickle.pickled_size({"sparse": sparse, "meta": meta}) < 10_000
+
+
+@pytest.fixture
+def fake_s3(tmp_path, monkeypatch):
+    """S3 as a local folder: ``s3://bucket/<key>`` is ``<tmp_path>/bucket/<key>``; returns the downloaded keys."""
+    from botocore.exceptions import ClientError
+
+    from autogluon.common.utils import s3_utils
+
+    bucket = tmp_path / "bucket"
+    downloads = []
+
+    def download_s3_file(*, local_path, s3_path):
+        key = s3_utils.s3_path_to_bucket_prefix(s3_path)[1]
+        if not (bucket / key).exists():
+            raise ClientError({"Error": {"Code": "404", "Message": "Not Found"}}, "HeadObject")
+        downloads.append(key)
+        shutil.copyfile(bucket / key, local_path)
+
+    monkeypatch.setattr(s3_utils, "download_s3_file", download_s3_file)
+    return bucket, downloads
+
+
+def test_a_model_saved_locally_and_copied_to_s3_loads_from_there(tmp_path, fake_s3):
+    bucket, downloads = fake_s3
+    cache = torch.randn(64, 8)
+    shutil.copytree(_model(tmp_path / "local", state={"cache": cache, "head": cache[:4]}).save(), bucket / "m")
+
+    loaded = _Model.load("s3://bucket/m/").model
+
+    assert torch.equal(loaded["cache"], cache)
+    assert loaded["head"].untyped_storage().data_ptr() == loaded["cache"].untyped_storage().data_ptr()
+    assert downloads == ["m/model.pkl", "m/model_tensors.pt"]
+
+
+def test_a_pickle_without_tensor_references_on_s3_downloads_nothing_else(tmp_path, fake_s3):
+    bucket, downloads = fake_s3
+    shutil.copytree(_model(tmp_path / "local", state={"weights": np.arange(3)}).save(), bucket / "m")
+
+    np.testing.assert_array_equal(_Model.load("s3://bucket/m/").model["weights"], np.arange(3))
+    assert downloads == ["m/model.pkl"]
+
+
+def test_a_missing_tensor_file_on_s3_fails_clearly(tmp_path, fake_s3):
+    bucket, _ = fake_s3
+    shutil.copytree(_model(tmp_path / "local", state={"cache": torch.ones(8)}).save(), bucket / "m")
+    os.remove(bucket / "m" / _Model.model_tensors_file_name)
+
+    with pytest.raises(FileNotFoundError, match="s3://bucket/m/model_tensors.pt"):
+        _Model.load("s3://bucket/m/")
