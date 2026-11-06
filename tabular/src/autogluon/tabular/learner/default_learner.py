@@ -599,6 +599,8 @@ class DefaultLearner(AbstractTabularLearner):
         return feature_metadata
 
     def bundle_weights(self, X: DataFrame | None, w: Series | None, name: str, is_train=False) -> DataFrame:
+        if self.sample_weight is None:
+            return X
         if is_train:
             if w is not None:
                 X[self.sample_weight] = w
