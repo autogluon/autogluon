@@ -34,16 +34,24 @@ def get_param_baseline():
 
 
 def get_penalty(params: dict) -> str:
-    """Return the model's `penalty` hyperparameter, "L2" when unset, after checking it is "L1" or "L2"."""
+    """Return the model's `penalty` hyperparameter, "L2" when unset, after checking it is valid."""
     penalty = params.get("penalty", "L2")
-    if penalty not in ("L1", "L2"):
-        raise ValueError(f'Unknown value for penalty "{penalty}" - supported types are ["L1", "L2"]')
+    if penalty is None:
+        penalty = "L2"
+    if isinstance(penalty, str):
+        penalty = penalty.upper()
+    if penalty not in ("L1", "L2", "ELASTICNET"):
+        raise ValueError(f'Unknown value for penalty "{penalty}" - supported types are ["L1", "L2", "elasticnet"]')
     return penalty
 
 
 def _get_solver(problem_type, penalty="L2"):
-    if penalty == "L1":
-        # SAGA supports L1 for both binary and multinomial logistic regression.
+    if penalty is None:
+        penalty = "L2"
+    if isinstance(penalty, str):
+        penalty = penalty.upper()
+    if penalty in ("L1", "ELASTICNET"):
+        # SAGA supports L1 and elasticnet for both binary and multinomial logistic regression.
         return "saga"
     if problem_type == BINARY:
         # TODO explore using liblinear for smaller datasets

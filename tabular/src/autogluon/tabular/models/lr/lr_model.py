@@ -77,17 +77,22 @@ class LinearModel(AbstractModel):
         if self.params_aux.get("use_daal", False):
             # Appears to give 20x training speedup when enabled
             try:
-                from sklearnex.linear_model import Lasso, LogisticRegression, Ridge
+                from sklearnex.linear_model import ElasticNet, Lasso, LogisticRegression, Ridge
 
                 fix_sklearnex_logging_if_kaggle()  # Fix logging verbosity if in Kaggle notebook environment
 
                 logger.log(15, "\tUsing sklearnex LR backend...")
             except Exception:
-                from sklearn.linear_model import Lasso, LogisticRegression, Ridge
+                from sklearn.linear_model import ElasticNet, Lasso, LogisticRegression, Ridge
         else:
-            from sklearn.linear_model import Lasso, LogisticRegression, Ridge
+            from sklearn.linear_model import ElasticNet, Lasso, LogisticRegression, Ridge
         if self.problem_type == REGRESSION:
-            model_type = Lasso if penalty == "L1" else Ridge
+            if penalty == "L1":
+                model_type = Lasso
+            elif penalty == "ELASTICNET":
+                model_type = ElasticNet
+            else:
+                model_type = Ridge
         else:
             model_type = LogisticRegression
         return model_type
@@ -200,25 +205,33 @@ class LinearModel(AbstractModel):
             y = y.astype(int).values
 
         params = {k: v for k, v in self.params.items() if k not in preprocess_params_set}
+        penalty = get_penalty(self.params)
         if self.problem_type != REGRESSION:
-            penalty = get_penalty(self.params)
             if parse_version(sklearn.__version__).release >= (1, 8):
                 # sklearn 1.8 replaced penalty with l1_ratio for logistic regression.
-                params["l1_ratio"] = 1.0 if penalty == "L1" else 0.0
+                if penalty == "ELASTICNET":
+                    params["l1_ratio"] = self.params.get("l1_ratio", 0.5)
+                else:
+                    params["l1_ratio"] = 1.0 if penalty == "L1" else 0.0
             else:
                 params["penalty"] = penalty.lower()
+                if penalty == "ELASTICNET":
+                    params["l1_ratio"] = self.params.get("l1_ratio", 0.5)
         if "n_jobs" not in params:
             if self.problem_type != REGRESSION:
                 params["n_jobs"] = num_cpus
 
-        # Ridge/Lasso are using alpha instead of C, which is C^-1
+        # Ridge/Lasso/ElasticNet are using alpha instead of C, which is C^-1
         # https://scikit-learn.org/stable/modules/generated/sklearn.linear_model.Ridge.html#sklearn.linear_model.Ridge
-        if self.problem_type == REGRESSION and "alpha" not in params:
-            # For numerical reasons, using alpha = 0 with the Lasso object is not advised, so we add epsilon
-            params["alpha"] = 1 / (params["C"] if params["C"] != 0 else 1e-8)
-            params.pop("C", None)
+        if self.problem_type == REGRESSION:
+            if "alpha" not in params:
+                # For numerical reasons, using alpha = 0 with the Lasso/ElasticNet object is not advised, so we add epsilon
+                params["alpha"] = 1 / (params["C"] if params["C"] != 0 else 1e-8)
+                params.pop("C", None)
+            if penalty == "ELASTICNET" and "l1_ratio" not in params:
+                params["l1_ratio"] = self.params.get("l1_ratio", 0.5)
 
-        logger.log(15, f"Training Model with the following hyperparameter settings:")
+        logger.log(15, "Training Model with the following hyperparameter settings:")
         logger.log(15, params)
 
         max_iter = params.pop("max_iter", 10000)
