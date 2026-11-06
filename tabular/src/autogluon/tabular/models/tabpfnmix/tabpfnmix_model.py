@@ -312,7 +312,7 @@ class TabPFNMixModel(AbstractModel):
 
     # FIXME: Switch to `weights_only=True`, need to reinitialize the model though...
     @classmethod
-    def load(cls, path: str, reset_paths=False, verbose=True):
+    def load(cls, path: str, reset_paths=True, verbose=True):
         model: TabPFNMixModel = super().load(path=path, reset_paths=reset_paths, verbose=verbose)
 
         if model._weights_saved:
