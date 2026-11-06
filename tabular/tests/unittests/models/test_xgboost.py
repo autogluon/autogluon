@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 
-from autogluon.core.metrics import get_metric
+from autogluon.core.metrics import get_metric, make_scorer
 from autogluon.tabular.models.xgboost.xgboost_model import XGBoostModel
 from autogluon.tabular.testing import FitHelper
 
@@ -65,3 +65,43 @@ def test_xgboost_enable_categorical_predict_time_categories():
     X_test_novel["cat"] = pd.Categorical(["z"] * len(X_test))
     y_pred_proba_novel = model.predict_proba(X_test_novel)
     assert len(y_pred_proba_novel) == len(X_test_novel)
+
+
+def test_xgboost_custom_metric_with_sample_weights():
+    """Verify custom evaluation metrics requiring sample_weight work with XGBoost."""
+    rng = np.random.default_rng(42)
+    n = 60
+    X_train = pd.DataFrame({"feat1": rng.normal(size=n), "feat2": rng.normal(size=n)})
+    y_train = pd.Series(rng.normal(size=n))
+    weights = pd.Series(rng.uniform(0.5, 1.5, size=n))
+
+    X_val = pd.DataFrame({"feat1": rng.normal(size=20), "feat2": rng.normal(size=20)})
+    y_val = pd.Series(rng.normal(size=20))
+    weights_val = pd.Series(rng.uniform(0.5, 1.5, size=20))
+
+    def weighted_mae(y_true, y_pred, sample_weight):
+        return float(np.average(np.abs(y_true - y_pred), weights=sample_weight))
+
+    custom_metric = make_scorer(
+        name="weighted_mae",
+        score_func=weighted_mae,
+        optimum=0,
+        greater_is_better=False,
+    )
+
+    model = XGBoostModel(
+        name="XGB",
+        problem_type="regression",
+        eval_metric=custom_metric,
+        hyperparameters={"n_estimators": 5},
+    )
+    model.fit(
+        X=X_train,
+        y=y_train,
+        X_val=X_val,
+        y_val=y_val,
+        sample_weight=weights,
+        sample_weight_val=weights_val,
+    )
+    score = model.score(X=X_val, y=y_val, sample_weight=weights_val)
+    assert not np.isnan(score)
