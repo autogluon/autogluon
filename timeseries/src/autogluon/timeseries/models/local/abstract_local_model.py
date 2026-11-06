@@ -155,11 +155,23 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
         end_time = None if time_limit is None else time.time() + time_limit
         executor = Parallel(n_jobs=n_jobs, timeout=timeout)
 
+        predict_with_local_model_fn = self._predict_with_local_model
+
         try:
             with warning_filter():
                 predictions_with_flags = executor(
-                    delayed(self._predict_wrapper)(
-                        ts, use_fallback_model=model_params["use_fallback_model"], end_time=end_time
+                    delayed(self.__class__._predict_wrapper)(
+                        time_series=ts,
+                        local_model_args=self._local_model_args,
+                        dummy_forecast=self._dummy_forecast,
+                        prediction_length=self.prediction_length,
+                        quantile_levels=self.quantile_levels,
+                        seasonal_period=self._seasonal_period,
+                        use_fallback_model=model_params["use_fallback_model"],
+                        predict_with_local_model_fn=predict_with_local_model_fn,
+                        freq=self.freq,
+                        target=self.target,
+                        end_time=end_time,
                     )
                     for ts in all_series
                 )
@@ -177,23 +189,40 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
         predictions_df.index = self.get_forecast_horizon_index(data)
         return TimeSeriesDataFrame(predictions_df)
 
+    @classmethod
     def _predict_wrapper(
-        self,
+        cls,
         time_series: pd.Series,
+        local_model_args: dict[str, Any],
+        dummy_forecast: pd.DataFrame,
+        prediction_length: int,
+        quantile_levels: list[float],
+        seasonal_period: int,
         use_fallback_model: bool,
+        predict_with_local_model_fn: Callable | None = None,
+        freq: str | None = None,
+        target: str | None = None,
         end_time: float | None = None,
+        **kwargs,
     ) -> tuple[pd.DataFrame, bool]:
         if end_time is not None and time.time() >= end_time:
             raise TimeLimitExceeded
 
+        predict_fn = predict_with_local_model_fn or cls._predict_with_local_model
+
         model_failed = False
         if time_series.isna().all():
-            result = self._dummy_forecast.copy()
+            result = dummy_forecast.copy()
         else:
             try:
-                result = self._predict_with_local_model(
+                result = predict_fn(
                     time_series=time_series,
-                    local_model_args=self._local_model_args.copy(),
+                    local_model_args=local_model_args.copy(),
+                    prediction_length=prediction_length,
+                    quantile_levels=quantile_levels,
+                    freq=freq,
+                    target=target,
+                    **kwargs,
                 )
                 if not np.isfinite(result.values).all():
                     raise RuntimeError("Forecast contains NaN or Inf values.")
@@ -201,19 +230,25 @@ class AbstractLocalModel(AbstractTimeSeriesModel):
                 if use_fallback_model:
                     result = seasonal_naive_forecast(
                         target=time_series.values.ravel(),
-                        prediction_length=self.prediction_length,
-                        quantile_levels=self.quantile_levels,
-                        seasonal_period=self._seasonal_period,
+                        prediction_length=prediction_length,
+                        quantile_levels=quantile_levels,
+                        seasonal_period=seasonal_period,
                     )
                     model_failed = True
                 else:
                     raise
         return result, model_failed
 
+    @classmethod
     def _predict_with_local_model(
-        self,
+        cls,
         time_series: pd.Series,
         local_model_args: dict,
+        prediction_length: int,
+        quantile_levels: list[float],
+        freq: str | None = None,
+        target: str | None = None,
+        **kwargs,
     ) -> pd.DataFrame:
         raise NotImplementedError
 
