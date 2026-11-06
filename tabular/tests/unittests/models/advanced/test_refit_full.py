@@ -141,3 +141,97 @@ def test_clone_for_deployment_non_best_refit_full_model():
     clone.predict(test_data)
     shutil.rmtree(predictor.path, ignore_errors=True)
     shutil.rmtree(clone_path, ignore_errors=True)
+
+
+def test_bundle_weights_no_sample_weight():
+    """Verifies that bundle_weights does not add a None column when sample_weight is None (issue #5172)."""
+    import pandas as pd
+    from autogluon.tabular.learner.default_learner import DefaultLearner
+
+    dl = DefaultLearner(path_context="test_dl_bundle", label="target")
+    assert dl.sample_weight is None
+
+    df_train = pd.DataFrame({"a": [1, 2], "b": [3, 4]})
+    df_val = pd.DataFrame({"a": [5, 6], "b": [7, 8]})
+    df_test = pd.DataFrame({"a": [9, 10], "b": [11, 12]})
+
+    res_train = dl.bundle_weights(df_train, None, "X", is_train=True)
+    res_val = dl.bundle_weights(df_val, None, "X_val", is_train=False)
+    res_test = dl.bundle_weights(df_test, None, "X_test", is_train=False)
+
+    assert list(res_train.columns) == ["a", "b"]
+    assert list(res_val.columns) == ["a", "b"]
+    assert list(res_test.columns) == ["a", "b"]
+    assert None not in res_val.columns
+    assert None not in res_test.columns
+
+
+def test_refit_full_train_data_extra_with_tuning_data():
+    """Verifies that refit_full(train_data_extra) works when tuning_data is provided (issue #5172)."""
+    dataset = "adult"
+    train_data, test_data, dataset_info = FitHelper.load_dataset(dataset)
+    train_data = train_data.head(100)
+    val_data = test_data.head(50)
+    extra_data = test_data.iloc[50:100]
+
+    len_combined = len(train_data) + len(val_data) + len(extra_data)
+
+    predictor = TabularPredictor(label=dataset_info["label"], problem_type=dataset_info["problem_type"])
+    predictor.fit(
+        train_data=train_data,
+        tuning_data=val_data,
+        hyperparameters={"RF": {}},
+        raise_on_model_failure=True,
+        fit_weighted_ensemble=False,
+    )
+
+    assert len(predictor.model_names()) == 1
+    model_name = predictor.model_names()[0]
+    refit_model_map = predictor.refit_full(train_data_extra=extra_data)
+    refit_model_name = refit_model_map[model_name]
+
+    assert len(predictor.model_names()) == 2
+    refit_model_info = predictor.model_info(refit_model_name)
+    assert refit_model_info["num_samples"] == len_combined
+
+    predictor.predict(extra_data, model=refit_model_name)
+    shutil.rmtree(predictor.path, ignore_errors=True)
+
+
+def test_refit_full_train_data_extra_bag_with_tuning_data():
+    """Verifies that refit_full(train_data_extra) works with bagging and tuning_data (issue #5172)."""
+    dataset = "adult"
+    train_data, test_data, dataset_info = FitHelper.load_dataset(dataset)
+    train_data = train_data.head(100)
+    val_data = test_data.head(50)
+    extra_data = test_data.iloc[50:100]
+
+    len_train = len(train_data)
+    len_val = len(val_data)
+    len_extra = len(extra_data)
+    len_combined = len_train + len_val + len_extra
+
+    predictor = TabularPredictor(label=dataset_info["label"], problem_type=dataset_info["problem_type"])
+    predictor.fit(
+        train_data=train_data,
+        tuning_data=val_data,
+        use_bag_holdout=True,
+        hyperparameters={"RF": {}},
+        raise_on_model_failure=True,
+        fit_weighted_ensemble=False,
+        num_bag_folds=2,
+        ag_args_ensemble={"fold_fitting_strategy": "sequential_local"},
+    )
+
+    assert len(predictor.model_names()) == 1
+    model_name = predictor.model_names()[0]
+    refit_model_map = predictor.refit_full(train_data_extra=extra_data)
+    refit_model_name = refit_model_map[model_name]
+
+    assert len(predictor.model_names()) == 2
+    refit_model_info = predictor.model_info(refit_model_name)
+    assert refit_model_info["num_samples"] == len_train + len_val
+    assert refit_model_info["children_info"]["S1F1"]["num_samples"] == len_combined
+
+    predictor.predict(extra_data, model=refit_model_name)
+    shutil.rmtree(predictor.path, ignore_errors=True)
