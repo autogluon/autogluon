@@ -47,20 +47,24 @@ def model_trial(
             time_limit=time_limit,
         )
     except Exception as err:
-        if not isinstance(err, TimeLimitExceeded):
+        is_error = not isinstance(err, TimeLimitExceeded)
+        if is_error:
             logger.error(f"\tWarning: Exception caused {model.name} to fail during training... Skipping this model.")
             logger.error(f"\t{err}")
             logger.debug(traceback.format_exc())
         # In case of TimeLimitExceed, val_score could be None
+        tb = traceback.format_exc() if is_error else None
         hpo_executor.report(
             reporter=reporter,
             epoch=1,
             validation_performance=model.val_score if model.val_score is not None else float("-inf"),
+            failed=is_error,
+            traceback=tb,
         )
         if reporter is not None:
             reporter.terminate()
     else:
-        hpo_executor.report(reporter=reporter, epoch=1, validation_performance=model.val_score)
+        hpo_executor.report(reporter=reporter, epoch=1, validation_performance=model.val_score, failed=False)
 
 
 def fit_and_save_model(model, fit_kwargs, train_data, val_data, eval_metric, time_start, time_limit=None):
