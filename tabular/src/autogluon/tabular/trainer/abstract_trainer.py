@@ -837,6 +837,90 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
 
         return base_model_names
 
+    def _filter_base_models_via_memory_limit(
+        self,
+        base_model_names: list[str],
+        X: pd.DataFrame | None,
+        max_memory_ratio: float = 0.25,
+        verbose: bool = True,
+    ) -> list[str]:
+        """
+        Returns a subset of base_model_names whose combined out-of-fold/stack prediction memory usage
+        does not exceed a safe fraction of available system memory.
+
+        For large multiclass datasets (e.g. C=355 classes, S=1,000,000 rows), each base model adds
+        S * C * 4 bytes to the stack feature matrix. Pruning base models with lower validation scores
+        prevents out-of-memory errors when constructing stack levels or weighted ensembles.
+
+        Parameters
+        ----------
+        base_model_names : list[str]
+            List of base model names to filter.
+        X : pd.DataFrame, optional
+            Data to derive row count and base memory usage from.
+        max_memory_ratio : float, default = 0.25
+            Maximum fraction of available virtual memory allowed for stack features and original data.
+        verbose : bool, default = True
+            Whether to log pruning warnings.
+
+        Returns
+        -------
+        list[str]
+            Subset of base_model_names satisfying the memory constraint, retaining at least 1 model.
+        """
+        if not base_model_names or X is None or len(X) == 0:
+            return base_model_names
+
+        S = len(X)
+        if self.problem_type == MULTICLASS:
+            num_pred_cols = len(self.classes) if hasattr(self, "classes") and self.classes is not None else 1
+        elif self.problem_type == QUANTILE:
+            num_pred_cols = (
+                len(self.quantile_levels)
+                if hasattr(self, "quantile_levels") and self.quantile_levels is not None
+                else 1
+            )
+        else:
+            num_pred_cols = 1
+
+        bytes_per_base_model = S * num_pred_cols * 4
+
+        try:
+            X_og_mem = int(X.memory_usage(deep=False).sum())
+        except Exception:
+            X_og_mem = 0
+
+        available_mem = ResourceManager.get_available_virtual_mem()
+        max_allowed_mem = available_mem * max_memory_ratio
+
+        if bytes_per_base_model > 0:
+            available_for_base = max(0.0, max_allowed_mem - X_og_mem)
+            max_N = max(1, int(available_for_base // bytes_per_base_model))
+        else:
+            max_N = len(base_model_names)
+
+        if len(base_model_names) <= max_N:
+            return base_model_names
+
+        score_val_dict = self.get_models_attribute_dict(attribute="val_score", models=base_model_names)
+        sorted_base_models = sorted(
+            base_model_names,
+            key=lambda m: (score_val_dict.get(m) is not None, score_val_dict.get(m, float("-inf"))),
+            reverse=True,
+        )
+
+        kept_models = sorted_base_models[:max_N]
+        pruned_models = sorted_base_models[max_N:]
+
+        if verbose and pruned_models:
+            logger.warning(
+                f"Pruning {len(pruned_models)} base models due to memory constraints "
+                f"({len(kept_models)} retained, max allowed: {max_N} based on {max_memory_ratio:.0%} memory threshold). "
+                f"Pruned models: {pruned_models}"
+            )
+
+        return kept_models
+
     def stack_new_level(
         self,
         X,
@@ -991,6 +1075,10 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             base_model_names=base_model_names,
             infer_limit=infer_limit,
             infer_limit_modifier=0.8,
+        )
+        base_model_names = self._filter_base_models_via_memory_limit(
+            base_model_names=base_model_names,
+            X=X,
         )
         if ag_args_fit is None:
             ag_args_fit = {}
@@ -1354,6 +1442,11 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
             child_ag_args.setdefault("valid_base", False)
             child_hyperparameters["ag_args"] = child_ag_args
             use_orig_features = self._ensemble_model_uses_orig_features(child_hyperparameters)
+
+        base_model_names = self._filter_base_models_via_memory_limit(
+            base_model_names=base_model_names,
+            X=X,
+        )
 
         X_stack_preds = self.get_inputs_to_stacker(
             X, base_models=base_model_names, fit=fit, use_orig_features=use_orig_features, use_val_cache=use_val_cache
