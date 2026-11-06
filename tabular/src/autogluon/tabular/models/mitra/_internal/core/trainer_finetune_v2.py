@@ -191,21 +191,10 @@ class TrainerFinetuneV2(TrainerFinetune):
                 with torch.autocast(
                     device_type=torch.device(self.device).type, dtype=getattr(torch, self.cfg.hyperparams["precision"])
                 ):
-                    # Match the released predictor's transfers and tensor
-                    # lifetimes: memory retries also consume support draws.
-                    x_s = batch["x_support"].to(self.device, non_blocking=True)
-                    y_s = batch["y_support"].to(self.device, non_blocking=True)
-                    x_q = batch["x_query"].to(self.device, non_blocking=True)
-                    padding_features = batch["padding_features"].to(self.device, non_blocking=True)
-                    padding_obs_support = batch["padding_obs_support"].to(self.device, non_blocking=True)
-                    padding_obs_query = batch["padding_obs_query"].to(self.device, non_blocking=True)
-                    if self.cfg.task == "regression" and self.cfg.hyperparams["regression_loss"] == "cross_entropy":
-                        y_s = torch.bucketize(y_s, self.bins) - 1
-                        y_s = torch.clamp(y_s, 0, self.cfg.hyperparams["dim_output"] - 1).to(torch.int64)
-                    logits = self.model(x_s, y_s, x_q, padding_features, padding_obs_support, padding_obs_query)
+                    logits = self._forward(batch)
                 logits = logits[0].float()
                 if prediction:
-                    # Release GPU logits before the next forward, as HF does.
+                    # Decode on the CPU and release GPU logits before the next batch.
                     logits = logits.cpu()
                 if self.cfg.task == "regression" and self.cfg.hyperparams["regression_loss"] == "cross_entropy":
                     logits = self._decode_regression(logits)
@@ -240,8 +229,9 @@ class TrainerFinetuneV2(TrainerFinetune):
                     raise
                 if query_chunk <= query_floor:
                     raise
-                torch.cuda.empty_cache()
                 query_chunk = max(query_floor, query_chunk // 2)
+            gc.collect()
+            torch.cuda.empty_cache()
         objective = metrics.metrics[self.metric]
         metrics.loss = -objective if self.metric in ("accuracy", "auc", "r2", "f1") else objective
         return metrics
@@ -283,7 +273,6 @@ class TrainerFinetuneV2(TrainerFinetune):
         stock_query_chunk = self.cfg.hyperparams["max_samples_query"]
         initial_query_chunk = max(stock_query_chunk, self.cfg.hyperparams["predict_max_samples_query"])
         query_chunk = initial_query_chunk
-        retry_without_traceback = False
         while True:
             query_floor = min(
                 query_chunk,
@@ -296,8 +285,6 @@ class TrainerFinetuneV2(TrainerFinetune):
             except RuntimeError as error:
                 if not _is_out_of_memory(error):
                     raise
-                # HF keeps draws consumed by failed forwards. Rewinding here
-                # changes the support sampled for the successful prediction.
                 if query_chunk > query_floor:
                     query_chunk = max(query_floor, query_chunk // 2)
                 elif support_cap > support_floor:
@@ -305,19 +292,9 @@ class TrainerFinetuneV2(TrainerFinetune):
                     if support_cap > 32768 and next_cap < 32768:
                         next_cap = 32768
                     support_cap = max(support_floor, next_cap)
-                    # HF's outer support retry re-enters its query retry at
-                    # the original chunk size, now with a smaller context.
                     query_chunk = initial_query_chunk
                 else:
-                    if retry_without_traceback:
-                        raise
-                    retry_without_traceback = True
-                if not retry_without_traceback:
-                    # Match HF's cleanup point. Blocks released when this
-                    # handler exits remain reusable by the next forward.
-                    torch.cuda.empty_cache()
-            if retry_without_traceback:
-                # Release the final failed forward's traceback before one
-                # last attempt at the minimum context.
-                gc.collect()
-                torch.cuda.empty_cache()
+                    raise
+            # Release the failed forward before allocating the next attempt.
+            gc.collect()
+            torch.cuda.empty_cache()

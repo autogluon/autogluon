@@ -1367,7 +1367,7 @@ def test_prediction_oversized_support_retries_at_hf_baseline(requested_cap):
 
 
 @pytest.mark.parametrize("fails_again", [False, True])
-def test_final_prediction_oom_retry_releases_traceback(fails_again):
+def test_prediction_oom_retry_releases_traceback_before_cleanup(fails_again):
     import sys
     import weakref
     from types import SimpleNamespace
@@ -1382,7 +1382,7 @@ def test_final_prediction_oom_retry_releases_traceback(fails_again):
             "max_samples_query": 2,
             "predict_max_samples_support": 8,
             "predict_min_samples_support": 8,
-            "predict_max_samples_query": 2,
+            "predict_max_samples_query": 4,
             "predict_min_samples_query": 2,
         }
     )
@@ -1416,9 +1416,31 @@ def test_final_prediction_oom_retry_releases_traceback(fails_again):
         else:
             prediction = trainer.predict(np.zeros((4, 2)), np.zeros(4), np.zeros((3, 2)))
             assert prediction.shape == (3,)
-    assert attempts == [(8, 2), (8, 2)]
+    assert attempts == [(8, 4), (8, 2)]
     np.testing.assert_array_equal(draws, np.random.RandomState(0).rand(2))
     cleanup.assert_called_once()
+
+
+def test_prediction_oom_at_minimum_context_terminates():
+    import torch
+
+    from autogluon.tabular.models.mitra._internal.core.trainer_finetune_v2 import TrainerFinetuneV2
+
+    trainer = TrainerFinetuneV2.__new__(TrainerFinetuneV2)
+    trainer.cfg = SimpleNamespace(
+        hyperparams={
+            "max_samples_query": 2,
+            "predict_max_samples_support": 8,
+            "predict_min_samples_support": 8,
+            "predict_max_samples_query": 2,
+            "predict_min_samples_query": 2,
+        }
+    )
+    trainer.preprocessor = SimpleNamespace(transform_X=lambda x: x, transform_y=lambda y: y)
+    trainer._predict_transformed = mock.Mock(side_effect=torch.cuda.OutOfMemoryError("minimum allocation"))
+    with pytest.raises(torch.cuda.OutOfMemoryError, match="minimum allocation"):
+        trainer.predict(np.zeros((4, 2)), np.zeros(4), np.zeros((3, 2)))
+    trainer._predict_transformed.assert_called_once()
 
 
 @pytest.mark.parametrize("memory_error", [True, False])

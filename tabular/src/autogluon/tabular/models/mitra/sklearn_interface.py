@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import contextlib
+import gc
 import time
 
 import numpy as np
@@ -215,26 +216,18 @@ class MitraBase(BaseEstimator):
                 return self
 
             except torch.cuda.OutOfMemoryError:
-                # Preserve the released trainer's retry lifetime. Clearing
-                # CUDA's cache here changes later prediction OOM boundaries
-                # and therefore the support samples used for prediction.
-                if cfg.hyperparams["max_samples_support"] >= 2048:
-                    cfg.hyperparams["max_samples_support"] = int(cfg.hyperparams["max_samples_support"] // 2)
-                    print(
-                        f"Reducing max_samples_support from {cfg.hyperparams['max_samples_support'] * 2}"
-                        f"to {cfg.hyperparams['max_samples_support']} due to OOM error."
-                    )
-                else:
-                    cfg.hyperparams["max_samples_support"] = int(cfg.hyperparams["max_samples_support"] // 2)
-                    print(
-                        f"Reducing max_samples_support from {cfg.hyperparams['max_samples_support'] * 2}"
-                        f"to {cfg.hyperparams['max_samples_support']} due to OOM error."
-                    )
-                    cfg.hyperparams["max_samples_query"] = int(cfg.hyperparams["max_samples_query"] // 2)
-                    print(
-                        f"Reducing max_samples_query from {cfg.hyperparams['max_samples_query'] * 2}"
-                        f"to {cfg.hyperparams['max_samples_query']} due to OOM error."
-                    )
+                limits = ["max_samples_support"]
+                if cfg.hyperparams["max_samples_support"] < 2048:
+                    limits.append("max_samples_query")
+                for name in limits:
+                    previous = cfg.hyperparams[name]
+                    cfg.hyperparams[name] = previous // 2
+                    print(f"Reducing {name} from {previous} to {cfg.hyperparams[name]} due to OOM error.")
+
+            self.trainers.clear()
+            model = trainer = None
+            gc.collect()
+            torch.cuda.empty_cache()
 
         raise RuntimeError("Failed to train Mitra model after multiple attempts due to out of memory error.")
 
