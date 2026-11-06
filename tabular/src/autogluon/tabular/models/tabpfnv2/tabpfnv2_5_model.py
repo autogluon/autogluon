@@ -663,6 +663,7 @@ class RealTabPFNv2Model(TabPFNModel):
 
     ag_key = "REALTABPFN-V2"
     ag_name = "RealTabPFN-v2"
+    ag_aliases = ("TABPFNV2",)
 
     # TODO: Verify if this is the same as the "default" ckpt
     default_classification_model: str | None = "tabpfn-v2-classifier-finetuned-zk73skhh.ckpt"
