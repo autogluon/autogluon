@@ -658,6 +658,10 @@ class NNFastAiTabularModel(AbstractModel):
             "f1_macro": FBeta(beta=1, average="macro"),
             "f1_micro": FBeta(beta=1, average="micro"),
             "f1_weighted": FBeta(beta=1, average="weighted"),  # this one has some issues
+            "f2": FBeta(beta=2),
+            "f2_macro": FBeta(beta=2, average="macro"),
+            "f2_micro": FBeta(beta=2, average="micro"),
+            "f2_weighted": FBeta(beta=2, average="weighted"),
             "roc_auc": RocAucBinary(),
             "precision": Precision(),
             "precision_macro": Precision(average="macro"),
