@@ -320,3 +320,75 @@ def test_model_cls_no_duplicate_keys():
         if c.ag_key in keys:
             raise AssertionError(f"Two model classes cannot share the same key: {c.ag_key}")
         keys.add(c.ag_key)
+
+
+def test_model_cls_no_duplicate_aliases():
+    keys_and_aliases = set()
+    for c in REGISTERED_MODEL_CLS_LST:
+        assert c.ag_key not in keys_and_aliases
+        keys_and_aliases.add(c.ag_key)
+        for alias in ag_model_registry.aliases(c):
+            assert alias not in keys_and_aliases
+            keys_and_aliases.add(alias)
+
+
+def test_model_registry_aliases():
+    assert ag_model_registry.aliases(RealTabPFNv2Model) == ("TABPFNV2",)
+    assert ag_model_registry.aliases_map.get("TABPFNV2") == "REALTABPFN-V2"
+    assert ag_model_registry.key_to_cls("TABPFNV2") == RealTabPFNv2Model
+    assert "TABPFNV2" in ag_model_registry.all_keys
+
+    # Test custom model with aliases in an isolated registry
+    class CustomModel(AbstractModel):
+        ag_key = "CUSTOM_PRIMARY"
+        ag_name = "CustomModel"
+        ag_priority = 10
+        ag_aliases = ("CUSTOM_ALIAS_1", "CUSTOM_ALIAS_2")
+
+    registry = ModelRegistry()
+    registry.add(CustomModel)
+    assert registry.key_to_cls("CUSTOM_PRIMARY") == CustomModel
+    assert registry.key_to_cls("CUSTOM_ALIAS_1") == CustomModel
+    assert registry.key_to_cls("CUSTOM_ALIAS_2") == CustomModel
+    assert registry.aliases_map["CUSTOM_ALIAS_1"] == "CUSTOM_PRIMARY"
+    assert registry.aliases_map["CUSTOM_ALIAS_2"] == "CUSTOM_PRIMARY"
+
+    # Test alias collision with existing key
+    class CollidingKeyModel(AbstractModel):
+        ag_key = "CUSTOM_ALIAS_1"
+        ag_name = "Colliding"
+        ag_priority = 10
+
+    with pytest.raises(AssertionError):
+        registry.add(CollidingKeyModel)
+
+    # Test alias collision with existing alias
+    class CollidingAliasModel(AbstractModel):
+        ag_key = "ANOTHER_KEY"
+        ag_name = "CollidingAlias"
+        ag_priority = 10
+        ag_aliases = ("CUSTOM_ALIAS_2",)
+
+    with pytest.raises(AssertionError):
+        registry.add(CollidingAliasModel)
+
+    registry.remove(CustomModel)
+    assert not registry.exists(CustomModel)
+    assert "CUSTOM_PRIMARY" not in registry.all_keys
+    assert "CUSTOM_ALIAS_1" not in registry.all_keys
+    assert "CUSTOM_ALIAS_2" not in registry.all_keys
+
+
+def test_presets_with_tabpfnv2_alias():
+    from autogluon.tabular.trainer.model_presets.presets import get_preset_models
+
+    models, _ = get_preset_models(
+        path="dummy_path",
+        problem_type="binary",
+        eval_metric="accuracy",
+        hyperparameters={"TABPFNV2": {}},
+    )
+    assert len(models) == 1
+    model = models[0]
+    assert isinstance(model, RealTabPFNv2Model)
+    assert model.name.startswith("RealTabPFN-v2")
