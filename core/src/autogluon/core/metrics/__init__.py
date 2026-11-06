@@ -653,6 +653,7 @@ average_precision = make_scorer("average_precision", sklearn.metrics.average_pre
 
 # Score functions that need pos_label
 f1 = make_scorer("f1", sklearn.metrics.f1_score, needs_class=True, needs_pos_label=True)
+f2 = make_scorer("f2", partial(sklearn.metrics.fbeta_score, beta=2), needs_class=True, needs_pos_label=True)
 precision = make_scorer("precision", sklearn.metrics.precision_score, needs_class=True, needs_pos_label=True)
 recall = make_scorer("recall", sklearn.metrics.recall_score, needs_class=True, needs_pos_label=True)
 
@@ -753,6 +754,7 @@ for _name, _metric in [
     ("precision", sklearn.metrics.precision_score),
     ("recall", sklearn.metrics.recall_score),
     ("f1", sklearn.metrics.f1_score),
+    ("f2", partial(sklearn.metrics.fbeta_score, beta=2)),
 ]:
     _add_scorer_to_metric_dict(metric_dict=BINARY_METRICS, scorer=globals()[_name])
     for average in ["macro", "micro", "weighted"]:
