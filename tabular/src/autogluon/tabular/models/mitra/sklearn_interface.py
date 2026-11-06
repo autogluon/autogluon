@@ -59,8 +59,6 @@ DEFAULT_VALIDATION_SPLIT = 0.2
 class MitraBase(BaseEstimator):
     """Base class for Mitra models with common functionality."""
 
-    model_version = "1"
-
     def __init__(
         self,
         model_type=DEFAULT_MODEL_TYPE,

@@ -76,9 +76,8 @@ class PredictionDataset(DatasetFinetune):
 class TrainerFinetuneV2(TrainerFinetune):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        if self.cfg.hyperparams["fast_loop"]:
-            self.checkpoint = DeviceCheckpoint()
-            self.checkpoint.reset(self.model)
+        self.checkpoint = DeviceCheckpoint()
+        self.checkpoint.reset(self.model)
         self.early_stopping.metric = "roc_auc" if self.metric == "auc" else self.metric
         self._evaluation_cache = None
 
@@ -90,8 +89,6 @@ class TrainerFinetuneV2(TrainerFinetune):
         return (logits.softmax(dim=-1) * centers).sum(dim=-1)
 
     def train(self, x_train, y_train, x_val, y_val):
-        if not self.cfg.hyperparams["fast_loop"]:
-            return super().train(x_train, y_train, x_val, y_val)
         # The release uses SDPA in the training loop and the construction-time
         # attention backend for inference. These flags belong to this network.
         attention = [
@@ -180,7 +177,7 @@ class TrainerFinetuneV2(TrainerFinetune):
             max_samples_query=query_chunk,
             rng=self.rng,
         )
-        if prediction and self.cfg.hyperparams["fast_predict"]:
+        if prediction:
             dataset = PredictionDataset(
                 **dataset_kwargs, balance_binary=self.cfg.hyperparams["balance_binary_support"]
             )
@@ -217,8 +214,6 @@ class TrainerFinetuneV2(TrainerFinetune):
         return np.concatenate(predictions, axis=0)
 
     def evaluate(self, x_support, y_support, x_query, y_query):
-        if not self.cfg.hyperparams["fast_loop"]:
-            return super().evaluate(x_support, y_support, x_query, y_query)
         if (
             self._evaluation_cache is None
             or self._evaluation_cache[0] is not x_support

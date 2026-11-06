@@ -2681,7 +2681,13 @@ class AbstractModel(ModelBase, Tunable):
         return template
 
     def _get_model_template_for_save(self):
-        """Return the model-base state that should be persisted by a bagged ensemble."""
+        """Return the model template to persist before fitting bagged ensemble children.
+
+        Override this to omit transient state that children need during fitting
+        but a saved template does not need. Return a copy when dropping state;
+        the in-memory template must retain it for subsequent fold copies.
+        The default returns this instance without changing it.
+        """
         return self
 
     def convert_to_refit_full_template(self):

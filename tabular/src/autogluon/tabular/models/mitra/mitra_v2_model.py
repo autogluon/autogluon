@@ -1,19 +1,13 @@
 from __future__ import annotations
 
 import copy
-import logging
-import os
 
 import pandas as pd
 
-from autogluon.tabular import __version__
-from autogluon.tabular.models.abstract.abstract_torch_model import AbstractTorchModel
-
 from ._internal.core.fit_context import FitContextMemo
-from .checkpoint import CHECKPOINTS, DEFAULT_MODEL_VERSION, validate_checkpoint_version, validate_model_version
+from ._internal.data.feature_reduction import DEFAULT_FEATURE_REDUCTION, DEFAULT_MAX_FEATURES
+from .checkpoint import CHECKPOINTS, DEFAULT_MODEL_VERSION, validate_model_version
 from .mitra_model import MitraModel
-
-logger = logging.getLogger(__name__)
 
 
 class MitraV2Model(MitraModel):
@@ -21,8 +15,9 @@ class MitraV2Model(MitraModel):
 
     V2 checkpoints and fine-tuning settings are the default. ``model_version="1"``
     selects v1 weights with the same v2 trainer. Use :class:`MitraModel` explicitly
-    for the original v1 API. Custom checkpoints declare their release with
-    ``mitra_version`` in ``config.json``; the shared architecture does not identify it.
+    for the original v1 API. An explicit ``hf_model`` overrides the default
+    checkpoint selected by ``model_version``. The checkpoint's ``config.json``
+    defines the architecture; release metadata is not required.
 
     A fit defaults to 3,600 seconds shared across bag folds. AutoGluon's global
     ``time_limit`` can impose a shorter limit. Override the budget with
@@ -71,7 +66,6 @@ class MitraV2Model(MitraModel):
         self._feature_reduction_fitted_upstream = False
         self._use_training_projection = False
         self._pending_fold_support = None
-        self._category_maps = {}
         self._fit_context_memo = None
 
     def validate_fit_args(self, X: pd.DataFrame, **kwargs):
@@ -98,10 +92,10 @@ class MitraV2Model(MitraModel):
 
         return FeatureReducer(
             problem_type=self.problem_type,
-            max_features=self.params.get("max_features", self._user_params.get("max_features", 256)),
+            max_features=self.params.get("max_features", self._user_params.get("max_features", DEFAULT_MAX_FEATURES)),
             method=self.params.get(
                 "feature_reduction",
-                self._user_params.get("feature_reduction", "auto"),
+                self._user_params.get("feature_reduction", DEFAULT_FEATURE_REDUCTION),
             ),
             has_categoricals=self._has_non_numeric_reduction_dtype(X),
         )
@@ -118,33 +112,6 @@ class MitraV2Model(MitraModel):
             for dtype in X.dtypes
         )
 
-    def _align_categorical_features(self, X: pd.DataFrame, *, is_train: bool) -> pd.DataFrame:
-        if is_train:
-            columns = [
-                column
-                for column, dtype in X.dtypes.items()
-                if isinstance(dtype, pd.CategoricalDtype)
-                or pd.api.types.is_object_dtype(dtype)
-                or isinstance(dtype, pd.StringDtype)
-            ]
-            self._category_maps = {}
-            if not columns:
-                return X
-            X = X.copy(deep=False)
-            for column in columns:
-                categorical = X[column].astype("category")
-                self._category_maps[column] = categorical.cat.categories
-                X[column] = categorical
-            return X
-
-        category_maps = getattr(self, "_category_maps", {})
-        if not category_maps:
-            return X
-        X = X.copy(deep=False)
-        for column, categories in category_maps.items():
-            X[column] = pd.Categorical(X[column], categories=categories)
-        return X
-
     @classmethod
     def _estimate_reduced_num_features(
         cls,
@@ -154,11 +121,11 @@ class MitraV2Model(MitraModel):
         problem_type: str | None,
     ) -> int:
         n_rows, n_features = X.shape
-        max_features = hyperparameters.get("max_features", 256)
+        max_features = hyperparameters.get("max_features", DEFAULT_MAX_FEATURES)
         if "feature_reduction" in hyperparameters:
             method = hyperparameters["feature_reduction"]
         else:
-            method = "auto"
+            method = DEFAULT_FEATURE_REDUCTION
         if (
             max_features is None
             or method is None
@@ -204,16 +171,13 @@ class MitraV2Model(MitraModel):
             return self._feature_reducer.align_input(X)
         return super()._preprocess_align_features(X, **kwargs)
 
-    def _preprocess(self, X: pd.DataFrame, is_train: bool = False, **kwargs) -> pd.DataFrame:
-        # V2 aligns categories before encoding; bypass the legacy encoding step.
-        X = AbstractTorchModel._preprocess(self, X, **kwargs)
-        X = self._align_categorical_features(X, is_train=is_train)
+    def _preprocess_features(self, X: pd.DataFrame, is_train: bool = False, **kwargs) -> pd.DataFrame:
         if is_train and not getattr(self, "_feature_reduction_fitted_upstream", False):
             self._feature_reducer = self._make_feature_reducer(X)
-            X = self._label_encode_categoricals(X, is_train=True)
+            X = super()._preprocess_features(X, is_train=True, **kwargs)
             self._feature_reducer.fit(X, kwargs["y"], cache_training=True)
         else:
-            X = self._label_encode_categoricals(X, is_train=is_train)
+            X = super()._preprocess_features(X, is_train=is_train, **kwargs)
         if getattr(self, "_feature_reducer", None) is not None:
             if is_train or getattr(self, "_use_training_projection", False):
                 X = self._feature_reducer.transform_training(X)
@@ -221,107 +185,28 @@ class MitraV2Model(MitraModel):
                 X = self._feature_reducer.transform(X)
         return X
 
-    def _fit(
-        self,
-        X: pd.DataFrame,
-        y: pd.Series,
-        X_val: pd.DataFrame = None,
-        y_val: pd.Series = None,
-        time_limit: float = None,
-        num_cpus: int = 1,
-        num_gpus: float = 0,
-        verbosity: int = 2,
-        **kwargs,
-    ):
-        need_to_reset_torch_threads = False
-        torch_threads_og = None
+    def _prepare_fit(self):
         self._pending_fold_support = None
         self._use_training_projection = self._fit_constraints_validated_upstream and getattr(
             self, "_feature_reduction_fitted_upstream", False
         )
 
-        try:
-            model_cls = self.get_model_cls()
-            import torch
-        except ImportError as err:
-            logger.log(
-                40,
-                f"\tFailed to import Mitra! To use the Mitra model, "
-                f"do: `pip install autogluon.tabular[mitra]=={__version__}`.",
-            )
-            raise err
-
-        hyp = self._get_model_params()
+    def _get_estimator_params(self) -> dict:
+        hyp = super()._get_estimator_params()
         model_version = self._get_model_version()
         hyp["model_version"] = model_version
         hyp.pop("fine_tune_recipe", None)
         hyp.pop("max_features", None)
         hyp.pop("feature_reduction", None)
+        return hyp
 
-        hf_model = self._resolve_hf_model(problem_type=self.problem_type, hyp=hyp)
-        if hf_model is not None:
-            validate_checkpoint_version(hf_model, model_version)
-            logger.log(30, f"\tCustom hf_model specified: {hf_model}")
-            hyp["hf_model"] = hf_model
-
-        self._log_cpu_fallback_warning(num_gpus=num_gpus)
-        if hyp.get("device", None) is None:
-            if num_gpus == 0:
-                hyp["device"] = "cpu"
-            else:
-                hyp["device"] = self._get_default_device()
-
-        if hyp["device"] == "cpu" and hyp.get("fine_tune", True):
-            logger.log(
-                30,
-                "\tWarning: Attempting to fine-tune Mitra on CPU. This will be very slow. "
-                "We strongly recommend using a GPU instance to fine-tune Mitra.",
-            )
-
-        # `state_dict_classification` / `state_dict_regression` pointed at a raw `.pt` checkpoint.
-        # That loading path was never reachable, so these have always been no-ops. Pop them so an
-        # existing hyperparameter dict keeps working, and point users at the replacement.
-        for deprecated_key in ["state_dict", "state_dict_classification", "state_dict_regression"]:
-            if hyp.pop(deprecated_key, None) is not None:
-                logger.log(
-                    30,
-                    f"\tWarning: `{deprecated_key}` is deprecated and ignored. "
-                    f"To load custom weights, save them with `Tab2D.save_pretrained(<dir>)` and pass "
-                    f"the directory as `hf_model`, which also accepts a HuggingFace repo id.",
-                )
-
-        if "verbose" not in hyp:
-            hyp["verbose"] = verbosity >= 3
-
-        self.model = model_cls(**hyp)
+    def _initialize_estimator(self, model_cls, hyp: dict, X: pd.DataFrame):
+        super()._initialize_estimator(model_cls, hyp, X)
         self.model._fit_context_memo = self._fit_context_memo
         self.model._num_samples_total = getattr(self, "_num_samples_total", len(X))
 
-        X = self.preprocess(X, y=y, is_train=True)
-        if X_val is not None:
-            X_val = self.preprocess(X_val)
-
-        if num_cpus is not None:
-            torch_threads_og = torch.get_num_threads()
-            if torch_threads_og != num_cpus:
-                torch.set_num_threads(num_cpus)
-                need_to_reset_torch_threads = True
-        try:
-            model = self.model.fit(
-                X=X,
-                y=y,
-                X_val=X_val,
-                y_val=y_val,
-                time_limit=time_limit,
-            )
-        finally:
-            if need_to_reset_torch_threads:
-                torch.set_num_threads(torch_threads_og)
-
-        for i in range(len(model.trainers)):
-            model.trainers[i].post_fit_optimize()
-
-        self.model = model
+    def _finalize_estimator_fit(self, model, X_val: pd.DataFrame, y_val: pd.Series):
+        super()._finalize_estimator_fit(model, X_val=X_val, y_val=y_val)
         if not self._use_training_projection and self._feature_reducer is not None:
             self._feature_reducer.clear_training_cache()
         if (
@@ -371,54 +256,6 @@ class MitraV2Model(MitraModel):
         ):
             self._feature_reducer.clear_training_cache()
             self._use_training_projection = False
-
-    def save(self, path: str = None, verbose=True) -> str:
-        # This method owns artifact serialization; skip the legacy save override.
-        if self.model is None:
-            return AbstractTorchModel.save(self, path=path, verbose=verbose)
-        self._save_model_artifact(path=path)
-        trainer_states = []
-        try:
-            for trainer in self.model.trainers:
-                state = {
-                    name: getattr(trainer, name) for name in ("model", "bins", "bin_width") if hasattr(trainer, name)
-                }
-                trainer_states.append((trainer, state))
-                trainer.model = None
-                # The network is stored separately, but the regression bin
-                # tensors stay in the pickle. They must load without CUDA.
-                for name in ("bins", "bin_width"):
-                    if name in state:
-                        setattr(trainer, name, state[name].cpu())
-            return AbstractTorchModel.save(self, path=path, verbose=verbose)
-        finally:
-            for trainer, state in trainer_states:
-                for name, value in state.items():
-                    setattr(trainer, name, value)
-
-    def _save_model_artifact(self, path: str | None):
-        if path is None:
-            path = self.path
-        import torch
-
-        device_og = self.device
-        self.set_device("cpu")
-        try:
-            model_weights = [trainer.model for trainer in self.model.trainers]
-            os.makedirs(path, exist_ok=True)
-            torch.save(model_weights, self.weights_path(path=path))
-        finally:
-            self.set_device(device_og)
-        self._weights_saved = True
-
-    def _load_model_artifact(self):
-        import torch
-
-        device = self.suggest_device_infer()
-        model_weights_list = torch.load(self.weights_path(), map_location="cpu", weights_only=False)  # nosec B614
-        for i in range(len(self.model.trainers)):
-            self.model.trainers[i].model = model_weights_list[i]
-        self.set_device(device)
 
     @classmethod
     def download_default_weights(cls, model_version: str = DEFAULT_MODEL_VERSION):

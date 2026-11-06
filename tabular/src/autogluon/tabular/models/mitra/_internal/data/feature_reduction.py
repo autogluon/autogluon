@@ -5,9 +5,18 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
+DEFAULT_MAX_FEATURES = 256
+DEFAULT_FEATURE_REDUCTION = "auto"
+
 
 class FeatureReducer:
-    def __init__(self, problem_type, max_features=256, method="auto", has_categoricals=False):
+    def __init__(
+        self,
+        problem_type,
+        max_features=DEFAULT_MAX_FEATURES,
+        method=DEFAULT_FEATURE_REDUCTION,
+        has_categoricals=False,
+    ):
         if max_features is not None and (not isinstance(max_features, int) or max_features < 1):
             raise ValueError("max_features must be a positive integer or None.")
         if method not in ("auto", "select", "svd", None):

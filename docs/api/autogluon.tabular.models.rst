@@ -319,7 +319,8 @@ for example, this allows two hours:
    )
 
 ``MitraV2Model`` uses the new fine-tuning method for both checkpoint versions.
-``model_version`` selects the weights. The legacy v1 API is the separate
+``model_version`` selects the default checkpoint. An explicit ``hf_model``
+takes precedence. The legacy v1 API is the separate
 ``MitraModel`` class shown above:
 
 .. code-block:: python
@@ -331,26 +332,24 @@ for example, this allows two hours:
    )
    predictor.fit(
        train_data,
-       hyperparameters={"MITRA": {"model_version": "2", "hf_model": "/path/to/checkpoint"}},
+       hyperparameters={"MITRA": {"hf_model": "/path/to/checkpoint"}},
        num_bag_folds=8,
    )
 
 The default v2 repositories are ``autogluon/mitra-classifier-2`` and
 ``autogluon/mitra-regressor-2``. A local checkpoint must contain ``config.json``
-and ``model.safetensors``. Custom checkpoints must declare
-``"mitra_version": "1"`` or ``"2"`` in ``config.json``. This metadata and known
-repository IDs are checked against ``model_version``. AutoGluon does not infer
-a release from tensor dimensions: a scalar
-regression head selects MSE, and a binned head selects cross-entropy with mean
-decoding, regardless of the checkpoint version. Existing
+and ``model.safetensors``. The architecture is read from ``config.json`` and
+the weights must match it. No ``mitra_version`` field is required; existing
+release metadata is ignored. A scalar regression head selects MSE, and a
+binned head selects cross-entropy with mean decoding, regardless of
+``model_version``. Existing
 fitted v1 predictors keep the original ``MitraModel`` class when loaded or refitted.
 
 Bagging remains an AutoGluon fit option: use ``num_bag_folds=8`` for the released
 eight-fold recipe. The native implementation uses AutoGluon's validation and
-time-limit semantics. The unsupervised regression projection is fitted once on
-the outer training table, as in the released Hugging Face recipe. Classification
-feature selection is fitted within each training fold to keep held-out labels
-out of the selector.
+time-limit semantics. Regression projection and classification feature selection
+are fitted once on the outer training table before bagging, matching the released
+Hugging Face recipes.
 With the new recipe, bag children in the same process reuse the training context
 that fitted the same table shape, checkpoint, and device. Out-of-memory retries
 can still reduce that context when needed.

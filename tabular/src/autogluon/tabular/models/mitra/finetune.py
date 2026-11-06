@@ -15,7 +15,6 @@ from autogluon.core.utils.exceptions import TimeLimitExceeded
 from ._internal.core.fit_context import FitContextMemo
 from ._internal.core.trainer_finetune_v2 import TrainerFinetuneV2
 from .checkpoint import CHECKPOINTS, DEFAULT_MODEL_VERSION, validate_model_version
-from .recipes import DEFAULT_FINE_TUNE_RECIPE, get_finetune_recipe
 from .sklearn_interface import DEFAULT_DEVICE, MitraClassifier, MitraRegressor
 
 
@@ -54,10 +53,14 @@ class MitraFinetuneMixin:
         fine_tune_recipe=None,
     ):
         self.model_version = validate_model_version(model_version)
-        if fine_tune_recipe is None:
-            fine_tune_recipe = DEFAULT_FINE_TUNE_RECIPE
-        recipe = get_finetune_recipe(fine_tune_recipe)
-        self.fine_tune_recipe = fine_tune_recipe
+        # Retain the accepted v2 argument for estimator cloning and existing callers.
+        # The original fine-tuning implementation is exposed through MitraModel.
+        if fine_tune_recipe is not None and (not isinstance(fine_tune_recipe, str) or fine_tune_recipe != "2"):
+            raise ValueError(
+                "MitraFinetune estimators use the v2 fine_tune_recipe. "
+                "Use hyperparameters={MitraModel: {...}} for the original v1 API."
+            )
+        self.fine_tune_recipe = "2"
         super().__init__(
             model_type=model_type,
             n_estimators=n_estimators,
@@ -67,8 +70,8 @@ class MitraFinetuneMixin:
             metric=metric if metric is not None else ("mse" if self._task == "regression" else "log_loss"),
             hf_model=hf_model if hf_model is not None else CHECKPOINTS[self.model_version][self._task],
             patience=patience,
-            lr=lr if lr is not None else recipe["lr"],
-            warmup_steps=warmup_steps if warmup_steps is not None else recipe["warmup_steps"],
+            lr=lr,
+            warmup_steps=warmup_steps if warmup_steps is not None else 10,
             shuffle_classes=shuffle_classes,
             shuffle_features=shuffle_features,
             use_random_transforms=use_random_transforms,
@@ -77,30 +80,16 @@ class MitraFinetuneMixin:
             seed=seed,
             verbose=verbose,
         )
-        self.weight_decay = weight_decay if weight_decay is not None else recipe["weight_decay"]
-        self.max_samples_support = (
-            max_samples_support if max_samples_support is not None else recipe["max_samples_support"]
-        )
-        self.max_samples_query = max_samples_query if max_samples_query is not None else recipe["max_samples_query"]
-        self.predict_max_samples_support = (
-            predict_max_samples_support
-            if predict_max_samples_support is not None
-            else recipe["predict_max_samples_support"]
-        )
-        self.predict_max_samples_query = (
-            predict_max_samples_query if predict_max_samples_query is not None else recipe["predict_max_samples_query"]
-        )
+        self.weight_decay = weight_decay if weight_decay is not None else 0.3
+        self.max_samples_support = max_samples_support
+        self.max_samples_query = max_samples_query if max_samples_query is not None else 1024
+        self.predict_max_samples_support = predict_max_samples_support
+        self.predict_max_samples_query = predict_max_samples_query if predict_max_samples_query is not None else 16384
         self.predict_min_samples_support = predict_min_samples_support
         self.predict_min_samples_query = predict_min_samples_query
-        self.eval_max_samples_query = (
-            eval_max_samples_query if eval_max_samples_query is not None else recipe["eval_max_samples_query"]
-        )
-        self.balance_binary_support = (
-            balance_binary_support if balance_binary_support is not None else recipe["balance_binary_support"]
-        )
-        self.heldout_in_support = (
-            heldout_in_support if heldout_in_support is not None else recipe["heldout_in_support"]
-        )
+        self.eval_max_samples_query = eval_max_samples_query if eval_max_samples_query is not None else 16384
+        self.balance_binary_support = balance_binary_support if balance_binary_support is not None else True
+        self.heldout_in_support = heldout_in_support if heldout_in_support is not None else True
         self.fine_tune_time_limit = fine_tune_time_limit
         for name in (
             "n_estimators",
@@ -140,8 +129,6 @@ class MitraFinetuneMixin:
             eval_max_samples_query=self.eval_max_samples_query,
             balance_binary_support=self.balance_binary_support and is_binary,
             budget=budget,
-            fast_loop=get_finetune_recipe(self.fine_tune_recipe)["fast_loop"],
-            fast_predict=get_finetune_recipe(self.fine_tune_recipe)["fast_predict"],
         )
         pending = getattr(self, "_fitted_context_key", None)
         if pending is not None and len(pending) == 6:
@@ -153,18 +140,17 @@ class MitraFinetuneMixin:
         return cfg, model_cls
 
     def _train_ensemble(self, X_train, y_train, X_valid, y_valid, task, dim_output, n_classes=0, time_limit=None):
-        if get_finetune_recipe(self.fine_tune_recipe)["fast_loop"]:
-            shape = np.shape(X_train)
-            if getattr(self, "_fit_context_memo", None) is None:
-                self._fit_context_memo = FitContextMemo()
-            self._fitted_context_key = (
-                str(task),
-                int(shape[1]) if len(shape) > 1 else 1,
-                int(round(int(shape[0]) / 256)),
-                str(self.device),
-                str(self.hf_model),
-                self.model_version,
-            )
+        shape = np.shape(X_train)
+        if getattr(self, "_fit_context_memo", None) is None:
+            self._fit_context_memo = FitContextMemo()
+        self._fitted_context_key = (
+            str(task),
+            int(shape[1]) if len(shape) > 1 else 1,
+            int(round(int(shape[0]) / 256)),
+            str(self.device),
+            str(self.hf_model),
+            self.model_version,
+        )
         try:
             result = super()._train_ensemble(
                 X_train, y_train, X_valid, y_valid, task, dim_output, n_classes=n_classes, time_limit=time_limit
@@ -182,9 +168,6 @@ class MitraFinetuneMixin:
 
     def _get_trainer_cls(self):
         return TrainerFinetuneV2
-
-    def _load_pretrained_model(self, model_cls):
-        return model_cls.from_pretrained(self.hf_model, device=self.device, model_version=self.model_version)
 
     def _configure_pretrained_model(self, cfg, model):
         super()._configure_pretrained_model(cfg, model)

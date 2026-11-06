@@ -30,7 +30,6 @@ from ..._internal.models.embedding import (
     Tab2DEmbeddingYRegression,
     Tab2DQuantileEmbeddingX,
 )
-from ...checkpoint import checkpoint_version, validate_checkpoint_version
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +57,6 @@ class Tab2D(BaseModel):
         use_pretrained_weights: bool,
         path_to_weights: str,
         device: str = "cuda",  # Add device parameter
-        mitra_version: Optional[str] = None,
     ) -> None:
         super().__init__()
 
@@ -68,7 +66,6 @@ class Tab2D(BaseModel):
         self.n_heads = n_heads
         self.task = task
         self.device_type = device
-        self.mitra_version = mitra_version
 
         # Determine if we can use flash attention
         self.use_flash_attn = FLASH_ATTN_AVAILABLE and device.startswith("cuda")
@@ -224,8 +221,6 @@ class Tab2D(BaseModel):
             "n_heads": self.n_heads,
             "task": str(self.task).upper(),
         }
-        if getattr(self, "mitra_version", None) is not None:
-            config["mitra_version"] = self.mitra_version
         with open(os.path.join(save_directory, "config.json"), "w") as f:
             json.dump(config, f)
 
@@ -236,7 +231,6 @@ class Tab2D(BaseModel):
         device: str = "cuda",
         *,
         state_dict: Optional[Mapping[str, torch.Tensor]] = None,
-        model_version: Optional[str] = None,
     ) -> "Tab2D":
         """Load a pretrained model from a local directory (as saved by `save_pretrained`) or a HuggingFace repo id.
 
@@ -252,16 +246,6 @@ class Tab2D(BaseModel):
         with open(config_path, "r") as f:
             config = json.load(f)
 
-        if model_version is None:
-            version = checkpoint_version(path_or_repo_id, config.get("mitra_version"))
-        else:
-            version = validate_checkpoint_version(
-                path_or_repo_id,
-                model_version,
-                config.get("mitra_version"),
-                require_identity=True,
-            )
-
         with torch.device("meta"):
             model = cls(
                 dim=config["dim"],
@@ -272,7 +256,6 @@ class Tab2D(BaseModel):
                 use_pretrained_weights=False,
                 path_to_weights="",
                 device=device,
-                mitra_version=version,
             )
         model.to_empty(device=device)
 
