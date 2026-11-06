@@ -146,6 +146,34 @@ def test_when_n_jobs_hyperparameter_provided_then_joblib_receives_it(input_n_job
         assert mock_parallel.call_args[1]["n_jobs"] == joblib_n_jobs
 
 
+def test_when_local_model_predicts_then_model_instance_is_not_passed_to_joblib(temp_model_path):
+    model = AverageModel(path=temp_model_path, hyperparameters={"n_jobs": 1, "use_fallback_model": False})
+    model.fit(train_data=DUMMY_TS_DATAFRAME)
+
+    captured_calls = []
+    from joblib.parallel import Parallel
+
+    orig_call = Parallel.__call__
+
+    def mock_call(self, iterable):
+        calls = list(iterable)
+        captured_calls.extend(calls)
+        return orig_call(self, calls)
+
+    with mock.patch.object(Parallel, "__call__", mock_call):
+        model.predict(DUMMY_TS_DATAFRAME)
+
+    assert len(captured_calls) == DUMMY_TS_DATAFRAME.num_items
+    for fn, args, kwargs in captured_calls:
+        # Predict wrapper is called as a classmethod, not an instance method
+        assert fn.__self__ is AverageModel
+        assert getattr(kwargs.get("predict_with_local_model_fn"), "__self__", None) is AverageModel
+        for a in args:
+            assert a is not model
+        for k, v in kwargs.items():
+            assert v is not model
+
+
 def failing_predict(*args, **kwargs):
     raise RuntimeError("Custom error message")
 
@@ -248,12 +276,18 @@ def test_when_npts_fit_with_default_seasonal_features_then_predictions_match_glu
 
 
 class MockConformalModel(AbstractConformalizedStatsForecastModel):
-    def _get_point_forecast(self, time_series: pd.Series, local_model_args: dict):
-        return np.ones(self.prediction_length)
+    returned_nonconformity_scores = None
 
-    def _get_nonconformity_scores(self, time_series: pd.Series, local_model_args: dict):
-        scores = super()._get_nonconformity_scores(time_series, local_model_args)
-        self.returned_nonconformity_scores = scores
+    @classmethod
+    def _get_point_forecast(cls, time_series: pd.Series, local_model_args: dict, prediction_length: int):
+        return np.ones(prediction_length)
+
+    @classmethod
+    def _get_nonconformity_scores(cls, time_series: pd.Series, local_model_args: dict, prediction_length: int):
+        scores = super()._get_nonconformity_scores(
+            time_series=time_series, local_model_args=local_model_args, prediction_length=prediction_length
+        )
+        cls.returned_nonconformity_scores = scores
         return scores
 
 
