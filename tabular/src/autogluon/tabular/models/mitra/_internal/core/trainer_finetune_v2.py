@@ -166,7 +166,7 @@ class TrainerFinetuneV2(TrainerFinetune):
             y_support = torch.clamp(y_support, 0, self.cfg.hyperparams["dim_output"] - 1).to(torch.int64)
         return self.model(x_support, y_support, x_query, padding_features, padding_obs_support, padding_obs_query)
 
-    def _predict_transformed(self, x_support, y_support, x_query, support_cap, query_chunk, *, prediction):
+    def _predict_transformed(self, x_support, y_support, x_query, support_cap, query_chunk):
         dataset_kwargs = dict(
             cfg=self.cfg,
             x_support=x_support,
@@ -177,12 +177,7 @@ class TrainerFinetuneV2(TrainerFinetune):
             max_samples_query=query_chunk,
             rng=self.rng,
         )
-        if prediction:
-            dataset = PredictionDataset(
-                **dataset_kwargs, balance_binary=self.cfg.hyperparams["balance_binary_support"]
-            )
-        else:
-            dataset = DatasetFinetune(**dataset_kwargs)
+        dataset = PredictionDataset(**dataset_kwargs, balance_binary=self.cfg.hyperparams["balance_binary_support"])
         loader = self.make_loader(dataset, training=False)
         self.model.eval()
         predictions = []
@@ -193,9 +188,8 @@ class TrainerFinetuneV2(TrainerFinetune):
                 ):
                     logits = self._forward(batch)
                 logits = logits[0].float()
-                if prediction:
-                    # Decode on the CPU and release GPU logits before the next batch.
-                    logits = logits.cpu()
+                # Decode on the CPU and release GPU logits before the next batch.
+                logits = logits.cpu()
                 if self.cfg.task == "regression" and self.cfg.hyperparams["regression_loss"] == "cross_entropy":
                     logits = self._decode_regression(logits)
                 logits = self.preprocessor.inverse_transform_y(logits.cpu().numpy())
@@ -281,7 +275,7 @@ class TrainerFinetuneV2(TrainerFinetune):
                 else stock_query_chunk,
             )
             try:
-                return self._predict_transformed(*transformed, support_cap, query_chunk, prediction=True)
+                return self._predict_transformed(*transformed, support_cap, query_chunk)
             except RuntimeError as error:
                 if not _is_out_of_memory(error):
                     raise

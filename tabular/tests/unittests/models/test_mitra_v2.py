@@ -464,7 +464,7 @@ def test_regression_prediction_matches_released_cpu_mean():
         }
     ]
 
-    actual = trainer._predict_transformed(np.zeros((2, 1)), np.zeros(2), np.zeros((67, 1)), 2, 67, prediction=True)
+    actual = trainer._predict_transformed(np.zeros((2, 1)), np.zeros(2), np.zeros((67, 1)), 2, 67)
     # The released API transfers logits before its float32 softmax and mean.
     cpu_logits = torch.nan_to_num(logits[0].float().cpu(), nan=0.0, posinf=1e4, neginf=-1e4)
     cpu_centers = (trainer.bins[:-1] + trainer.bin_width / 2).cpu()
