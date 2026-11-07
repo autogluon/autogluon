@@ -21,7 +21,8 @@ class TabularDataset:
     Parameters
     ----------
     data : str, :class:`pd.DataFrame`, :class:`np.ndarray`, Iterable, or dict
-        If str, path to data file (CSV or Parquet format).
+        If str, path to data file (CSV, Parquet, or Excel format).
+        Excel files (`.xlsx`, `.xls`, `.xlsm`, `.xlsb`) are loaded from the first sheet.
         If you already have your data in a :class:`pd.DataFrame`, you can specify it here. In this case, the same DataFrame will be returned with no changes.
 
     Examples
