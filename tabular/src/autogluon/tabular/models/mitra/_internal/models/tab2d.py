@@ -133,7 +133,6 @@ class Tab2D(BaseModel):
         x_query__ = x_query
 
         batch_size = x_support.shape[0]
-        n_obs_support = x_support.shape[1]
         n_obs_query__ = x_query__.shape[1]
 
         x_support, x_query__ = self.x_quantile(x_support, x_query__, padding_obs_support, padding_features)
@@ -149,7 +148,9 @@ class Tab2D(BaseModel):
         padding_features_y = torch.zeros((batch_size, 1), device=padding_features.device, dtype=torch.bool)  # (b, 1)
         padding_features, _ = einops.pack((padding_features_y, padding_features), "b *")  # (b, f+1)
 
-        if self.use_flash_attn:
+        # A saved GPU model may later be loaded on a machine without CUDA or
+        # flash-attn. Select the backend from the tensors used for this call.
+        if self.use_flash_attn and FLASH_ATTN_AVAILABLE and x_support.is_cuda:
             padder_support = Padder(support, padding_obs_support, padding_features)
             padder_query__ = Padder(query__, padding_obs_query__, padding_features)
 
@@ -365,7 +366,6 @@ class Padder(torch.nn.Module):
         if hasattr(self, "cpu_mode") and self.cpu_mode:
             # CPU fallback: reshape back to base format
             # This is the inverse of base_to_obs
-            total_elements = x.numel()
             expected_d = self.original_shape[-1]  # last dimension
             b, s, f = self.batch_size, self.n_obs, self.n_feat
             return x.view(b, s, f, expected_d)
@@ -380,7 +380,6 @@ class Padder(torch.nn.Module):
         if hasattr(self, "cpu_mode") and self.cpu_mode:
             # CPU fallback: reshape back to base format
             # This is the inverse of base_to_feat
-            total_elements = x.numel()
             expected_d = self.original_shape[-1]  # last dimension
             b, s, f = self.batch_size, self.n_obs, self.n_feat
             return x.view(b, s, f, expected_d)
