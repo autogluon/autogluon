@@ -704,6 +704,21 @@ def customized_roc_auc(y_true, y_pred, **kwargs):
         return sklearn.metrics.roc_auc_score(y_true.astype(np.int32), y_pred, labels=labels, **kwargs)
 
 
+def customized_multiclass_average_precision(y_true, y_pred, average="macro", sample_weight=None, **kwargs):
+    assert y_true.ndim == 1
+    if y_pred.ndim == 1:
+        return sklearn.metrics.average_precision_score(y_true, y_pred, sample_weight=sample_weight, **kwargs)
+    else:
+        assert y_pred.ndim == 2, "Only ndim=2 is supported"
+        y_true = np.asarray(y_true, dtype=np.int32)
+        y_pred = np.asarray(y_pred)
+        classes = np.arange(y_pred.shape[1], dtype=np.int32)
+        y_true_bin = (y_true[:, None] == classes).astype(int)
+        return sklearn.metrics.average_precision_score(
+            y_true_bin, y_pred, average=average, sample_weight=sample_weight, **kwargs
+        )
+
+
 # Score function for probabilistic classification
 log_loss = make_scorer("log_loss", customized_log_loss, optimum=0, greater_is_better=False, needs_proba=True)
 log_loss.add_alias("nll")
@@ -783,6 +798,31 @@ for _name, _metric, _kwargs in [
             qualified_name, partial(_metric, average=average, **_kwargs), **scorer_kwargs
         )
         _add_scorer_to_metric_dict(metric_dict=MULTICLASS_METRICS, scorer=globals()[qualified_name])
+
+average_precision_macro = make_scorer(
+    "average_precision_macro",
+    partial(customized_multiclass_average_precision, average="macro"),
+    **scorer_kwargs,
+)
+average_precision_macro.add_alias("average_precision")
+globals()["average_precision_macro"] = average_precision_macro
+_add_scorer_to_metric_dict(metric_dict=MULTICLASS_METRICS, scorer=average_precision_macro)
+
+average_precision_micro = make_scorer(
+    "average_precision_micro",
+    partial(customized_multiclass_average_precision, average="micro"),
+    **scorer_kwargs,
+)
+globals()["average_precision_micro"] = average_precision_micro
+_add_scorer_to_metric_dict(metric_dict=MULTICLASS_METRICS, scorer=average_precision_micro)
+
+average_precision_weighted = make_scorer(
+    "average_precision_weighted",
+    partial(customized_multiclass_average_precision, average="weighted"),
+    **scorer_kwargs,
+)
+globals()["average_precision_weighted"] = average_precision_weighted
+_add_scorer_to_metric_dict(metric_dict=MULTICLASS_METRICS, scorer=average_precision_weighted)
 
 
 METRICS: dict[str, dict[str, Scorer]] = {

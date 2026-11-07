@@ -55,6 +55,10 @@ EXPECTED_BINARY_METRICS = {
 EXPECTED_MULTICLASS_METRICS = {
     "acc",
     "accuracy",
+    "average_precision",
+    "average_precision_macro",
+    "average_precision_micro",
+    "average_precision_weighted",
     "balanced_accuracy",
     "f1_macro",
     "f1_micro",
