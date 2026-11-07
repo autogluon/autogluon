@@ -55,10 +55,16 @@ class FeatureReducer:
             from sklearn.pipeline import make_pipeline
             from sklearn.preprocessing import StandardScaler
 
+            values = self._replace_infinity(values)
+            # Mean imputation drops entirely missing columns. Keep that policy,
+            # but size the projection for the columns that will survive it.
+            n_features = np.count_nonzero(~np.isnan(values).all(axis=0))
+            if n_features == 0:
+                return self
             self.projection = make_pipeline(
                 SimpleImputer(strategy="mean"),
                 StandardScaler(),
-                PCA(n_components=min(self.max_features, *values.shape), random_state=0),
+                PCA(n_components=min(self.max_features, len(values), n_features), random_state=0),
             )
             # PCA.fit_transform and PCA.transform need not use the same
             # numerical computation, especially for randomized SVD.
@@ -84,6 +90,15 @@ class FeatureReducer:
             scores = np.where(np.isfinite(scores), scores, -np.inf)
             self.columns = X.columns[np.argsort(scores)[::-1][: self.max_features]].tolist()
         return self
+
+    @staticmethod
+    def _replace_infinity(values):
+        infinite = np.isinf(values)
+        if infinite.any():
+            # to_numpy can share storage with the caller's DataFrame.
+            values = values.copy()
+            values[infinite] = np.nan
+        return values
 
     @staticmethod
     def _row_keys(X):
@@ -138,6 +153,7 @@ class FeatureReducer:
             return self.align_input(X)
         if self.projection is not None:
             values = self.align_input(X).to_numpy(dtype=float)
+            values = self._replace_infinity(values)
             projected = self.projection.transform(values)
             return self._frame(projected, X)
         return X

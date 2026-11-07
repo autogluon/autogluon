@@ -932,6 +932,182 @@ def test_feature_reduction_fits_only_training_data():
     assert np.isfinite(regression.transform(X)).all().all()
 
 
+@pytest.mark.parametrize("infinite_training", [False, True])
+def test_projection_treats_infinity_as_missing(infinite_training):
+    from autogluon.tabular.models.mitra._internal.data.feature_reduction import FeatureReducer
+
+    X = pd.DataFrame(np.random.RandomState(21).normal(size=(40, 12)))
+    if infinite_training:
+        X.iloc[0, 0] = np.inf
+        X.iloc[1, 1] = -np.inf
+    X.iloc[2, 2] = np.nan
+    original = X.copy(deep=True)
+    reference = FeatureReducer("regression", max_features=3).fit(
+        X.replace([np.inf, -np.inf], np.nan), None, cache_training=True
+    )
+    reducer = FeatureReducer("regression", max_features=3).fit(X, None, cache_training=True)
+    np.testing.assert_allclose(
+        reducer.transform_training(X),
+        reference.transform_training(X.replace([np.inf, -np.inf], np.nan)),
+        rtol=1e-10,
+        atol=1e-10,
+    )
+    query = X.iloc[:4].copy() + 100
+    query.iloc[0, 1] = np.inf
+    query.iloc[1, 0] = -np.inf
+    original_query = query.copy(deep=True)
+    expected = reference.transform(query.replace([np.inf, -np.inf], np.nan))
+    np.testing.assert_allclose(reducer.transform(query), expected, rtol=1e-10, atol=1e-10)
+    np.testing.assert_allclose(reducer.transform_training(query), expected, rtol=1e-10, atol=1e-10)
+    assert np.isfinite(expected).all().all()
+    pd.testing.assert_frame_equal(X, original)
+    pd.testing.assert_frame_equal(query, original_query)
+
+
+@pytest.mark.parametrize("nonempty_features", [0, 1, 3, 8])
+def test_projection_caps_components_after_imputation(nonempty_features):
+    from sklearn.decomposition import PCA
+    from sklearn.impute import SimpleImputer
+    from sklearn.pipeline import make_pipeline
+    from sklearn.preprocessing import StandardScaler
+
+    from autogluon.tabular.models.mitra._internal.data.feature_reduction import FeatureReducer
+
+    X = pd.DataFrame(np.random.RandomState(22).normal(size=(40, 12)))
+    X.iloc[:, nonempty_features:] = np.nan
+    original = X.copy(deep=True)
+    reducer = FeatureReducer("regression", max_features=5).fit(X, None, cache_training=True)
+    if nonempty_features == 0:
+        # With no observed features there is no projection to learn.
+        pd.testing.assert_frame_equal(reducer.transform_training(X), X)
+        assert reducer.projection is None
+    else:
+        reference = make_pipeline(
+            SimpleImputer(strategy="mean"),
+            StandardScaler(),
+            PCA(n_components=min(5, nonempty_features), random_state=0),
+        )
+        expected = reference.fit_transform(X.to_numpy())
+        np.testing.assert_array_equal(reducer.transform_training(X), expected)
+        assert expected.shape == (len(X), min(5, nonempty_features))
+        query = X.iloc[:4].fillna(100) + 10
+        np.testing.assert_array_equal(reducer.transform(query), reference.transform(query.to_numpy()))
+    pd.testing.assert_frame_equal(X, original)
+
+
+@pytest.mark.parametrize("bagged", [False, True])
+@pytest.mark.parametrize("problem_type", ["binary", "regression"])
+@pytest.mark.parametrize(
+    "feature_filter",
+    [
+        {"ignored_type_group_raw": ["int"]},
+        {"ignored_type_group_special": ["excluded_test"]},
+        {"get_features_kwargs_extra": {"invalid_raw_types": ["int"]}},
+    ],
+    ids=["raw_type", "special_type", "extra_filter"],
+)
+def test_feature_exclusions_match_dropped_columns(checkpoint_factory, tmp_path, bagged, problem_type, feature_filter):
+    import torch
+
+    from autogluon.common.features.feature_metadata import FeatureMetadata
+
+    rng = np.random.RandomState(23)
+    X = pd.DataFrame(rng.normal(size=(40, 8)), columns=[f"f{i}" for i in range(8)])
+    X["constant"] = 0.0
+    X["rare"] = 0.0
+    X.loc[0, "rare"] = 1.0
+    X["excluded"] = np.arange(len(X)) % 2
+    y = X["excluded"].copy() if problem_type == "binary" else pd.Series(rng.normal(size=len(X)))
+    metadata = FeatureMetadata.from_df(X).add_special_types({"excluded": ["excluded_test"]})
+    retained = X.drop(columns="excluded")
+    checkpoint = checkpoint_factory(
+        task="CLASSIFICATION" if problem_type == "binary" else "REGRESSION",
+        dim_output=10 if problem_type == "binary" else 7,
+    )
+
+    def fit(name, data, feature_metadata, filter_params):
+        # The released preprocessing recipe draws mirrors from the global RNG.
+        np.random.seed(0)
+        torch.manual_seed(0)
+        model = MitraV2Model(
+            path=str(tmp_path / name),
+            problem_type=problem_type,
+            hyperparameters={
+                "hf_model": checkpoint,
+                "fine_tune": False,
+                "max_features": 3,
+                **{f"ag.{key}": value for key, value in filter_params.items()},
+            },
+        )
+        if bagged:
+            model = BaggedEnsembleModel(
+                model_base=model,
+                path=str(tmp_path / name),
+                hyperparameters={"fold_fitting_strategy": "sequential_local"},
+            )
+            model.fit(X=data, y=y, feature_metadata=feature_metadata, k_fold=2, num_cpus=1, num_gpus=0)
+        else:
+            model.fit(
+                X=data.iloc[:32],
+                y=y.iloc[:32],
+                X_val=data.iloc[32:],
+                y_val=y.iloc[32:],
+                feature_metadata=feature_metadata,
+                num_cpus=1,
+                num_gpus=0,
+            )
+        return model
+
+    model = fit("filtered", X, metadata, feature_filter)
+    reference = fit("dropped", retained, metadata.keep_features(retained.columns.tolist()), {})
+    query = retained.iloc[:4] + 0.1
+    expected = reference.predict_proba(query)
+    assert np.isfinite(expected).all()
+    np.testing.assert_array_equal(model.predict_proba(query), expected)
+    if bagged:
+        np.testing.assert_array_equal(model.predict_proba_oof(), reference.predict_proba_oof())
+    model.save()
+    restored = type(model).load(model.path)
+    np.testing.assert_array_equal(restored.predict_proba(query), expected)
+
+
+@pytest.mark.parametrize("num_bag_folds", [0, 2])
+def test_predictor_reduction_handles_infinity_and_excluded_features(checkpoint_factory, tmp_path, num_bag_folds):
+    from autogluon.tabular import TabularPredictor
+
+    rng = np.random.RandomState(24)
+    X = pd.DataFrame(rng.normal(size=(48, 260)), columns=[f"f{i}" for i in range(260)])
+    X.iloc[0, 0] = np.inf
+    X.iloc[25, 1] = -np.inf
+    X["excluded"] = np.arange(len(X))
+    data = X.assign(target=rng.normal(size=len(X)))
+    predictor = TabularPredictor(
+        label="target", problem_type="regression", path=str(tmp_path / "predictor"), verbosity=0
+    ).fit(
+        data,
+        hyperparameters={
+            "MITRA": {
+                "hf_model": checkpoint_factory(task="REGRESSION", dim_output=7),
+                "fine_tune": False,
+                "ag.ignored_type_group_raw": ["int"],
+                "ag.ens.fold_fitting_strategy": "sequential_local",
+            }
+        },
+        num_bag_folds=num_bag_folds,
+        num_cpus=1,
+        num_gpus=0,
+        fit_weighted_ensemble=False,
+        raise_on_model_failure=True,
+    )
+    query = X.iloc[:4].copy()
+    query.iloc[2, 2] = np.inf
+    query.iloc[3, 3] = -np.inf
+    prediction = predictor.predict(query)
+    assert np.isfinite(prediction).all()
+    restored = TabularPredictor.load(predictor.path)
+    np.testing.assert_array_equal(restored.predict(query), prediction)
+
+
 def test_binary_descriptor_and_categorical_tables_are_not_reduced():
     from autogluon.tabular.models.mitra._internal.data.feature_reduction import FeatureReducer
 
@@ -1135,6 +1311,10 @@ def test_bagged_regression_matches_released_projection(checkpoint_factory, tmp_p
     # projection fitted on the outer table.
     X["rare"] = 0.0
     X.loc[0, "rare"] = 1.0
+    # Bag metadata omits globally constant columns, but the released projection
+    # still sees them and lets its imputer drop entirely missing columns.
+    X["constant"] = 0.0
+    X["empty"] = np.nan
     y = pd.Series(rng.normal(size=len(X)))
     reference = make_pipeline(SimpleImputer(strategy="mean"), StandardScaler(), PCA(n_components=3, random_state=0))
     expected = pd.DataFrame(reference.fit_transform(X.to_numpy(dtype=float)), index=X.index)

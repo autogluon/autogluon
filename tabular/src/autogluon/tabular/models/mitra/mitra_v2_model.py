@@ -79,6 +79,7 @@ class MitraV2Model(MitraModel):
             # HF fits both supervised selection and the regression projection
             # before bagging. This hook receives the outer training data and
             # labels; fold children reuse the fitted reducer.
+            X = self._get_feature_reduction_input(X, feature_metadata=kwargs.get("feature_metadata"))
             reducer = self._make_feature_reducer(X)
             y = kwargs.get("y")
             if y is not None or (self.problem_type == "regression" and reducer.method in ("auto", "svd")):
@@ -86,6 +87,25 @@ class MitraV2Model(MitraModel):
                 if reducer.projection is not None or reducer.columns is not None:
                     self._feature_reducer = reducer
                     self._feature_reduction_fitted_upstream = True
+
+    def _get_feature_reduction_input(self, X, feature_metadata=None):
+        if self.features is not None:
+            return self._preprocess_nonadaptive(X)
+        # Bagging validates an uninitialized template. Resolve its feature
+        # filters without initializing it on the full table.
+        template = copy.copy(self)
+        template.params_aux = self._get_params_aux()
+        if feature_metadata is None:
+            feature_metadata = self._infer_feature_metadata(X)
+        else:
+            # Bag metadata omits constant columns. Preserve them in the outer
+            # projection's input, as the fold models' external schema does.
+            missing = [column for column in X.columns if column not in feature_metadata.type_map_raw]
+            if missing:
+                feature_metadata = feature_metadata.join_metadata(self._infer_feature_metadata(X[missing]))
+        valid_features = set(template._get_valid_features(feature_metadata=feature_metadata))
+        features = [column for column in X.columns if column in valid_features]
+        return X if features == list(X.columns) else X.loc[:, features]
 
     def _make_feature_reducer(self, X):
         from ._internal.data.feature_reduction import FeatureReducer
