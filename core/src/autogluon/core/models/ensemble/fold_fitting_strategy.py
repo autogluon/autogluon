@@ -20,6 +20,7 @@ from autogluon.common.utils.log_utils import reset_logger_for_remote_call
 from autogluon.common.utils.pandas_utils import get_approximate_df_mem_usage
 from autogluon.common.utils.resource_utils import ResourceManager
 from autogluon.common.utils.try_import import try_import_ray
+from autogluon.features.utils import get_smallest_valid_dtype_int
 
 from ...pseudolabeling.pseudolabeling import assert_pseudo_column_match
 from ...ray.resources_calculator import ResourceCalculatorFactory
@@ -103,6 +104,8 @@ class FoldFittingStrategy(AbstractFoldFittingStrategy):
             Number of repeats the out of folds predict probabilities has been done.
         save_folds: bool,
             Whether to save the folds to disk.
+        oof_per_fold: dict, default=None
+            With the bag's `oof_per_fold`, where each fold's (validation row positions, predictions) go, by fold name.
         time_limit_fold_ratio: float, default=0.8
             The ratio of max time limit for each fold.
             If the estimated time required exceeds this ratio, will raise TimeLimitExceed error
@@ -159,6 +162,7 @@ class FoldFittingStrategy(AbstractFoldFittingStrategy):
         time_limit_fold_ratio=0.8,
         time_limit_fold_min: float | None = None,
         time_limit_fold_min_num_cpus: int | None = None,
+        oof_per_fold: dict[str, tuple[ndarray, ndarray]] | None = None,
         **kwargs,
     ):
         self.model_base = model_base
@@ -173,6 +177,9 @@ class FoldFittingStrategy(AbstractFoldFittingStrategy):
         self.models = models
         self.oof_pred_proba = oof_pred_proba
         self.oof_pred_model_repeats = oof_pred_model_repeats
+        self.oof_per_fold = oof_per_fold
+        # Row positions of the folds kept per fold, in the smallest unsigned integer type for the bag's rows
+        self._oof_row_dtype = get_smallest_valid_dtype_int(min_val=0, max_val=max(len(X) - 1, 0))
         self.bagged_ensemble_model = bagged_ensemble_model
         self.jobs = []
         self.save_folds = save_folds
@@ -201,6 +208,15 @@ class FoldFittingStrategy(AbstractFoldFittingStrategy):
 
     def after_all_folds_scheduled(self):
         raise NotImplementedError
+
+    def _add_fold_oof(self, pred_proba: ndarray, fold_ctx: dict):
+        """Add a fold's predictions on its validation rows to the out-of-fold totals, and keep them apart by fold
+        when the bag keeps them per fold."""
+        _, val_index = fold_ctx["fold"]
+        self.oof_pred_proba[val_index] += pred_proba
+        self.oof_pred_model_repeats[val_index] += 1
+        if self.oof_per_fold is not None:
+            self.oof_per_fold[fold_ctx["model_name_suffix"]] = (val_index.astype(self._oof_row_dtype), pred_proba)
 
     @property
     def _fold_time_limit_ratio(self) -> float:
@@ -300,7 +316,6 @@ class FoldFittingStrategy(AbstractFoldFittingStrategy):
         return time_limit_fold
 
     def _update_bagged_ensemble(self, fold_model, pred_proba, fold_ctx):
-        _, val_index = fold_ctx["fold"]
         model_to_append = fold_model
         if not self.save_folds:
             fold_model.model = None
@@ -310,8 +325,7 @@ class FoldFittingStrategy(AbstractFoldFittingStrategy):
             self.bagged_ensemble_model.save_child(fold_model, verbose=False)
             model_to_append = fold_model.name
         self.models.append(model_to_append)
-        self.oof_pred_proba[val_index] += pred_proba
-        self.oof_pred_model_repeats[val_index] += 1
+        self._add_fold_oof(pred_proba=pred_proba, fold_ctx=fold_ctx)
         self.bagged_ensemble_model._add_child_times_to_bag(model=fold_model)
         self.bagged_ensemble_model._add_child_num_cpus(num_cpus=fold_model.fit_num_cpus)
         self.bagged_ensemble_model._add_child_num_gpus(num_gpus=fold_model.fit_num_gpus)
@@ -1208,10 +1222,8 @@ class ParallelFoldFittingStrategy(FoldFittingStrategy):
         fit_num_gpus,
         fold_ctx,
     ):
-        _, val_index = fold_ctx["fold"]
         self.models.append(fold_model)
-        self.oof_pred_proba[val_index] += pred_proba
-        self.oof_pred_model_repeats[val_index] += 1
+        self._add_fold_oof(pred_proba=pred_proba, fold_ctx=fold_ctx)
         if self.time_start_fit:
             self.time_start_fit = min(time_start_fit, self.time_start_fit)
         else:
