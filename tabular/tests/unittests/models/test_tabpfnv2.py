@@ -91,6 +91,56 @@ def test_tabpfn_set_device_moves_inner_checkpoints():
     )
 
 
+@pytest.mark.skipif(not torch.cuda.is_available() or torch.cuda.device_count() < 2, reason="needs two GPUs")
+def test_tabpfn_multi_gpu_fit_saves_one_copy_of_each_checkpoint(tmp_path, monkeypatch):
+    """A fit on two GPUs is saved without a move, with one copy of each checkpoint instead of the engine's copy per
+    GPU. It loads back on both GPUs, and without CUDA on the CPU, predicting as a save through the CPU does."""
+    import os
+
+    import numpy as np
+
+    X, y = _classification_frame()
+    model = RealTabPFNv2Model(
+        path=str(tmp_path / "multi"),
+        name="multi",
+        problem_type="binary",
+        eval_metric="log_loss",
+        hyperparameters=toy_model_params,
+    )
+    model.fit(X=X, y=y, num_cpus=1, num_gpus=2)
+    assert len(model.model.devices_) == 2
+    caches = model.model.executor_.model_caches
+    one_copy = sum(
+        t.numel() * t.element_size()
+        for cache in caches
+        for t in cache.get(cache.get_devices()[0]).state_dict().values()
+    )
+    expected = model.predict_proba(X)
+    moves = []
+    set_device = RealTabPFNv2Model.set_device
+    monkeypatch.setattr(
+        RealTabPFNv2Model, "set_device", lambda self, device: moves.append(device) or set_device(self, device)
+    )
+
+    saved_path = model.save()
+    tensors_bytes = os.path.getsize(os.path.join(saved_path, model.model_tensors_file_name))
+    assert moves == [] and len(model.model.devices_) == 2, "saved where it is"
+    assert all(len(cache.get_devices()) == 2 for cache in model.model.executor_.model_caches), (
+        "the live engine is kept"
+    )
+    assert one_copy <= tensors_bytes < 1.5 * one_copy, "one copy of each checkpoint in the file"
+    loaded = RealTabPFNv2Model.load(saved_path)
+    assert len(loaded.model.devices_) == 2, "the load spreads it over both GPUs again"
+    np.testing.assert_allclose(loaded.predict_proba(X), expected, rtol=1e-5, atol=1e-6)
+
+    monkeypatch.setattr(RealTabPFNv2Model, "_device_for_save", lambda self: "cpu")  # a save through the CPU
+    reference_path = model.save(path=str(tmp_path / "reference") + os.sep)
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
+    on_cpu, reference = RealTabPFNv2Model.load(saved_path), RealTabPFNv2Model.load(reference_path)
+    assert on_cpu.get_device() == "cpu" and reference.get_device() == "cpu"
+    np.testing.assert_array_equal(on_cpu.predict_proba(X), reference.predict_proba(X))
+
+
 class _MovedEstimator:
     """Records the device argument of every move."""
 
@@ -300,9 +350,9 @@ def test_tabpfn_share_weights_off_loads_and_pickles_its_own_network(tmp_path, mo
     assert not registry.report()["entries"]
 
 
-def test_tabpfn_saves_a_fit_on_one_device_where_it_is(tmp_path, monkeypatch):
-    """A fit that owns its network is saved without a move to the CPU and back, and loads without the GPU it
-    was saved from; a fit spread over several devices still goes to the CPU, where the engine keeps one copy."""
+def test_tabpfn_saves_a_fit_where_it_is(tmp_path, monkeypatch):
+    """A fit that owns its network is saved without a move to the CPU and back, on one device or several, and
+    loads without the GPU it was saved from."""
     import numpy as np
 
     X, y = _classification_frame()
@@ -319,7 +369,7 @@ def test_tabpfn_saves_a_fit_on_one_device_where_it_is(tmp_path, monkeypatch):
 
     model.model.devices_ = (torch.device("cpu"), torch.device("cpu"))  # stands for a fit on two GPUs
     model.save()
-    assert moves == ["cpu", "cpu"], "to the CPU for the save, and back"
+    assert moves == [], "a fit on several devices is saved where it is, with one copy of each checkpoint"
 
     # What a fit on one GPU records: the estimator's devices, the engine's per-device caches, the model's device.
     cuda = torch.device("cuda")

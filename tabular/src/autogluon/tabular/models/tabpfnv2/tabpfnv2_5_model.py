@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import contextvars
+import copy
 import logging
 import os
 from dataclasses import dataclass
@@ -8,6 +10,7 @@ from typing import TYPE_CHECKING, Any, ClassVar
 
 import numpy as np
 
+from autogluon.core.models.abstract import _tensor_pickle
 from autogluon.core.models.abstract._shared_weights_registry import SharedWeightsClassSettings
 from autogluon.core.models.abstract.shared_weights import SharedWeights
 from autogluon.tabular.models.abstract.abstract_torch_model import AbstractTorchModel
@@ -40,6 +43,30 @@ def _narrow_array(obj: object, name: str, narrowed_dtypes: dict) -> None:
     narrower = narrowed_dtypes.get(getattr(array, "dtype", None))
     if narrower is not None:
         setattr(obj, name, array.astype(narrower, copy=False))
+
+
+_SAVING = contextvars.ContextVar("autogluon_tabpfn_saving", default=False)
+"""Set while ``TabPFNModel.save`` pickles the model, also to an S3 path, where the tensors stay in the pickle."""
+
+
+def _with_one_copy_per_checkpoint(estimator: Any) -> Any:
+    """``estimator``, or for one spread over several devices a shallow copy whose inference engine holds each
+    checkpoint once (its copy on the first device) instead of once per device. The live estimator is unchanged.
+    """
+    from tabpfn.inference import MultiDeviceInferenceEngine
+
+    if not hasattr(estimator, "executor_") or len(estimator.devices_) <= 1:
+        return estimator
+    if not isinstance(estimator.executor_, MultiDeviceInferenceEngine):
+        return estimator
+    caches = [type(cache)(cache.get(cache.get_devices()[0])) for cache in estimator.executor_.model_caches]
+    executor = copy.copy(estimator.executor_)
+    executor.model_caches = caches
+    narrowed = copy.copy(estimator)
+    narrowed.executor_ = executor
+    if len(estimator.models_) == len(caches):
+        narrowed.models_ = [cache.get(cache.get_devices()[0]) for cache in caches]
+    return narrowed
 
 
 #: Fit modes whose inference engine only reads the network. ``"low_memory"`` re-runs the preprocessing on
@@ -378,18 +405,34 @@ class TabPFNModel(AbstractTorchModel):
         # The prediction batch sizes the estimate, and `_get_model_params()` leaves out the `ag.` parameters.
         return super()._estimate_gpu_memory_usage(X=X, max_batch_size=self.aux_params.max_batch_size, **kwargs)
 
-    def _device_for_save(self) -> str | None:
-        """Leave a fit on one device where it is while it is saved; move one spread over several GPUs to the CPU.
+    def save(self, path: str | None = None, verbose: bool = True) -> str:
+        """Save the model where it is; a fit spread over several GPUs is pickled with one copy of each checkpoint."""
+        token = _SAVING.set(True)
+        try:
+            return super().save(path=path, verbose=verbose)
+        finally:
+            _SAVING.reset(token)
 
-        tabpfn's unpickling does nothing with the device, so a single-device fit loads anywhere and is
-        moved by ``load``: its weights, and the key/value cache of ``fit_mode="fit_with_cache"``, are not
-        copied to the CPU and back on each save. With several devices the inference engine keeps a copy
-        of the weights per GPU, which a pickle would include; on the CPU it keeps one.
+    def __getstate__(self) -> dict:
+        """A fit spread over several GPUs keeps a copy of each checkpoint per GPU. The pickle that ``save`` and the
+        size estimate write keeps one, which ``load`` spreads again (tabpfn's ``.to()`` copies it to each device).
+        Other pickles (Ray, ``copy.deepcopy``) keep every copy, so the model they make runs on all its GPUs.
         """
-        device = super()._device_for_save()
-        if device is None or len(self.model.devices_) <= 1:
-            return None
-        return device
+        state = super().__getstate__()
+        if self.model is not None and state.get("model") is self.model:
+            if _SAVING.get() or _tensor_pickle.tensors_saved_apart():
+                state["model"] = _with_one_copy_per_checkpoint(self.model)
+        return state
+
+    def _device_for_save(self) -> str | None:
+        """Leave the fit where it is while it is saved, on one device or several.
+
+        tabpfn's unpickling does nothing with the device, so the model loads anywhere and is moved by
+        ``load``: its weights, and the key/value cache of ``fit_mode="fit_with_cache"``, are not copied to
+        the CPU and back on each save. A fit spread over several GPUs is pickled with one copy of each
+        checkpoint (``__getstate__``) instead of the copy per GPU its inference engine keeps.
+        """
+        return None
 
     def get_device(self) -> str:
         return self.model.devices_[0].type
