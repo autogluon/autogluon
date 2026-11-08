@@ -15,7 +15,8 @@ moved into place last, so a pair from two different saves fails to load instead 
 A state ``torch.save`` refuses (two views of one storage with different dtypes) keeps its tensors in
 the pickle. :func:`load` reads the tensor file only when the pickle refers to it, and restores each
 tensor on the device it was saved from, or on the CPU when that CUDA device is not available, so a
-``__getstate__`` that asks :func:`tensors_saved_apart` can leave its tensors where they are.
+``__getstate__`` that asks :func:`tensors_saved_apart` can leave its tensors where they are. A tensor kept
+in the pickle (a state ``torch.save`` refuses, a save to S3) is restored the same way.
 :func:`pickled_size` streams the pickle into a byte counter and adds every storage's bytes once,
 without serializing any tensor.
 
@@ -30,6 +31,7 @@ from __future__ import annotations
 
 import contextvars
 import functools
+import io
 import logging
 import os
 import pickle
@@ -106,18 +108,35 @@ class _TensorPickler(pickle.Pickler):
 
 
 class _TensorUnpickler(pickle.Unpickler):
-    """Resolves tensor references from the tensor file, read on the first reference."""
+    """Resolves tensor references from the tensor file, read on the first reference, and restores the
+    storages the pickle holds itself as the tensor file's are restored."""
 
-    def __init__(self, file, read_tensors: Callable[[], dict], tensors_path: str):
+    def __init__(self, file, read_tensors: Callable[[], dict], tensors_path: str, pin: bool = False):
         super().__init__(file)
         self._read_tensors = read_tensors  # raises FileNotFoundError for a missing tensor file
         self._tensors_path = tensors_path
+        self._pin = pin
+        self._restore: Callable | None = None
         self._saved: dict | None = None
 
     def find_class(self, module: str, name: str):
         if module == __name__ and name == _tensor_ref.__name__:
             return self._resolve
+        if module == "torch.storage" and name == "_load_from_bytes":
+            return self._load_storage
         return super().find_class(module, name)
+
+    def _load_storage(self, data: bytes):
+        """A storage pickled the way torch pickles one, through ``torch.save`` into bytes.
+
+        torch's own ``_load_from_bytes`` restores it where it was saved, which fails without that CUDA
+        device; this restores it through :func:`_map_location`, as the tensor file does.
+        """
+        import torch
+
+        if self._restore is None:
+            self._restore = _map_location(self._pin)
+        return torch.load(io.BytesIO(data), map_location=self._restore, weights_only=False)
 
     def _resolve(self, token: str, index: int):
         if self._saved is None:
@@ -271,7 +290,7 @@ def load(path: str, tensors_path: str, pin: bool = False, verbose: bool = True) 
         read_tensors = functools.partial(_read_tensors, tensors_path, pin)
 
     def unpickle(file) -> Any:
-        return _TensorUnpickler(file, read_tensors=read_tensors, tensors_path=tensors_path).load()
+        return _TensorUnpickler(file, read_tensors=read_tensors, tensors_path=tensors_path, pin=pin).load()
 
     return load_pkl.load_with_fn(path, unpickle, verbose=verbose)
 
