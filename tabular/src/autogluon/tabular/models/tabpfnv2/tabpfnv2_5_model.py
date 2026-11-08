@@ -386,8 +386,10 @@ class TabPFNModel(AbstractTorchModel):
         copied to the CPU and back on each save. With several devices the inference engine keeps a copy
         of the weights per GPU, which a pickle would include; on the CPU it keeps one.
         """
-        devices = getattr(self.model, "devices_", None) or ()
-        return super()._device_for_save() if len(devices) > 1 else None
+        device = super()._device_for_save()
+        if device is None or len(self.model.devices_) <= 1:
+            return None
+        return device
 
     def get_device(self) -> str:
         return self.model.devices_[0].type

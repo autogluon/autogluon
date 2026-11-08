@@ -286,7 +286,9 @@ def test_tabpfn_saves_a_fit_on_one_device_where_it_is(tmp_path, monkeypatch):
     # What a fit on one GPU records: the estimator's devices, the engine's per-device caches, the model's device.
     cuda = torch.device("cuda")
     model.model.devices_, model.model.device = (cuda,), "cuda"
-    for cache in getattr(model.model.executor_, "model_caches", None) or []:
+    caches = model.model.executor_.model_caches
+    assert caches, "the engine keeps its networks per device"
+    for cache in caches:
         cache._models = {cuda: network for network in cache._models.values()}
     model.device = model.device_train = "cuda"
     moves.clear()
