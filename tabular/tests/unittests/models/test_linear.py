@@ -116,3 +116,17 @@ def test_linear_rapids_penalty_forwarding(tmp_path, monkeypatch, penalty, proble
         assert params["solver"] == "qn"
         assert params["C"] == 0.1
     backend_cls.return_value.fit.assert_called_once()
+
+
+def test_linear_skewed_feature_preprocessing_is_seeded(tmp_path):
+    # Above 10,000 rows the QuantileTransformer of skewed features fits on a random subsample.
+    rng = np.random.default_rng(0)
+    X = pd.DataFrame({"skewed": rng.lognormal(sigma=2.0, size=12_000), "normal": rng.normal(size=12_000)})
+    y = pd.Series((X["skewed"] > 1).astype(int) ^ (rng.random(12_000) < 0.2))
+
+    def fit_predict(name):
+        model = LinearModel(path=str(tmp_path / name), problem_type="binary")
+        model.fit(X=X, y=y)
+        return model.predict_proba(X)
+
+    np.testing.assert_array_equal(fit_predict("a"), fit_predict("b"))

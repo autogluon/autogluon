@@ -172,7 +172,7 @@ class LinearModel(AbstractModel):
                     ("imputer", SimpleImputer(strategy=self.params["proc.impute_strategy"])),
                     (
                         "quantile",
-                        QuantileTransformer(output_distribution="normal"),
+                        QuantileTransformer(output_distribution="normal", random_state=self.random_seed),
                     ),  # Or output_distribution = 'uniform'
                 ]
             )
