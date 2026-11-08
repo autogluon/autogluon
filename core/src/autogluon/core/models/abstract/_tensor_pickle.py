@@ -22,7 +22,7 @@ without serializing any tensor.
 A model saved to S3 keeps its tensors in the pickle. One saved to a local folder and copied to S3
 loads from there too: :func:`load` downloads its tensor file when the pickle refers to it.
 
-An object without tensors is pickled byte for byte as before and gets no tensor file. In a process
+An object without tensors is written as a plain protocol-5 pickle and gets no tensor file. In a process
 that never imported torch no object can hold a tensor, so torch is never imported here for it.
 """
 
@@ -158,11 +158,7 @@ def save(obj: Any, path: str, tensors_path: str, verbose: bool = True) -> None:
     """
     torch = _imported_torch()
     if s3_utils.is_s3_url(path):
-        save_pkl.save(path=path, object=obj, verbose=verbose)
-        return
-    if torch is None:
-        save_pkl.save(path=path, object=obj, verbose=verbose)
-        _remove(tensors_path)
+        save_pkl.save_with_fn(path, obj, functools.partial(pickle.dump, protocol=PROTOCOL), verbose=verbose)
         return
     if verbose:
         logger.log(15, f"Saving {path}")
@@ -173,14 +169,19 @@ def save(obj: Any, path: str, tensors_path: str, verbose: bool = True) -> None:
     tmp_path, tmp_tensors_path = f"{path}.{token}.tmp", f"{tensors_path}.{token}.tmp"
     try:
         with open(tmp_path, "wb") as f:
-            pickler = _TensorPickler(f, tensor_type=torch.Tensor, token=token)
-            pickler.dump(obj)
-        if pickler.tensors and _save_tensors(torch, {"token": token, "tensors": pickler.tensors}, tmp_tensors_path):
+            if torch is None:  # no object can hold a tensor
+                pickle.Pickler(f, protocol=PROTOCOL).dump(obj)
+                tensors = []
+            else:
+                pickler = _TensorPickler(f, tensor_type=torch.Tensor, token=token)
+                pickler.dump(obj)
+                tensors = pickler.tensors
+        if tensors and _save_tensors(torch, {"token": token, "tensors": tensors}, tmp_tensors_path):
             # A model whose pinning failed on load still maps the old tensor file; replacing the file keeps
             # that mapping valid, where rewriting it in place would not (SIGBUS).
             os.replace(tmp_tensors_path, tensors_path)
         else:
-            if pickler.tensors:
+            if tensors:
                 with open(tmp_path, "wb") as f:
                     pickle.Pickler(f, protocol=PROTOCOL).dump(obj)
             _remove(tensors_path)
@@ -194,6 +195,9 @@ def _save_tensors(torch, saved: dict, path: str) -> bool:
     """Write ``saved`` with ``torch.save``; False when torch refuses the tensors, which a pickle accepts.
 
     The CRC32 of each record, which ``torch.load`` never checks, is skipped; it is about 40% of the save.
+    The file therefore fails the CRC check of a generic zip reader (``zipfile.ZipFile.testzip``). The
+    setting is process-wide while it is patched, so a ``torch.save`` on another thread meanwhile skips
+    its CRC32 as well.
     """
     from torch.utils.serialization import config as serialization_config
 
@@ -323,7 +327,9 @@ def _tensors_nbytes(torch, tensors: list, protocol: int) -> int:
 def pickled_size(obj: Any, protocol: int = PROTOCOL) -> int:
     """Bytes of the pickle of ``obj`` plus the bytes of its tensors' storages, each storage counted once.
 
-    The pickle is streamed into a byte counter and dense tensors are counted, not serialized.
+    The pickle is streamed into a byte counter and dense tensors are counted, not serialized. The
+    tensor file's own overhead (its tensor metadata and zip records, about 200 bytes per tensor) is
+    not counted, which matters only for a model of many small tensors.
     """
     counter = _ByteCounter()
     torch = _imported_torch()

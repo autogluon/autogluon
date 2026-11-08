@@ -139,7 +139,7 @@ def test_numpy_arrays_are_saved_and_sized_without_a_copy(tmp_path):
     np.testing.assert_array_equal(_Model.load(path).model["weights"], weights)
 
 
-def test_an_object_without_tensors_pickles_as_before(tmp_path):
+def test_an_object_without_tensors_is_a_plain_pickle(tmp_path):
     obj = {"a": np.arange(100), "b": [1, 2, 3]}
     path = str(tmp_path / "obj.pkl")
     tensors_path = str(tmp_path / "obj_tensors.pt")
@@ -328,13 +328,17 @@ def test_saves_into_one_folder_at_once_never_mix_their_files(tmp_path, monkeypat
 
 def test_an_object_without_tensors_never_imports_torch(tmp_path):
     code = (
+        "import os\n"
         "import sys\n"
         "from autogluon.core.models import AbstractModel\n"
         f"model = AbstractModel(path={str(tmp_path)!r}, name='m')\n"
         "model.model = {'weights': [1.0, 2.0]}\n"
         "model.get_memory_size()\n"
-        "assert AbstractModel.load(model.save()).model == model.model\n"
+        "path = model.save()\n"
+        "assert AbstractModel.load(path).model == model.model\n"
         "assert 'torch' not in sys.modules, 'torch imported'\n"
+        "with open(os.path.join(path, AbstractModel.model_file_name), 'rb') as f:\n"
+        "    assert f.read(2) == b'\\x80\\x05', 'protocol 5, as with torch imported'\n"
     )
     subprocess.run([sys.executable, "-c", code], check=True, timeout=300)  # noqa: S603
 
