@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import contextvars
 import copy
+import dataclasses
 import logging
 import os
 from dataclasses import dataclass
@@ -49,24 +50,47 @@ _SAVING = contextvars.ContextVar("autogluon_tabpfn_saving", default=False)
 """Set while ``TabPFNModel.save`` pickles the model, also to an S3 path, where the tensors stay in the pickle."""
 
 
-def _with_one_copy_per_checkpoint(estimator: Any) -> Any:
-    """``estimator``, or for one spread over several devices a shallow copy whose inference engine holds each
-    checkpoint once (its copy on the first device) instead of once per device. The live estimator is unchanged.
-    """
-    from tabpfn.inference import MultiDeviceInferenceEngine
+def _as_saved(estimator: Any) -> Any:
+    """``estimator`` as ``save`` and the size estimate write it: a shallow copy where that differs, the live
+    estimator unchanged.
 
-    if not hasattr(estimator, "executor_") or len(estimator.devices_) <= 1:
+    * Spread over several devices, its inference engine holds each checkpoint once (its copy on the first
+      device) instead of once per device; ``load`` spreads it again.
+    * Each key/value cache of ``fit_mode="fit_with_cache"`` holds its ``test_y_embedding`` by itself. tabpfn
+      keeps it as one row of the target embedding of every training row, whose storage a save writes whole.
+    """
+    from tabpfn.inference import InferenceEngineExplicitKVCache, MultiDeviceInferenceEngine
+
+    if not hasattr(estimator, "executor_"):
         return estimator
-    if not isinstance(estimator.executor_, MultiDeviceInferenceEngine):
+    engine = estimator.executor_
+    model_caches = kv_caches = None
+    if len(estimator.devices_) > 1 and isinstance(engine, MultiDeviceInferenceEngine):
+        model_caches = [type(cache)(cache.get(cache.get_devices()[0])) for cache in engine.model_caches]
+    if isinstance(engine, InferenceEngineExplicitKVCache):
+        own = [_with_own_test_y_embedding(cache) for cache in engine.kv_caches]
+        if any(new is not old for new, old in zip(own, engine.kv_caches, strict=True)):
+            kv_caches = own
+    if model_caches is None and kv_caches is None:
         return estimator
-    caches = [type(cache)(cache.get(cache.get_devices()[0])) for cache in estimator.executor_.model_caches]
-    executor = copy.copy(estimator.executor_)
-    executor.model_caches = caches
-    narrowed = copy.copy(estimator)
-    narrowed.executor_ = executor
-    if len(estimator.models_) == len(caches):
-        narrowed.models_ = [cache.get(cache.get_devices()[0]) for cache in caches]
-    return narrowed
+    saved_engine = copy.copy(engine)
+    saved = copy.copy(estimator)
+    saved.executor_ = saved_engine
+    if model_caches is not None:
+        saved_engine.model_caches = model_caches
+        if len(estimator.models_) == len(model_caches):
+            saved.models_ = [cache.get(cache.get_devices()[0]) for cache in model_caches]
+    if kv_caches is not None:
+        saved_engine.kv_caches = kv_caches
+    return saved
+
+
+def _with_own_test_y_embedding(cache: Any) -> Any:
+    """``cache``, or a copy whose ``test_y_embedding`` is a tensor of its own rather than a row of a larger one."""
+    embedding = getattr(cache, "test_y_embedding", None)  # the TabPFN-3 caches have none
+    if embedding is None or embedding.untyped_storage().nbytes() <= embedding.numel() * embedding.element_size():
+        return cache
+    return dataclasses.replace(cache, test_y_embedding=embedding.clone())
 
 
 #: Fit modes whose inference engine only reads the network. ``"low_memory"`` re-runs the preprocessing on
@@ -406,7 +430,7 @@ class TabPFNModel(AbstractTorchModel):
         return super()._estimate_gpu_memory_usage(X=X, max_batch_size=self.aux_params.max_batch_size, **kwargs)
 
     def save(self, path: str | None = None, verbose: bool = True) -> str:
-        """Save the model where it is; a fit spread over several GPUs is pickled with one copy of each checkpoint."""
+        """Save the model where it is, pickled as :func:`_as_saved` describes."""
         token = _SAVING.set(True)
         try:
             return super().save(path=path, verbose=verbose)
@@ -414,14 +438,15 @@ class TabPFNModel(AbstractTorchModel):
             _SAVING.reset(token)
 
     def __getstate__(self) -> dict:
-        """A fit spread over several GPUs keeps a copy of each checkpoint per GPU. The pickle that ``save`` and the
-        size estimate write keeps one, which ``load`` spreads again (tabpfn's ``.to()`` copies it to each device).
-        Other pickles (Ray, ``copy.deepcopy``) keep every copy, so the model they make runs on all its GPUs.
+        """The pickle that ``save`` and the size estimate write holds the estimator as :func:`_as_saved` makes it:
+        one copy of each checkpoint for a fit spread over several GPUs, which ``load`` spreads again (tabpfn's
+        ``.to()`` copies it to each device), and no storage a key/value cache only holds a row of. Other pickles
+        (Ray, ``copy.deepcopy``) hold the estimator as it is, so the model they make runs on all its GPUs.
         """
         state = super().__getstate__()
         if self.model is not None and state.get("model") is self.model:
             if _SAVING.get() or _tensor_pickle.tensors_saved_apart():
-                state["model"] = _with_one_copy_per_checkpoint(self.model)
+                state["model"] = _as_saved(self.model)
         return state
 
     def _device_for_save(self) -> str | None:

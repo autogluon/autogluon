@@ -141,6 +141,33 @@ def test_tabpfn_multi_gpu_fit_saves_one_copy_of_each_checkpoint(tmp_path, monkey
     np.testing.assert_array_equal(on_cpu.predict_proba(X), reference.predict_proba(X))
 
 
+def test_tabpfn_save_writes_a_cache_row_without_its_storage(tmp_path):
+    """tabpfn 2.5 and 2.6 keep a key/value cache's ``test_y_embedding`` as one row of the target embedding of every
+    training row. The save writes the row by itself, not that storage, and the live cache keeps its view."""
+    import numpy as np
+
+    X, y = _classification_frame()
+    model = _fit_tabpfn(tmp_path, "cache", X, y, hyperparameters={"fit_mode": "fit_with_cache"})
+    expected = model.predict_proba(X)
+    caches = model.model.executor_.kv_caches
+    assert caches and all(isinstance(cache.test_y_embedding, torch.Tensor) for cache in caches)
+    row_bytes = []
+    for cache in caches:  # what tabpfn 2.5 builds: the last of 20,001 rows
+        row = cache.test_y_embedding
+        rows = row.new_zeros((20_001, *row.shape))
+        rows[-1] = row
+        cache.test_y_embedding = rows[-1]
+        row_bytes.append(row.numel() * row.element_size())
+
+    loaded = RealTabPFNv2Model.load(model.save())
+
+    for cache, own in zip(model.model.executor_.kv_caches, row_bytes, strict=True):
+        assert cache.test_y_embedding.untyped_storage().nbytes() == 20_001 * own, "the live cache keeps its view"
+    for cache, own in zip(loaded.model.executor_.kv_caches, row_bytes, strict=True):
+        assert cache.test_y_embedding.untyped_storage().nbytes() == own, "the save wrote the row by itself"
+    np.testing.assert_allclose(loaded.predict_proba(X), expected, rtol=1e-5, atol=1e-6)
+
+
 class _MovedEstimator:
     """Records the device argument of every move."""
 
