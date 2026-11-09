@@ -79,7 +79,9 @@ Below is a curated list of recent tutorials and talks on AutoGluon. A comprehens
 
 | Title | Venue | Year | Citation |
 |-------|-------|------|----------|
-| [fev-bench: A Realistic Benchmark for Time Series Forecasting](https://arxiv.org/abs/2509.26468) | Arxiv | 2025 |  |
+| [Beyond IID: How General Are Tabular Foundation Models, Really?](https://arxiv.org/abs/2606.30410) | NeurIPS | 2026 |  |
+| [TabPrep: Closing the Feature Engineering Gap in Tabular Benchmarks](https://arxiv.org/abs/2606.02384) | NeurIPS | 2026 |  |
+| [fev-bench: A Realistic Benchmark for Time Series Forecasting](https://arxiv.org/abs/2509.26468) | NeurIPS | 2026 |  |
 | [MLZero: A Multi-Agent System for End-to-end Machine Learning Automation](https://arxiv.org/abs/2505.13941) | NeurIPS | 2025 |  |
 | [Mitra: Mixed Synthetic Priors for Enhancing Tabular Foundation Models](https://arxiv.org/abs/2510.21204) | NeurIPS | 2025 |  |
 | [TabArena: A Living Benchmark for Machine Learning on Tabular Data](https://arxiv.org/abs/2506.16791) | NeurIPS Spotlight | 2025 |  |
