@@ -737,3 +737,14 @@ def test_oof_per_fold_outlives_the_folds_of_a_refit_folds_bag():
 
     assert bag.n_children == 1, "the folds were replaced by the refit"
     assert len(_assert_rows_match_the_folds(bag, X, y)) == 9
+
+
+def test_oof_per_fold_with_custom_splits_given_as_lists():
+    rng = np.random.default_rng(0)
+    folds = np.array_split(rng.permutation(60), 3)
+    custom_splits = [(sorted(set(range(60)) - set(val)), sorted(val)) for val in folds]  # plain lists
+    bag, X, y = _fit_per_fold_bag({"oof_per_fold": True, "custom_splits": custom_splits}, n_repeats=1)
+
+    per_fold = _assert_rows_match_the_folds(bag, X, y)
+    for (rows, _), (_, val) in zip(per_fold, custom_splits):
+        np.testing.assert_array_equal(rows, val)
