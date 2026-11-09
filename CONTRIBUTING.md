@@ -89,7 +89,7 @@ GitHub provides additional documentation on [forking a repository](https://help.
     - VSCode: install `autoDocstring` and set `autoDocstring.docstringFormat` to `numpy`
     - PyCharm: configure docstring generation style to NumPy in the IDE settings
 
-- We encourage you to add your own unit tests, but please ensure they run quickly (unit tests should train models on small data-subsample with the lowest values of training iterations and time-limits that suffice to evaluate the intended functionality). You can run a specific unit test within a specific file like this:
+- Add unit tests for new functionality and for behavior that other changes could break, and ensure they run quickly (unit tests should train models on small data-subsample with the lowest values of training iterations and time-limits that suffice to evaluate the intended functionality). Do not add tests that only check that a specific fix is still in place; see [AGENTS.md](AGENTS.md). You can run a specific unit test within a specific file like this:
     ```
     python3 -m pytest path_to_file::test_mytest
     ```
