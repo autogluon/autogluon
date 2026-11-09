@@ -54,7 +54,10 @@ predictions = predictor.predict("test.csv")
 
 ## :mag: Resources
 
-### Hands-on Tutorials / Talks
+More talks, articles, Kaggle solutions and papers using AutoGluon are listed in [AWESOME.md](AWESOME.md).
+
+<details>
+<summary><b>Hands-on Tutorials / Talks</b></summary>
 
 Below is a curated list of recent tutorials and talks on AutoGluon. A comprehensive list is available [here](AWESOME.md#videos--tutorials).
 
@@ -69,7 +72,11 @@ Below is a curated list of recent tutorials and talks on AutoGluon. A comprehens
 | :tv: [Solving Complex ML Problems in a few Lines of Code with AutoGluon](https://www.youtube.com/watch?v=J1UQUCPB88I)    | Tutorial | PyData Seattle                                                                   | 2023/06/20 |
 | :tv: [The AutoML Revolution](https://www.youtube.com/watch?v=VAAITEds-28)                                                | Tutorial | [Fall AutoML School 2022](https://sites.google.com/view/automl-fall-school-2022) | 2022/10/18 |
 
-### Scientific Publications
+</details>
+
+<details>
+<summary><b>Scientific Publications</b></summary>
+
 - [AutoGluon-Tabular: Robust and Accurate AutoML for Structured Data](https://arxiv.org/pdf/2003.06505.pdf) (*Arxiv*, 2020) ([BibTeX](CITING.md#general-usage--autogluontabular))
 - [Fast, Accurate, and Simple Models for Tabular Data via Augmented Distillation](https://proceedings.neurips.cc/paper/2020/hash/62d75fb2e3075506e8837d8f55021ab1-Abstract.html) (*NeurIPS*, 2020) ([BibTeX](CITING.md#tabular-distillation))
 - [Benchmarking Multimodal AutoML for Tabular Data with Text Fields](https://datasets-benchmarks-proceedings.neurips.cc/paper/2021/file/9bf31c7ff062936a96d3c8bd1f8f2ff3-Paper-round2.pdf) (*NeurIPS*, 2021) ([BibTeX](CITING.md#autogluonmultimodal))
@@ -85,16 +92,17 @@ Below is a curated list of recent tutorials and talks on AutoGluon. A comprehens
 - [MLZero: A Multi-Agent System for End-to-end Machine Learning Automation](https://arxiv.org/abs/2505.13941) (*NeurIPS*, 2025)
 - [fev-bench: A Realistic Benchmark for Time Series Forecasting](https://arxiv.org/abs/2509.26468) (*Arxiv*, 2025)
 
-### Articles
-- [AutoGluon-TimeSeries: Every Time Series Forecasting Model In One Library](https://towardsdatascience.com/autogluon-timeseries-every-time-series-forecasting-model-in-one-library-29a3bf6879db) (*Towards Data Science*, Jan 2024)
-- [AutoGluon for tabular data: 3 lines of code to achieve top 1% in Kaggle competitions](https://aws.amazon.com/blogs/opensource/machine-learning-with-autogluon-an-open-source-automl-library/) (*AWS Open Source Blog*, Mar 2020)
-- [AutoGluon overview & example applications](https://towardsdatascience.com/autogluon-deep-learning-automl-5cdb4e2388ec?source=friends_link&sk=e3d17d06880ac714e47f07f39178fdf2) (*Towards Data Science*, Dec 2019)
+</details>
 
-### Train/Deploy AutoGluon in the Cloud
+<details>
+<summary><b>Train/Deploy AutoGluon in the Cloud</b></summary>
+
 - [AutoGluon Cloud](https://auto.gluon.ai/cloud/stable/index.html) (Recommended)
 - [AutoGluon Deep Learning Containers](https://github.com/aws/deep-learning-containers/blob/master/available_images.md#autogluon-training-containers) (Security certified & maintained by the AutoGluon developers)
 - [AutoGluon Official Docker Container](https://hub.docker.com/r/autogluon/autogluon)
 - [Amazon SageMaker Autopilot](https://aws.amazon.com/blogs/machine-learning/amazon-sagemaker-autopilot-is-up-to-eight-times-faster-with-new-ensemble-training-mode-powered-by-autogluon/) (Managed AutoGluon experience)
+
+</details>
 
 ## :pencil: Citing AutoGluon
 
