@@ -1,9 +1,9 @@
-*Issue #, if available:*
+#### Issue #, if available
 
-*Description of changes:*
+#### Description of changes
 
 
-*AI assistance* (tick exactly one):
+#### AI assistance (tick exactly one)
 
 - [ ] No AI tools were used for this PR.
 - [ ] AI tools were used. I have reviewed and understood every change and will answer review comments myself.
