@@ -1,3 +1,4 @@
+import os
 import pickle
 
 import numpy as np
@@ -587,3 +588,163 @@ def test_predict_proba_and_the_children_pass_run_each_child_once(monkeypatch):
     calls.clear()
     bag.predict_proba_from_children(children)
     assert calls == [], "deriving the bag's output from the children runs no child"
+
+
+def _fit_per_fold_bag(
+    hyperparameters: dict, problem_type: str = MULTICLASS, n_repeats: int = 3, k_fold: int = 3, path: str = None
+):
+    rng = np.random.default_rng(0)
+    n_rows = 60
+    X = pd.DataFrame({"a": rng.normal(size=n_rows), "b": rng.normal(size=n_rows)})
+    signal = X["a"] + rng.normal(scale=0.7, size=n_rows)
+    if problem_type == REGRESSION:
+        y = pd.Series(signal)
+    elif problem_type == MULTICLASS:
+        y = pd.Series(pd.qcut(signal, 3, labels=False).astype(int))
+    else:
+        y = pd.Series((signal > 0).astype(int))
+    bag = BaggedEnsembleModel(
+        model_base=_LinearDummyModel(problem_type=problem_type),
+        path=path,
+        hyperparameters={"fold_fitting_strategy": "sequential_local", **hyperparameters},
+    )
+    return bag.fit(X=X, y=y, k_fold=k_fold, n_repeats=n_repeats), X, y
+
+
+def _pooled(per_fold, n_rows: int) -> np.ndarray:
+    """The per-row average of the folds' predictions."""
+    total = np.zeros((n_rows, *per_fold[0][1].shape[1:]))
+    count = np.zeros(n_rows)
+    for rows, pred in per_fold:
+        total[rows] += pred
+        count[rows] += 1
+    return total / count.reshape(-1, *[1] * (total.ndim - 1))
+
+
+def _assert_rows_match_the_folds(bag, X, y):
+    per_fold = bag.predict_proba_oof_per_fold()
+    val_idx = bag.get_oof_fold_val_idx(X=X, y=y)
+    assert len(per_fold) == len(val_idx)
+    for (rows, _), expected in zip(per_fold, val_idx):
+        np.testing.assert_array_equal(rows, expected)
+    bag._load_oof()
+    np.testing.assert_allclose(bag.predict_proba_oof(), _pooled(per_fold, len(X)), rtol=1e-5)
+    return per_fold
+
+
+@pytest.mark.parametrize("problem_type", [BINARY, MULTICLASS, REGRESSION])
+def test_oof_per_fold_keeps_each_fold_models_predictions(problem_type):
+    bag, X, y = _fit_per_fold_bag({"oof_per_fold": True, "save_bag_folds": True}, problem_type=problem_type)
+
+    per_fold = _assert_rows_match_the_folds(bag, X, y)
+    assert len(per_fold) == 9
+    assert all(rows.dtype == np.int64 for rows, _ in per_fold), "returned as int64"
+    assert bag._oof_per_fold["rows"].dtype == np.uint8, "stored compactly (60 rows)"
+    assert bag._oof_per_fold["offsets"].tolist() == list(range(0, 3 * 60 + 1, 20)), "flat: fold i is offsets[i:i+2]"
+    for (rows, pred), child_name in zip(per_fold, bag.models):
+        child = bag.load_child(child_name) if isinstance(child_name, str) else child_name
+        np.testing.assert_allclose(pred, child.predict_proba(X.iloc[rows]), rtol=1e-6)
+    for repeat in range(3):  # k-fold: each repeat's folds validate every row once
+        rows = np.concatenate([rows for rows, _ in per_fold[repeat * 3 : (repeat + 1) * 3]])
+        np.testing.assert_array_equal(np.sort(rows), np.arange(len(X)))
+
+
+def test_oof_per_fold_is_in_child_order_whatever_order_the_folds_finish(monkeypatch):
+    from autogluon.core.models.ensemble.fold_fitting_strategy import SequentialLocalFoldFittingStrategy
+
+    finished = []
+    run_jobs = SequentialLocalFoldFittingStrategy.after_all_folds_scheduled
+
+    def run_jobs_reversed(self):
+        self.jobs.reverse()
+        finished.extend(job["model_name_suffix"] for job in self.jobs)
+        run_jobs(self)
+
+    monkeypatch.setattr(SequentialLocalFoldFittingStrategy, "after_all_folds_scheduled", run_jobs_reversed)
+    bag, X, y = _fit_per_fold_bag({"oof_per_fold": True}, n_repeats=2)
+
+    assert finished[0] == "S2F3", "the last fold finished first"
+    _assert_rows_match_the_folds(bag, X, y)
+
+
+def test_oof_per_fold_off_by_default():
+    bag, X, y = _fit_per_fold_bag({})
+
+    assert bag._oof_per_fold is None
+    with pytest.raises(AssertionError, match="oof_per_fold"):
+        bag.predict_proba_oof_per_fold()
+
+
+def test_oof_per_fold_survives_save_and_sets_fit_one_call_at_a_time(tmp_path):
+    """With `delay_bag_sets` the trainer fits a repeated bag one set per `fit` call and saves it in between, so the
+    per-fold predictions must survive both; each save adds only the folds fit since, as a part file. Only they are saved: the pooled
+    predictions are derived from them, the same before and after."""
+
+    def n_folds(part_path):
+        with open(part_path, "rb") as f:
+            return len(pickle.load(f)["offsets"]) - 1
+
+    bag, X, y = _fit_per_fold_bag({"oof_per_fold": True}, n_repeats=1, path=str(tmp_path / "bag"))
+    bag.save()
+    parts = os.path.join(bag.path, "utils", "oof_per_fold")
+    with open(os.path.join(parts, "part-000.pkl"), "rb") as f:
+        first_part = f.read()
+    assert bag._oof_per_fold is None and bag._oof_pred_proba is None, "saved"
+    bag = BaggedEnsembleModel.load(path=bag.path)
+    bag.fit(X=X, y=y, k_fold=3, n_repeat_start=1, n_repeats=2)
+    pooled_after_fit = bag.predict_proba_oof()
+    bag.save()
+    bag._load_oof()
+    bag.save()  # nothing new to add
+
+    assert sorted(os.listdir(parts)) == ["part-000.pkl", "part-001.pkl"]
+    assert [n_folds(os.path.join(parts, p)) for p in sorted(os.listdir(parts))] == [3, 3], "only the new folds"
+    with open(os.path.join(parts, "part-000.pkl"), "rb") as f:
+        assert f.read() == first_part, "the first part is not rewritten"
+    assert not os.path.exists(os.path.join(bag.path, "utils", "oof.pkl")), "no pooled file: derived from the folds"
+    np.testing.assert_array_equal(BaggedEnsembleModel.load_oof(path=bag.path), pooled_after_fit)
+    bag = BaggedEnsembleModel.load(path=bag.path)
+    assert len(_assert_rows_match_the_folds(bag, X, y)) == 6
+    np.testing.assert_array_equal(bag.predict_proba_oof(), pooled_after_fit)
+
+    elsewhere = os.path.join(str(tmp_path), "elsewhere") + os.path.sep
+    bag.save(path=elsewhere)  # saved anywhere else: every fold, as one part
+    assert sorted(os.listdir(os.path.join(elsewhere, "utils", "oof_per_fold"))) == ["part-000.pkl"]
+    assert n_folds(os.path.join(elsewhere, "utils", "oof_per_fold", "part-000.pkl")) == 6
+    np.testing.assert_array_equal(BaggedEnsembleModel.load_oof(path=elsewhere), pooled_after_fit)
+
+    bag.reduce_memory_size(remove_fit_stack=True)
+    assert not os.path.exists(parts)
+
+
+def test_oof_per_fold_unfinished_set():
+    bag, X, y = _fit_per_fold_bag({"oof_per_fold": True}, n_repeats=1)
+    bag.fit(X=X, y=y, k_fold=3, k_fold_end=1, n_repeat_start=1, n_repeats=2)
+
+    assert len(_assert_rows_match_the_folds(bag, X, y)) == 4
+
+
+def test_oof_per_fold_single_child_is_one_fold():
+    bag, X, y = _fit_per_fold_bag({"oof_per_fold": True}, n_repeats=1, k_fold=1)
+
+    ((rows, pred),) = bag.predict_proba_oof_per_fold()
+    np.testing.assert_array_equal(rows, np.arange(len(X)))
+    np.testing.assert_allclose(pred, bag.predict_proba_oof(), rtol=1e-6)
+
+
+def test_oof_per_fold_outlives_the_folds_of_a_refit_folds_bag():
+    bag, X, y = _fit_per_fold_bag({"oof_per_fold": True, "refit_folds": True})
+
+    assert bag.n_children == 1, "the folds were replaced by the refit"
+    assert len(_assert_rows_match_the_folds(bag, X, y)) == 9
+
+
+def test_oof_per_fold_with_custom_splits_given_as_lists():
+    rng = np.random.default_rng(0)
+    folds = np.array_split(rng.permutation(60), 3)
+    custom_splits = [(sorted(set(range(60)) - set(val)), sorted(val)) for val in folds]  # plain lists
+    bag, X, y = _fit_per_fold_bag({"oof_per_fold": True, "custom_splits": custom_splits}, n_repeats=1)
+
+    per_fold = _assert_rows_match_the_folds(bag, X, y)
+    for (rows, _), (_, val) in zip(per_fold, custom_splits):
+        np.testing.assert_array_equal(rows, val)
