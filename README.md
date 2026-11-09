@@ -77,20 +77,22 @@ Below is a curated list of recent tutorials and talks on AutoGluon. A comprehens
 <details>
 <summary><b>Scientific Publications</b></summary>
 
-- [AutoGluon-Tabular: Robust and Accurate AutoML for Structured Data](https://arxiv.org/pdf/2003.06505.pdf) (*Arxiv*, 2020) ([BibTeX](CITING.md#general-usage--autogluontabular))
-- [Fast, Accurate, and Simple Models for Tabular Data via Augmented Distillation](https://proceedings.neurips.cc/paper/2020/hash/62d75fb2e3075506e8837d8f55021ab1-Abstract.html) (*NeurIPS*, 2020) ([BibTeX](CITING.md#tabular-distillation))
-- [Benchmarking Multimodal AutoML for Tabular Data with Text Fields](https://datasets-benchmarks-proceedings.neurips.cc/paper/2021/file/9bf31c7ff062936a96d3c8bd1f8f2ff3-Paper-round2.pdf) (*NeurIPS*, 2021) ([BibTeX](CITING.md#autogluonmultimodal))
-- [XTab: Cross-table Pretraining for Tabular Transformers](https://proceedings.mlr.press/v202/zhu23k/zhu23k.pdf) (*ICML*, 2023)
-- [AutoGluon-TimeSeries: AutoML for Probabilistic Time Series Forecasting](https://arxiv.org/abs/2308.05566) (*AutoML Conf*, 2023) ([BibTeX](CITING.md#autogluontimeseries))
-- [TabRepo: A Large Scale Repository of Tabular Model Evaluations and its AutoML Applications](https://arxiv.org/pdf/2311.02971.pdf) (*AutoML Conf*, 2024)
-- [AutoGluon-Multimodal (AutoMM): Supercharging Multimodal AutoML with Foundation Models](https://arxiv.org/pdf/2404.16233) (*AutoML Conf*, 2024) ([BibTeX](CITING.md#autogluonmultimodal))
-- [Chronos: Learning the Language of Time Series](https://arxiv.org/abs/2403.07815) (*TMLR*, 2024)
-- [Multi-layer Stack Ensembles for Time Series Forecasting](https://arxiv.org/abs/2511.15350) (*AutoML Conf*, 2025) ([BibTeX](CITING.md#autogluontimeseries))
-- [Chronos-2: From Univariate to Universal Forecasting](https://arxiv.org/abs/2510.15821) (*Arxiv*, 2025) ([BibTeX](CITING.md#autogluontimeseries))
-- [TabArena: A Living Benchmark for Machine Learning on Tabular Data](https://arxiv.org/abs/2506.16791) (*NeurIPS Spotlight*, 2025)
-- [Mitra: Mixed Synthetic Priors for Enhancing Tabular Foundation Models](https://arxiv.org/abs/2510.21204) (*NeurIPS*, 2025)
-- [MLZero: A Multi-Agent System for End-to-end Machine Learning Automation](https://arxiv.org/abs/2505.13941) (*NeurIPS*, 2025)
-- [fev-bench: A Realistic Benchmark for Time Series Forecasting](https://arxiv.org/abs/2509.26468) (*Arxiv*, 2025)
+| Title | Venue | Year | Citation |
+|-------|-------|------|----------|
+| [fev-bench: A Realistic Benchmark for Time Series Forecasting](https://arxiv.org/abs/2509.26468) | Arxiv | 2025 |  |
+| [MLZero: A Multi-Agent System for End-to-end Machine Learning Automation](https://arxiv.org/abs/2505.13941) | NeurIPS | 2025 |  |
+| [Mitra: Mixed Synthetic Priors for Enhancing Tabular Foundation Models](https://arxiv.org/abs/2510.21204) | NeurIPS | 2025 |  |
+| [TabArena: A Living Benchmark for Machine Learning on Tabular Data](https://arxiv.org/abs/2506.16791) | NeurIPS Spotlight | 2025 |  |
+| [Chronos-2: From Univariate to Universal Forecasting](https://arxiv.org/abs/2510.15821) | Arxiv | 2025 | [BibTeX](CITING.md#autogluontimeseries) |
+| [Multi-layer Stack Ensembles for Time Series Forecasting](https://arxiv.org/abs/2511.15350) | AutoML Conf | 2025 | [BibTeX](CITING.md#autogluontimeseries) |
+| [Chronos: Learning the Language of Time Series](https://arxiv.org/abs/2403.07815) | TMLR | 2024 |  |
+| [AutoGluon-Multimodal (AutoMM): Supercharging Multimodal AutoML with Foundation Models](https://arxiv.org/pdf/2404.16233) | AutoML Conf | 2024 | [BibTeX](CITING.md#autogluonmultimodal) |
+| [TabRepo: A Large Scale Repository of Tabular Model Evaluations and its AutoML Applications](https://arxiv.org/pdf/2311.02971.pdf) | AutoML Conf | 2024 |  |
+| [AutoGluon-TimeSeries: AutoML for Probabilistic Time Series Forecasting](https://arxiv.org/abs/2308.05566) | AutoML Conf | 2023 | [BibTeX](CITING.md#autogluontimeseries) |
+| [XTab: Cross-table Pretraining for Tabular Transformers](https://proceedings.mlr.press/v202/zhu23k/zhu23k.pdf) | ICML | 2023 |  |
+| [Benchmarking Multimodal AutoML for Tabular Data with Text Fields](https://datasets-benchmarks-proceedings.neurips.cc/paper/2021/file/9bf31c7ff062936a96d3c8bd1f8f2ff3-Paper-round2.pdf) | NeurIPS | 2021 | [BibTeX](CITING.md#autogluonmultimodal) |
+| [Fast, Accurate, and Simple Models for Tabular Data via Augmented Distillation](https://proceedings.neurips.cc/paper/2020/hash/62d75fb2e3075506e8837d8f55021ab1-Abstract.html) | NeurIPS | 2020 | [BibTeX](CITING.md#tabular-distillation) |
+| [AutoGluon-Tabular: Robust and Accurate AutoML for Structured Data](https://arxiv.org/pdf/2003.06505.pdf) | Arxiv | 2020 | [BibTeX](CITING.md#general-usage--autogluontabular) |
 
 </details>
 
