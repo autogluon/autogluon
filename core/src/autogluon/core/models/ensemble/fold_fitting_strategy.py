@@ -12,7 +12,6 @@ from abc import abstractmethod
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Optional, Tuple, Type, Union
 
-import numpy as np
 import pandas as pd
 from numpy import ndarray
 from pandas import DataFrame, Series
@@ -217,8 +216,7 @@ class FoldFittingStrategy(AbstractFoldFittingStrategy):
         self.oof_pred_proba[val_index] += pred_proba
         self.oof_pred_model_repeats[val_index] += 1
         if self.oof_per_fold is not None:
-            rows = np.asarray(val_index).astype(self._oof_row_dtype)  # `custom_splits` can hold lists
-            self.oof_per_fold[fold_ctx["model_name_suffix"]] = (rows, pred_proba)
+            self.oof_per_fold[fold_ctx["model_name_suffix"]] = (val_index.astype(self._oof_row_dtype), pred_proba)
 
     @property
     def _fold_time_limit_ratio(self) -> float:
