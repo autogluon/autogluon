@@ -5,9 +5,9 @@ Below you can find a list of our published work relating to AutoGluon along with
 
 | Title | Venue | Year | Citation |
 |-------|-------|------|----------|
-| [Beyond IID: How General Are Tabular Foundation Models, Really?](https://arxiv.org/abs/2606.30410) | NeurIPS | 2026 |  |
-| [TabPrep: Closing the Feature Engineering Gap in Tabular Benchmarks](https://arxiv.org/abs/2606.02384) | NeurIPS | 2026 |  |
-| [fev-bench: A Realistic Benchmark for Time Series Forecasting](https://arxiv.org/abs/2509.26468) | NeurIPS | 2026 |  |
+| [Beyond IID: How General Are Tabular Foundation Models, Really?](https://arxiv.org/abs/2606.30410) | NeurIPS | 2026 | [BibTeX](#beyond-iid-beyondarena) |
+| [TabPrep: Closing the Feature Engineering Gap in Tabular Benchmarks](https://arxiv.org/abs/2606.02384) | NeurIPS | 2026 | [BibTeX](#tabprep) |
+| [fev-bench: A Realistic Benchmark for Time Series Forecasting](https://arxiv.org/abs/2509.26468) | NeurIPS | 2026 | [BibTeX](#fev-bench) |
 | [MLZero: A Multi-Agent System for End-to-end Machine Learning Automation](https://arxiv.org/abs/2505.13941) | NeurIPS | 2025 |  |
 | [Mitra: Mixed Synthetic Priors for Enhancing Tabular Foundation Models](https://arxiv.org/abs/2510.21204) | NeurIPS | 2025 |  |
 | [TabArena: A Living Benchmark for Machine Learning on Tabular Data](https://arxiv.org/abs/2506.16791) | NeurIPS Spotlight | 2025 |  |
@@ -134,5 +134,47 @@ BibTeX entry:
   journal={Advances in Neural Information Processing Systems},
   volume={33},
   year={2020}
+}
+```
+
+## Related Publications
+
+If you use one of these benchmarks or methods, please cite the corresponding paper.
+
+### Beyond IID (BeyondArena)
+
+```bibtex
+@misc{purucker2026beyondiid,
+  title         = {Beyond IID: How General Are Tabular Foundation Models, Really?},
+  author        = {Purucker, Lennart and Tschalzev, Andrej and Erickson, Nick and Blayer, Gioia and Holzm{\"u}ller, David and Arazi, Alan and Pfefferle, Alexander and Tajjar, Mustafa and Varoquaux, Ga{\"e}l and Hutter, Frank},
+  year          = {2026},
+  eprint        = {2606.30410},
+  archivePrefix = {arXiv},
+  primaryClass  = {cs.LG},
+  url           = {https://arxiv.org/abs/2606.30410}
+}
+```
+
+### TabPrep
+
+```bibtex
+@article{tschalzev2026tabprep,
+  title={TabPrep: Closing the Feature Engineering Gap in Tabular Benchmarks},
+  author={Tschalzev, Andrej and Erickson, Nick and Wang, Yuyang and Rangwala, Huzefa and L{\"u}dtke, Stefan and Stuckenschmidt, Heiner and Bartelt, Christian},
+  journal={arXiv preprint arXiv:2606.02384},
+  year={2026}
+}
+```
+
+### fev-bench
+
+```bibtex
+@article{shchur2025fev,
+  title={{fev-bench}: A Realistic Benchmark for Time Series Forecasting},
+  author={Shchur, Oleksandr and Ansari, Abdul Fatir and Turkmen, Caner and Stella, Lorenzo and Erickson, Nick and Guerron, Pablo and Bohlke-Schneider, Michael and Wang, Yuyang},
+  year={2025},
+  eprint={2509.26468},
+  archivePrefix={arXiv},
+  primaryClass={cs.LG}
 }
 ```
