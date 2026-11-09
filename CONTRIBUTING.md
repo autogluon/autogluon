@@ -122,13 +122,11 @@ In order to evaluate the value a model provides, our developer team will run ext
 We are actively working on ways to automate the evaluation of new model contributions, and hope to have this new logic ready by the end of 2025.
 
 ## Code of Conduct
-This project has adopted the [Amazon Open Source Code of Conduct](https://aws.github.io/code-of-conduct).
-For more information see the [Code of Conduct FAQ](https://aws.github.io/code-of-conduct-faq) or contact
-opensource-codeofconduct@amazon.com with any additional questions or comments.
+See [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
 
 
 ## Security Issue Notifications
-If you discover a potential security issue in this project we ask that you notify AWS/Amazon Security via our [vulnerability reporting page](http://aws.amazon.com/security/vulnerability-reporting/). Please do **not** create a public GitHub issue for a security vulnerability.
+To report a potential security issue, follow [SECURITY.md](SECURITY.md). Please do **not** create a public GitHub issue for a security vulnerability.
 
 
 ## Instructions for Project Maintainers
