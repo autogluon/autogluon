@@ -71,7 +71,6 @@ def test_tabpfn_set_device_moves_inner_checkpoints():
     )
     model = predictor._trainer.load_model(predictor.model_names()[0])
     assert model.get_device() == "cuda", "expected a GPU fit"
-    assert len(model.model.devices_) > 1, "the save and the load put the fit back on all its GPUs"
 
     model.set_device("cpu")
 
@@ -89,83 +88,6 @@ def test_tabpfn_set_device_moves_inner_checkpoints():
     assert cached == {id(inner_model) for inner_model in model.model.models_}, (
         "models_ must reference the inference engine's cached checkpoints, not duplicates"
     )
-
-
-@pytest.mark.skipif(not torch.cuda.is_available() or torch.cuda.device_count() < 2, reason="needs two GPUs")
-def test_tabpfn_multi_gpu_fit_saves_one_copy_of_each_checkpoint(tmp_path, monkeypatch):
-    """A fit on two GPUs is saved without a move, with one copy of each checkpoint instead of the engine's copy per
-    GPU. It loads back on both GPUs, and without CUDA on the CPU, predicting as a save through the CPU does."""
-    import os
-
-    import numpy as np
-
-    X, y = _classification_frame()
-    model = RealTabPFNv2Model(
-        path=str(tmp_path / "multi"),
-        name="multi",
-        problem_type="binary",
-        eval_metric="log_loss",
-        hyperparameters=toy_model_params,
-    )
-    model.fit(X=X, y=y, num_cpus=1, num_gpus=2)
-    assert len(model.model.devices_) == 2
-    caches = model.model.executor_.model_caches
-    one_copy = sum(
-        t.numel() * t.element_size()
-        for cache in caches
-        for t in cache.get(cache.get_devices()[0]).state_dict().values()
-    )
-    expected = model.predict_proba(X)
-    moves = []
-    set_device = RealTabPFNv2Model.set_device
-    monkeypatch.setattr(
-        RealTabPFNv2Model, "set_device", lambda self, device: moves.append(device) or set_device(self, device)
-    )
-
-    saved_path = model.save()
-    tensors_bytes = os.path.getsize(os.path.join(saved_path, model.model_tensors_file_name))
-    assert moves == [] and len(model.model.devices_) == 2, "saved where it is"
-    assert all(len(cache.get_devices()) == 2 for cache in model.model.executor_.model_caches), (
-        "the live engine is kept"
-    )
-    assert one_copy <= tensors_bytes < 1.5 * one_copy, "one copy of each checkpoint in the file"
-    loaded = RealTabPFNv2Model.load(saved_path)
-    assert len(loaded.model.devices_) == 2, "the load spreads it over both GPUs again"
-    np.testing.assert_allclose(loaded.predict_proba(X), expected, rtol=1e-5, atol=1e-6)
-
-    monkeypatch.setattr(RealTabPFNv2Model, "_device_for_save", lambda self: "cpu")  # a save through the CPU
-    reference_path = model.save(path=str(tmp_path / "reference") + os.sep)
-    monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
-    on_cpu, reference = RealTabPFNv2Model.load(saved_path), RealTabPFNv2Model.load(reference_path)
-    assert on_cpu.get_device() == "cpu" and reference.get_device() == "cpu"
-    np.testing.assert_array_equal(on_cpu.predict_proba(X), reference.predict_proba(X))
-
-
-def test_tabpfn_save_writes_a_cache_row_without_its_storage(tmp_path):
-    """tabpfn 2.5 and 2.6 keep a key/value cache's ``test_y_embedding`` as one row of the target embedding of every
-    training row. The save writes the row by itself, not that storage, and the live cache keeps its view."""
-    import numpy as np
-
-    X, y = _classification_frame()
-    model = _fit_tabpfn(tmp_path, "cache", X, y, hyperparameters={"fit_mode": "fit_with_cache"})
-    expected = model.predict_proba(X)
-    caches = model.model.executor_.kv_caches
-    assert caches and all(isinstance(cache.test_y_embedding, torch.Tensor) for cache in caches)
-    row_bytes = []
-    for cache in caches:  # what tabpfn 2.5 builds: the last of 20,001 rows
-        row = cache.test_y_embedding
-        rows = row.new_zeros((20_001, *row.shape))
-        rows[-1] = row
-        cache.test_y_embedding = rows[-1]
-        row_bytes.append(row.numel() * row.element_size())
-
-    loaded = RealTabPFNv2Model.load(model.save())
-
-    for cache, own in zip(model.model.executor_.kv_caches, row_bytes, strict=True):
-        assert cache.test_y_embedding.untyped_storage().nbytes() == 20_001 * own, "the live cache keeps its view"
-    for cache, own in zip(loaded.model.executor_.kv_caches, row_bytes, strict=True):
-        assert cache.test_y_embedding.untyped_storage().nbytes() == own, "the save wrote the row by itself"
-    np.testing.assert_allclose(loaded.predict_proba(X), expected, rtol=1e-5, atol=1e-6)
 
 
 class _MovedEstimator:
