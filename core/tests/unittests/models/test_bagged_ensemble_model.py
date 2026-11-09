@@ -676,26 +676,45 @@ def test_oof_per_fold_off_by_default():
 
 
 def test_oof_per_fold_survives_save_and_sets_fit_one_call_at_a_time(tmp_path):
-    """The trainer fits a repeated bag one set per `fit` call and saves it in between, so the per-fold predictions
-    must survive both. Only they are saved; the pooled ones are derived from them, the same before and after."""
+    """With `delay_bag_sets` the trainer fits a repeated bag one set per `fit` call and saves it in between, so the
+    per-fold predictions must survive both; each save adds only the folds fit since, as a part file. Only they are saved: the pooled
+    predictions are derived from them, the same before and after."""
+
+    def n_folds(part_path):
+        with open(part_path, "rb") as f:
+            return len(pickle.load(f)["offsets"]) - 1
+
     bag, X, y = _fit_per_fold_bag({"oof_per_fold": True}, n_repeats=1, path=str(tmp_path / "bag"))
     bag.save()
+    parts = os.path.join(bag.path, "utils", "oof_per_fold")
+    with open(os.path.join(parts, "part-000.pkl"), "rb") as f:
+        first_part = f.read()
     assert bag._oof_per_fold is None and bag._oof_pred_proba is None, "saved"
     bag = BaggedEnsembleModel.load(path=bag.path)
     bag.fit(X=X, y=y, k_fold=3, n_repeat_start=1, n_repeats=2)
     pooled_after_fit = bag.predict_proba_oof()
     bag.save()
+    bag._load_oof()
+    bag.save()  # nothing new to add
 
-    utils = os.path.join(bag.path, "utils")
-    assert os.path.exists(os.path.join(utils, "oof_per_fold.pkl"))
-    assert not os.path.exists(os.path.join(utils, "oof.pkl")), "no pooled file: derived from the folds"
+    assert sorted(os.listdir(parts)) == ["part-000.pkl", "part-001.pkl"]
+    assert [n_folds(os.path.join(parts, p)) for p in sorted(os.listdir(parts))] == [3, 3], "only the new folds"
+    with open(os.path.join(parts, "part-000.pkl"), "rb") as f:
+        assert f.read() == first_part, "the first part is not rewritten"
+    assert not os.path.exists(os.path.join(bag.path, "utils", "oof.pkl")), "no pooled file: derived from the folds"
     np.testing.assert_array_equal(BaggedEnsembleModel.load_oof(path=bag.path), pooled_after_fit)
     bag = BaggedEnsembleModel.load(path=bag.path)
     assert len(_assert_rows_match_the_folds(bag, X, y)) == 6
     np.testing.assert_array_equal(bag.predict_proba_oof(), pooled_after_fit)
 
+    elsewhere = os.path.join(str(tmp_path), "elsewhere") + os.path.sep
+    bag.save(path=elsewhere)  # saved anywhere else: every fold, as one part
+    assert sorted(os.listdir(os.path.join(elsewhere, "utils", "oof_per_fold"))) == ["part-000.pkl"]
+    assert n_folds(os.path.join(elsewhere, "utils", "oof_per_fold", "part-000.pkl")) == 6
+    np.testing.assert_array_equal(BaggedEnsembleModel.load_oof(path=elsewhere), pooled_after_fit)
+
     bag.reduce_memory_size(remove_fit_stack=True)
-    assert not os.path.exists(os.path.join(utils, "oof_per_fold.pkl"))
+    assert not os.path.exists(parts)
 
 
 def test_oof_per_fold_unfinished_set():

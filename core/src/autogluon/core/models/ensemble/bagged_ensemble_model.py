@@ -64,7 +64,7 @@ class BaggedEnsembleModel(AbstractModel):
     """
 
     _oof_filename = "oof.pkl"
-    _oof_per_fold_filename = "oof_per_fold.pkl"
+    _oof_per_fold_dirname = "oof_per_fold"
     seed_name = "model_random_seed"
 
     _default_auxiliary_params_extra = dict(
@@ -96,9 +96,13 @@ class BaggedEnsembleModel(AbstractModel):
         # With `oof_per_fold`: each fold model's predictions on its own validation rows, in child order, kept flat as
         # {"rows", "pred", "offsets", "n_rows"}: fold i's validation row positions are rows[offsets[i]:offsets[i + 1]]
         # (in the smallest unsigned integer type for the bag's `n_rows` rows) and its predictions the same slice of
-        # pred. They are the only out-of-fold predictions saved: the pooled arrays above are derived from them
-        # (`_pooled_oof`), in memory after each fit and when loaded.
+        # pred. They are the only out-of-fold predictions saved, as part files in `utils/oof_per_fold/` (one per save
+        # that added folds): the pooled arrays above are derived from them (`_pooled_oof`), in memory after each fit
+        # and when loaded.
         self._oof_per_fold: dict[str, np.ndarray] | None = None
+        # Where the per-fold predictions were last saved or read from, and how many folds that holds: a save there
+        # writes only the folds added since as a new part file; a save anywhere else writes them all again.
+        self._oof_per_fold_saved: tuple[str, int] | None = None
         self._n_repeats = (
             0  # Number of n_repeats with at least 1 model fit, if kfold=5 and 8 models have been fit, _n_repeats is 2
         )
@@ -280,8 +284,14 @@ class BaggedEnsembleModel(AbstractModel):
                 f"{self.name} keeps no per-fold out-of-fold predictions: fit it with `oof_per_fold=True`."
             )
         self._load_oof_per_fold()
-        rows, pred, offsets = self._oof_per_fold["rows"], self._oof_per_fold["pred"], self._oof_per_fold["offsets"]
-        return [(rows[start:end].astype(np.int64), pred[start:end]) for start, end in zip(offsets[:-1], offsets[1:])]
+        return [(rows.astype(np.int64), pred) for rows, pred in self._oof_folds(self._oof_per_fold)]
+
+    @staticmethod
+    def _oof_folds(per_fold: dict[str, np.ndarray], start: int = 0) -> list[tuple[np.ndarray, np.ndarray]]:
+        """(row positions, predictions) of each fold of `per_fold` (`_oof_per_fold`'s layout) from fold `start` on,
+        as views."""
+        rows, pred, offsets = per_fold["rows"], per_fold["pred"], per_fold["offsets"]
+        return [(rows[begin:end], pred[begin:end]) for begin, end in zip(offsets[start:-1], offsets[start + 1 :])]
 
     @staticmethod
     def _append_oof_folds(
@@ -303,13 +313,49 @@ class BaggedEnsembleModel(AbstractModel):
     def _pooled_oof(per_fold: dict[str, np.ndarray]) -> tuple[np.ndarray, np.ndarray]:
         """The pooled out-of-fold arrays (per-row sum of the predictions and number of folds) of `per_fold`
         (`_oof_per_fold`'s layout), summed in child order."""
-        rows, pred, offsets = per_fold["rows"], per_fold["pred"], per_fold["offsets"]
-        oof_pred_proba = np.zeros((per_fold["n_rows"], *pred.shape[1:]), dtype=np.float64)
+        oof_pred_proba = np.zeros((per_fold["n_rows"], *per_fold["pred"].shape[1:]), dtype=np.float64)
         oof_pred_model_repeats = np.zeros(per_fold["n_rows"], dtype=np.uint8)
-        for start, end in zip(offsets[:-1], offsets[1:]):  # a fold's rows are unique; folds can share rows
-            oof_pred_proba[rows[start:end]] += pred[start:end]
-            oof_pred_model_repeats[rows[start:end]] += 1
+        for rows, pred in BaggedEnsembleModel._oof_folds(per_fold):  # a fold's rows are unique; folds share rows
+            oof_pred_proba[rows] += pred
+            oof_pred_model_repeats[rows] += 1
         return oof_pred_proba, oof_pred_model_repeats
+
+    @classmethod
+    def _oof_per_fold_dir(cls, path: str) -> str:
+        return os.path.join(path, "utils", cls._oof_per_fold_dirname)
+
+    @classmethod
+    def _read_oof_per_fold(cls, path: str, verbose: bool = True) -> dict[str, np.ndarray]:
+        """The per-fold out-of-fold predictions saved under the bag at `path`: its part files, in order, as one."""
+        directory = cls._oof_per_fold_dir(path)
+        names = sorted((f for f in os.listdir(directory) if f.startswith("part-")), key=lambda f: int(f[5:-4]))
+        parts = [load_pkl.load(path=os.path.join(directory, name), verbose=verbose) for name in names]
+        folds = [fold for part in parts for fold in cls._oof_folds(part)]
+        return cls._append_oof_folds(None, folds, n_rows=parts[-1]["n_rows"])
+
+    def _save_oof_per_fold(self, path: str):
+        """Save the per-fold predictions under the bag at `path`: the folds added since they were last saved or read
+        there as a new part file, or, if they were last saved elsewhere or not at all, all of them, replacing any
+        part files there."""
+        directory = self._oof_per_fold_dir(path)
+        n_folds = len(self._oof_per_fold["offsets"]) - 1
+        if self._oof_per_fold_saved is not None and self._oof_per_fold_saved[0] == path:
+            start = self._oof_per_fold_saved[1]
+        else:
+            start = 0
+            shutil.rmtree(directory, ignore_errors=True)
+        if start < n_folds:
+            os.makedirs(directory, exist_ok=True)
+            part_index = len([f for f in os.listdir(directory) if f.startswith("part-")])
+            begin = self._oof_per_fold["offsets"][start]
+            part = {
+                "rows": self._oof_per_fold["rows"][begin:],
+                "pred": self._oof_per_fold["pred"][begin:],
+                "offsets": self._oof_per_fold["offsets"][start:] - begin,
+                "n_rows": self._oof_per_fold["n_rows"],
+            }
+            save_pkl.save(path=os.path.join(directory, f"part-{part_index:03d}.pkl"), object=part)
+        self._oof_per_fold_saved = (path, n_folds)
 
     @staticmethod
     def _predict_proba_oof(oof_pred_proba, oof_pred_model_repeats, return_type=np.float32) -> np.array:
@@ -1805,11 +1851,8 @@ class BaggedEnsembleModel(AbstractModel):
 
     @classmethod
     def load_oof(cls, path: str, verbose: bool = True) -> np.array:
-        per_fold_path = os.path.join(path, "utils", cls._oof_per_fold_filename)
-        if os.path.exists(per_fold_path):  # an `oof_per_fold` bag saves only its folds' predictions
-            oof_pred_proba, oof_pred_model_repeats = cls._pooled_oof(
-                load_pkl.load(path=per_fold_path, verbose=verbose)
-            )
+        if os.path.isdir(cls._oof_per_fold_dir(path)):  # an `oof_per_fold` bag saves only its folds' predictions
+            oof_pred_proba, oof_pred_model_repeats = cls._pooled_oof(cls._read_oof_per_fold(path, verbose=verbose))
             return cls._predict_proba_oof(oof_pred_proba=oof_pred_proba, oof_pred_model_repeats=oof_pred_model_repeats)
         try:
             oof = load_pkl.load(path=os.path.join(path, "utils", cls._oof_filename), verbose=verbose)
@@ -1834,9 +1877,11 @@ class BaggedEnsembleModel(AbstractModel):
             self._oof_pred_model_repeats = oof["_oof_pred_model_repeats"]
 
     def _load_oof_per_fold(self):
-        """Read the per-fold out-of-fold predictions (`oof_per_fold`) from their own file, unless they are in memory."""
+        """Read the per-fold out-of-fold predictions (`oof_per_fold`) from their part files, unless they are in
+        memory."""
         if self._oof_per_fold is None:
-            self._oof_per_fold = load_pkl.load(path=os.path.join(self.path, "utils", self._oof_per_fold_filename))
+            self._oof_per_fold = self._read_oof_per_fold(self.path)
+            self._oof_per_fold_saved = (self.path, len(self._oof_per_fold["offsets"]) - 1)
 
     def prepare_for_inference(self) -> None:
         """Run ``prepare_for_inference`` on every child held in memory, isolating a failing child.
@@ -1902,7 +1947,7 @@ class BaggedEnsembleModel(AbstractModel):
             self._oof_pred_proba = None
             self._oof_pred_model_repeats = None
         if save_oof and self._oof_per_fold is not None:
-            save_pkl.save(path=os.path.join(path, "utils", self._oof_per_fold_filename), object=self._oof_per_fold)
+            self._save_oof_per_fold(path)
             self._oof_per_fold = None
 
         _models = self.models
@@ -1927,11 +1972,12 @@ class BaggedEnsembleModel(AbstractModel):
             remove_fit=remove_fit, remove_info=remove_info, requires_save=requires_save, **kwargs
         )
         if remove_fit_stack:
-            for filename in (self._oof_filename, self._oof_per_fold_filename):
-                try:
-                    os.remove(os.path.join(self.path, "utils", filename))
-                except FileNotFoundError:
-                    pass
+            try:
+                os.remove(os.path.join(self.path, "utils", self._oof_filename))
+            except FileNotFoundError:
+                pass
+            shutil.rmtree(self._oof_per_fold_dir(self.path), ignore_errors=True)
+            self._oof_per_fold_saved = None
             if requires_save:
                 self._oof_pred_proba = None
                 self._oof_pred_model_repeats = None
