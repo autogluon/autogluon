@@ -213,12 +213,13 @@ class LinearModel(AbstractModel):
 
         # Ridge/Lasso are using alpha instead of C, which is C^-1
         # https://scikit-learn.org/stable/modules/generated/sklearn.linear_model.Ridge.html#sklearn.linear_model.Ridge
-        if self.problem_type == REGRESSION and "alpha" not in params:
-            # For numerical reasons, using alpha = 0 with the Lasso object is not advised, so we add epsilon
-            params["alpha"] = 1 / (params["C"] if params["C"] != 0 else 1e-8)
+        if self.problem_type == REGRESSION:
+            if "alpha" not in params:
+                # For numerical reasons, using alpha = 0 with the Lasso object is not advised, so we add epsilon
+                params["alpha"] = 1 / (params["C"] if params["C"] != 0 else 1e-8)
             params.pop("C", None)
 
-        logger.log(15, f"Training Model with the following hyperparameter settings:")
+        logger.log(15, "Training Model with the following hyperparameter settings:")
         logger.log(15, params)
 
         max_iter = params.pop("max_iter", 10000)
