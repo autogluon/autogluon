@@ -873,13 +873,15 @@ dependencies = [
 [package.optional-dependencies]
 all = [
     { name = "autogluon-core", extra = ["raytune"] },
-    { name = "tfc-t0", extra = ["torch"] },
+    { name = "tfc-t0", version = "0.6.0", source = { registry = "https://pypi.org/simple" }, extra = ["torch"], marker = "python_full_version < '3.11'" },
+    { name = "tfc-t0", version = "0.6.1", source = { registry = "https://pypi.org/simple" }, extra = ["torch"], marker = "python_full_version >= '3.11'" },
 ]
 ray = [
     { name = "autogluon-core", extra = ["raytune"] },
 ]
 t0 = [
-    { name = "tfc-t0", extra = ["torch"] },
+    { name = "tfc-t0", version = "0.6.0", source = { registry = "https://pypi.org/simple" }, extra = ["torch"], marker = "python_full_version < '3.11'" },
+    { name = "tfc-t0", version = "0.6.1", source = { registry = "https://pypi.org/simple" }, extra = ["torch"], marker = "python_full_version >= '3.11'" },
 ]
 tests = [
     { name = "flaky" },
@@ -6519,15 +6521,54 @@ wheels = [
 name = "tfc-t0"
 version = "0.6.0"
 source = { registry = "https://pypi.org/simple" }
+resolution-markers = [
+    "python_full_version < '3.11' and sys_platform == 'darwin'",
+    "python_full_version < '3.11' and sys_platform != 'darwin' and sys_platform != 'win32'",
+    "python_full_version < '3.11' and sys_platform == 'win32'",
+]
 dependencies = [
     { name = "huggingface-hub" },
     { name = "jaxtyping" },
     { name = "numpy" },
-    { name = "typing-extensions", marker = "python_full_version < '3.11'" },
+    { name = "typing-extensions" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/ba/0d/1a25ce944f4ecc4598937ecb34330b93484dd4f4111770d3181d73d21da4/tfc_t0-0.6.0.tar.gz", hash = "sha256:40284afc78a544485f4f62aaf541f66f988028f6e51691a308cf604134da94d4", size = 1125198, upload-time = "2026-10-13T09:47:46.291Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/55/82/4e47c03dd3a22af03fded4d85feb1c7770d71623ea2173809b731c2d2a21/tfc_t0-0.6.0-py3-none-any.whl", hash = "sha256:0db2315e051d1fcb3c40f9525534817d40ee2f700d3b7498145a86cf0bcfd864", size = 75131, upload-time = "2026-10-13T09:47:44.624Z" },
+]
+
+[package.optional-dependencies]
+torch = [
+    { name = "einops" },
+    { name = "rotary-embedding-torch" },
+    { name = "safetensors" },
+    { name = "torch", version = "2.10.0", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform == 'darwin'" },
+    { name = "torch", version = "2.13.0", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'darwin'" },
+]
+
+[[package]]
+name = "tfc-t0"
+version = "0.6.1"
+source = { registry = "https://pypi.org/simple" }
+resolution-markers = [
+    "python_full_version >= '3.13' and sys_platform == 'darwin'",
+    "python_full_version >= '3.13' and sys_platform != 'darwin' and sys_platform != 'win32'",
+    "python_full_version >= '3.13' and sys_platform == 'win32'",
+    "python_full_version == '3.12.*' and sys_platform == 'darwin'",
+    "python_full_version == '3.12.*' and sys_platform != 'darwin' and sys_platform != 'win32'",
+    "python_full_version == '3.12.*' and sys_platform == 'win32'",
+    "python_full_version == '3.11.*' and sys_platform == 'darwin'",
+    "python_full_version == '3.11.*' and sys_platform != 'darwin' and sys_platform != 'win32'",
+    "python_full_version == '3.11.*' and sys_platform == 'win32'",
+]
+dependencies = [
+    { name = "huggingface-hub" },
+    { name = "jaxtyping" },
+    { name = "numpy" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/b3/25/fad4c5059814db4e050f5eaaea3853065af4cf59c5dd6de02e85a591fc0e/tfc_t0-0.6.1.tar.gz", hash = "sha256:8a4c10e21ee2f1f00453f972c6f2cfec02bac37445ccc5ae5e3e68e8cfdd35aa", size = 1121325, upload-time = "2026-11-09T09:23:48.439Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/92/d0/077e3227e7171cb7675a8e77786951271b415977a42cbd9771ab541c4928/tfc_t0-0.6.1-py3-none-any.whl", hash = "sha256:4ba5a53da1522bb7eb350cc6f83e4b1222f7f88ac77e66acdd29bf8e982858a0", size = 75517, upload-time = "2026-11-09T09:23:46.543Z" },
 ]
 
 [package.optional-dependencies]

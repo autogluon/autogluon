@@ -52,8 +52,7 @@ class T0Model(AbstractTimeSeriesModel):
     cross_learning : bool, default = False
         If True, all series in a batch are forecast together as one group, so the model reads across them. The group
         size is therefore ``batch_size``, and results depend on it. If False, each series is forecast on its own.
-        This matches ``cross_learning`` in Chronos-2 and corresponds to ``cross_inference`` in tfc-t0's
-        ``T0Predictor``.
+        This matches ``cross_learning`` in Chronos-2 and in tfc-t0's ``T0Predictor``.
     trim_leading_missing : bool, default = True
         If True, missing values before the first observation of each series are treated as padding. With
         ``cross_learning``, tfc-t0 trims each group as a whole, up to the first observation of any series in it.
