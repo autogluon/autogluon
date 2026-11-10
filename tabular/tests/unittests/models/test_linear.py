@@ -53,14 +53,23 @@ def test_linear_classification_penalty(tmp_path, classification_data, penalty):
 
 
 @pytest.mark.parametrize("penalty, model_cls", [("L1", Lasso), ("L2", Ridge)])
-def test_linear_regression_penalty(tmp_path, penalty, model_cls):
+@pytest.mark.parametrize(
+    "hyperparameters, expected_alpha",
+    [
+        ({"C": 0.1}, 10.0),
+        ({"alpha": 0.5}, 0.5),
+        ({"alpha": 2.0, "C": 0.1}, 2.0),
+    ],
+)
+def test_linear_regression_penalty(tmp_path, penalty, model_cls, hyperparameters, expected_alpha):
     X, y = make_regression(n_samples=100, n_features=10, n_informative=3, random_state=0)
     X, y = pd.DataFrame(X), pd.Series(y)
-    model = LinearModel(path=str(tmp_path), problem_type="regression", hyperparameters={"penalty": penalty, "C": 0.1})
+    hp = {"penalty": penalty, **hyperparameters}
+    model = LinearModel(path=str(tmp_path), problem_type="regression", hyperparameters=hp)
     model.fit(X=X, y=y)
 
     assert isinstance(model.model, model_cls)
-    assert model.model.alpha == 10
+    assert model.model.alpha == pytest.approx(expected_alpha)
     assert np.isfinite(model.predict(X)).all()
 
 
@@ -115,4 +124,22 @@ def test_linear_rapids_penalty_forwarding(tmp_path, monkeypatch, penalty, proble
         assert params["penalty"] == penalty.lower()
         assert params["solver"] == "qn"
         assert params["C"] == 0.1
+    backend_cls.return_value.fit.assert_called_once()
+
+
+def test_linear_rapids_regression_explicit_alpha(tmp_path, monkeypatch):
+    model = LinearRapidsModel(
+        path=str(tmp_path), problem_type="regression", hyperparameters={"penalty": "L2", "alpha": 0.5}
+    )
+    model._init_params()
+    X, y = pd.DataFrame({"x": [0.0, 1.0, 2.0]}), pd.Series([0, 1, 0])
+    backend_cls = Mock()
+    monkeypatch.setattr(model, "_get_model_type", lambda: backend_cls)
+    monkeypatch.setattr(model, "preprocess", lambda X, **kwargs: X)
+    model._fit(X=X, y=y)
+
+    params = backend_cls.call_args.kwargs
+    assert "penalty" not in params
+    assert "C" not in params
+    assert params["alpha"] == 0.5
     backend_cls.return_value.fit.assert_called_once()
