@@ -16,11 +16,12 @@ class EarlyStopping:
         if self.metric in ["log_loss", "mse", "mae", "rmse"]:
             score = -val_loss
         # larger is better for these metrics
-        elif self.metric in ["accuracy", "roc_auc", "r2"]:
+        elif self.metric in ["accuracy", "roc_auc", "r2", "f1"]:
             score = val_loss
         else:
             raise ValueError(
-                f"Unsupported metric: {self.metric}. Supported metrics are: log_loss, mse, mae, rmse, accuracy, roc_auc, r2."
+                f"Unsupported metric: {self.metric}. Supported metrics are: "
+                "log_loss, mse, mae, rmse, accuracy, roc_auc, r2, f1."
             )
 
         if self.best_score is None:

@@ -3,7 +3,6 @@ from __future__ import annotations
 import logging
 import os
 from pathlib import Path
-from typing import List, Optional
 
 import pandas as pd
 from typing_extensions import Self
@@ -52,6 +51,7 @@ class MitraModel(AbstractTorchModel):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self._weights_saved = False
+        self._category_maps = {}
 
     @staticmethod
     def _get_default_device():
@@ -101,8 +101,56 @@ class MitraModel(AbstractTorchModel):
 
     def _preprocess(self, X: pd.DataFrame, is_train: bool = False, **kwargs) -> pd.DataFrame:
         X = super()._preprocess(X, **kwargs)
-        X = self._label_encode_categoricals(X, is_train=is_train)
+        X = self._align_categorical_features(X, is_train=is_train)
+        return self._preprocess_features(X, is_train=is_train, **kwargs)
+
+    def _align_categorical_features(self, X: pd.DataFrame, *, is_train: bool) -> pd.DataFrame:
+        if is_train:
+            columns = [
+                column
+                for column, dtype in X.dtypes.items()
+                if isinstance(dtype, pd.CategoricalDtype)
+                or pd.api.types.is_object_dtype(dtype)
+                or isinstance(dtype, pd.StringDtype)
+            ]
+            self._category_maps = {}
+            if not columns:
+                return X
+            X = X.copy(deep=False)
+            for column in columns:
+                categorical = X[column].astype("category")
+                self._category_maps[column] = categorical.cat.categories
+                X[column] = categorical
+            return X
+
+        category_maps = getattr(self, "_category_maps", {})
+        if not category_maps:
+            return X
+        X = X.copy(deep=False)
+        for column, categories in category_maps.items():
+            X[column] = pd.Categorical(X[column], categories=categories)
         return X
+
+    def _preprocess_features(self, X: pd.DataFrame, is_train: bool = False, **kwargs) -> pd.DataFrame:
+        """Encode aligned categories before any subclass feature reduction."""
+        return self._label_encode_categoricals(X, is_train=is_train)
+
+    def _prepare_fit(self):
+        """Reset subclass state before resolving the estimator."""
+
+    def _get_estimator_params(self) -> dict:
+        """Return parameters accepted by the sklearn estimator."""
+        return self._get_model_params()
+
+    def _initialize_estimator(self, model_cls, hyp: dict, X: pd.DataFrame):
+        """Construct the estimator before preprocessing the training data."""
+        self.model = model_cls(**hyp)
+
+    def _finalize_estimator_fit(self, model, X_val: pd.DataFrame, y_val: pd.Series):
+        """Optimize the fitted trainers before retaining any subclass fold state."""
+        for i in range(len(model.trainers)):
+            model.trainers[i].post_fit_optimize()
+        self.model = model
 
     def _fit(
         self,
@@ -116,9 +164,9 @@ class MitraModel(AbstractTorchModel):
         verbosity: int = 2,
         **kwargs,
     ):
-        # TODO: Reset the number of threads based on the specified num_cpus
         need_to_reset_torch_threads = False
         torch_threads_og = None
+        self._prepare_fit()
 
         try:
             model_cls = self.get_model_cls()
@@ -131,14 +179,7 @@ class MitraModel(AbstractTorchModel):
             )
             raise err
 
-        if num_cpus is not None and isinstance(num_cpus, (int, float)):
-            torch_threads_og = torch.get_num_threads()
-            if torch_threads_og != num_cpus:
-                # reset torch threads back to original value after fit
-                torch.set_num_threads(num_cpus)
-                need_to_reset_torch_threads = True
-
-        hyp = self._get_model_params()
+        hyp = self._get_estimator_params()
 
         hf_model = self._resolve_hf_model(problem_type=self.problem_type, hyp=hyp)
         if hf_model is not None:
@@ -155,8 +196,8 @@ class MitraModel(AbstractTorchModel):
         if hyp["device"] == "cpu" and hyp.get("fine_tune", True):
             logger.log(
                 30,
-                f"\tWarning: Attempting to fine-tune Mitra on CPU. This will be very slow. "
-                f"We strongly recommend using a GPU instance to fine-tune Mitra.",
+                "\tWarning: Attempting to fine-tune Mitra on CPU. This will be very slow. "
+                "We strongly recommend using a GPU instance to fine-tune Mitra.",
             )
 
         # `state_dict_classification` / `state_dict_regression` pointed at a raw `.pt` checkpoint.
@@ -174,27 +215,31 @@ class MitraModel(AbstractTorchModel):
         if "verbose" not in hyp:
             hyp["verbose"] = verbosity >= 3
 
-        self.model = model_cls(**hyp)
+        self._initialize_estimator(model_cls, hyp, X)
 
         X = self.preprocess(X, y=y, is_train=True)
         if X_val is not None:
             X_val = self.preprocess(X_val)
 
-        model = self.model.fit(
-            X=X,
-            y=y,
-            X_val=X_val,
-            y_val=y_val,
-            time_limit=time_limit,
-        )
+        # Match the V2 order: preprocessing runs before the estimator's thread limit.
+        if num_cpus is not None:
+            torch_threads_og = torch.get_num_threads()
+            if torch_threads_og != num_cpus:
+                torch.set_num_threads(num_cpus)
+                need_to_reset_torch_threads = True
+        try:
+            model = self.model.fit(
+                X=X,
+                y=y,
+                X_val=X_val,
+                y_val=y_val,
+                time_limit=time_limit,
+            )
+        finally:
+            if need_to_reset_torch_threads:
+                torch.set_num_threads(torch_threads_og)
 
-        for i in range(len(model.trainers)):
-            model.trainers[i].post_fit_optimize()
-
-        self.model = model
-
-        if need_to_reset_torch_threads:
-            torch.set_num_threads(torch_threads_og)
+        self._finalize_estimator_fit(model, X_val=X_val, y_val=y_val)
 
     def _set_default_params(self):
         default_params = {
@@ -209,19 +254,27 @@ class MitraModel(AbstractTorchModel):
         return str(Path(path) / self.weights_file_name)
 
     def save(self, path: str = None, verbose=True) -> str:
-        _model_weights_list = None
-        if self.model is not None:
-            self._save_model_artifact(path=path)
-            _model_weights_list = []
-            for i in range(len(self.model.trainers)):
-                _model_weights_list.append(self.model.trainers[i].model)
-                self.model.trainers[i].model = None
-
-        path = super().save(path=path, verbose=verbose)
-        if _model_weights_list is not None:
-            for i in range(len(self.model.trainers)):
-                self.model.trainers[i].model = _model_weights_list[i]
-        return path
+        if self.model is None:
+            return super().save(path=path, verbose=verbose)
+        self._save_model_artifact(path=path)
+        trainer_states = []
+        try:
+            for trainer in self.model.trainers:
+                state = {
+                    name: getattr(trainer, name) for name in ("model", "bins", "bin_width") if hasattr(trainer, name)
+                }
+                trainer_states.append((trainer, state))
+                trainer.model = None
+                # The network is stored separately, but the regression bin
+                # tensors stay in the pickle. They must load without CUDA.
+                for name in ("bins", "bin_width"):
+                    if name in state:
+                        setattr(trainer, name, state[name].cpu())
+            return super().save(path=path, verbose=verbose)
+        finally:
+            for trainer, state in trainer_states:
+                for name, value in state.items():
+                    setattr(trainer, name, value)
 
     def _save_model_artifact(self, path: str | None):
         if path is None:
@@ -230,21 +283,19 @@ class MitraModel(AbstractTorchModel):
 
         device_og = self.device
         self.set_device("cpu")
-
-        _model_weights_list = []
-        for i in range(len(self.model.trainers)):
-            _model_weights_list.append(self.model.trainers[i].model)
-
-        os.makedirs(path, exist_ok=True)
-        torch.save(_model_weights_list, self.weights_path(path=path))
-        self.set_device(device_og)
+        try:
+            model_weights = [trainer.model for trainer in self.model.trainers]
+            os.makedirs(path, exist_ok=True)
+            torch.save(model_weights, self.weights_path(path=path))
+        finally:
+            self.set_device(device_og)
         self._weights_saved = True
 
     def _load_model_artifact(self):
         import torch
 
         device = self.suggest_device_infer()
-        model_weights_list = torch.load(self.weights_path(), weights_only=False)  # nosec B614
+        model_weights_list = torch.load(self.weights_path(), map_location="cpu", weights_only=False)  # nosec B614
         for i in range(len(self.model.trainers)):
             self.model.trainers[i].model = model_weights_list[i]
         self.set_device(device)

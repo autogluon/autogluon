@@ -72,7 +72,7 @@ Here is the mapping of keys to models, in registration order
         "TABPFN-2.6": TabPFNv26Model,
         "REALTABPFN-V2": RealTabPFNv2Model,
         "REALTABPFN-V2.5": RealTabPFNv25Model,
-        "MITRA": MitraModel,
+        "MITRA": MitraV2Model,
         "TABPFN-3": TabPFN3Model,
         "TABPFN-3.5": TabPFN35Model,
         "CAUSILO": CausiloModel,
@@ -124,7 +124,7 @@ Here is the mapping of model types to their default names when trained
         TabPFNv26Model: 'TabPFN-2.6',
         RealTabPFNv2Model: 'RealTabPFN-v2',
         RealTabPFNv25Model: 'RealTabPFN-v2.5',
-        MitraModel: 'Mitra',
+        MitraV2Model: 'Mitra',
         TabPFN3Model: 'TabPFN-3',
         TabPFN35Model: 'TabPFN-3.5',
         CausiloModel: 'Causilo',
@@ -196,6 +196,7 @@ Models
    RealMLPModel
    TabMModel
    MitraModel
+   MitraV2Model
    TabICLModel
    TabDPTModel
    TabDPTTurboModel
@@ -277,6 +278,83 @@ Models
 
 .. autoclass:: MitraModel
    :members: init
+
+The original v1 API keeps its class and saved-model format. Select it explicitly:
+
+.. code-block:: python
+
+   from autogluon.tabular.models import MitraModel
+
+   predictor.fit(train_data, hyperparameters={MitraModel: {}}, num_bag_folds=8)
+
+:hidden:`MitraV2Model`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: MitraV2Model
+   :members: init
+
+``MITRA`` defaults to Mitra v2 for both classification and regression:
+
+.. code-block:: python
+
+   predictor.fit(train_data, hyperparameters={"MITRA": {}}, num_bag_folds=8)
+
+Mitra uses the released HF API's default fit budget of 3,600 seconds, shared
+across the bag folds. AutoGluon's global ``time_limit`` can impose a shorter
+limit. To choose a different Mitra budget, set its model and ensemble limits;
+for example, this allows two hours:
+
+.. code-block:: python
+
+   predictor.fit(
+       train_data,
+       hyperparameters={
+           "MITRA": {
+               "ag.max_time_limit": 7200,
+               "ag.ens.ag.max_time_limit": 7200,
+           },
+       },
+       num_bag_folds=8,
+       time_limit=7200,
+   )
+
+``MitraV2Model`` uses the new fine-tuning method for both checkpoint versions.
+``model_version`` selects the default checkpoint. An explicit ``hf_model``
+takes precedence. The legacy v1 API is the separate
+``MitraModel`` class shown above:
+
+.. code-block:: python
+
+   predictor.fit(
+       train_data,
+       hyperparameters={"MITRA": {"model_version": "1"}},
+       num_bag_folds=8,
+   )
+   predictor.fit(
+       train_data,
+       hyperparameters={"MITRA": {"hf_model": "/path/to/checkpoint"}},
+       num_bag_folds=8,
+   )
+
+The default v2 repositories are ``autogluon/mitra-classifier-2`` and
+``autogluon/mitra-regressor-2``. A local checkpoint must contain ``config.json``
+and ``model.safetensors``. The architecture is read from ``config.json`` and
+the weights must match it. No ``mitra_version`` field is required; existing
+release metadata is ignored. A scalar regression head selects MSE, and a
+binned head selects cross-entropy with mean decoding, regardless of
+``model_version``. Existing
+fitted v1 predictors keep the original ``MitraModel`` class when loaded or refitted.
+
+Bagging remains an AutoGluon fit option: use ``num_bag_folds=8`` for the released
+eight-fold recipe. The native implementation uses AutoGluon's validation and
+time-limit semantics. Regression projection and classification feature selection
+are fitted once on the outer training table before bagging, matching the released
+Hugging Face recipes.
+With the new recipe, bag children in the same process reuse the training context
+that fitted the same table shape, checkpoint, and device. Out-of-memory retries
+can still reduce that context when needed.
+The standalone package's benchmark results should therefore be compared using
+the same evaluation protocol before attributing them to the native API.
 
 :hidden:`TabICLModel`
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -451,4 +529,3 @@ Experimental Models
 
 .. autoclass:: FTTransformerModel
    :members: init
-
