@@ -17,10 +17,7 @@ resolution-markers = [
 ]
 
 [options]
-exclude-newer = "2026-09-19T00:00:00Z"
-
-[options.exclude-newer-package]
-tfc-t0 = "2026-10-14T00:00:00Z"
+exclude-newer = "2026-11-10T00:00:00Z"
 
 [manifest]
 members = [

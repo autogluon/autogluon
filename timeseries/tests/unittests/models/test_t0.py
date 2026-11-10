@@ -305,6 +305,30 @@ class TestT0Model:
         )
         assert result.returncode == 0, result.stderr
 
+    def test_when_t0_runtime_is_missing_then_predict_raises_install_message(self):
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-c",
+                'import sys; sys.modules["t0"] = None\n'
+                "import pandas as pd\n"
+                "from autogluon.timeseries import TimeSeriesDataFrame\n"
+                "from autogluon.timeseries.models import T0Model\n"
+                "data = TimeSeriesDataFrame.from_iterable_dataset(\n"
+                '    [{"target": [1.0, 2.0, 3.0], "start": pd.Period("2020-01-01", freq="D")}]\n'
+                ")\n"
+                "try:\n"
+                "    T0Model()._predict(data)\n"
+                "except ImportError as error:\n"
+                '    assert "autogluon.timeseries[t0]" in str(error), str(error)\n'
+                "else:\n"
+                '    raise AssertionError("Missing runtime must raise ImportError")\n',
+            ],
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode == 0, result.stderr
+
     def test_load_model_uses_checkpoint_and_device(self):
         loaded_model = Mock()
         loaded_model.eval.return_value = loaded_model

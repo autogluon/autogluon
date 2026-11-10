@@ -1,12 +1,10 @@
 import logging
-import os
 from typing import Any, Sequence
 
 import numpy as np
 import pandas as pd
 from typing_extensions import Self
 
-from autogluon.common.loaders import load_pkl
 from autogluon.timeseries import TimeSeriesDataFrame
 from autogluon.timeseries.models.abstract import AbstractTimeSeriesModel
 from autogluon.timeseries.utils.features import CovariateMetadata
@@ -111,13 +109,6 @@ class T0Model(AbstractTimeSeriesModel):
         self._model = model
         return str(path)
 
-    @classmethod
-    def load(cls, path: str, reset_paths: bool = True, load_oof: bool = False, verbose: bool = True) -> Self:
-        model = load_pkl.load(path=os.path.join(path, cls.model_file_name), verbose=verbose)
-        if reset_paths:
-            model.set_contexts(path)
-        return model
-
     def _is_gpu_available(self) -> bool:
         import torch.cuda
 
@@ -213,12 +204,14 @@ class T0Model(AbstractTimeSeriesModel):
     def _predict(
         self, data: TimeSeriesDataFrame, known_covariates: TimeSeriesDataFrame | None = None, **kwargs
     ) -> TimeSeriesDataFrame:
-        from .dataloader import T0DataLoader, T0InferenceDataset
-
-        hyperparameters = self.get_hyperparameters()
+        # Load first: load_model raises the install message if tfc-t0 is missing, which the dataloader needs.
         if self._model is None:
             self.load_model()
         assert self._model is not None, "t0 model failed to load"
+
+        from .dataloader import T0DataLoader, T0InferenceDataset
+
+        hyperparameters = self.get_hyperparameters()
 
         dataset = T0InferenceDataset(
             data=data,

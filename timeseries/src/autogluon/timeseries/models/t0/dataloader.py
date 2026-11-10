@@ -53,19 +53,13 @@ class T0InferenceDataset(torch.utils.data.Dataset):
         self.past_known_covariate_array = data[known_covariate_columns].to_numpy(dtype=np.float32)
         self.indptr = data.get_indptr()
         self.future_known_covariate_array: np.ndarray | None = None
-        self.future_known_indptr: np.ndarray | None = None
 
         if known_covariate_columns:
             if known_covariates is None:
                 raise ValueError("known_covariates must be provided when known real-valued covariates are enabled")
-            if not data.item_ids.equals(known_covariates.item_ids):
-                raise ValueError("known_covariates must contain the same items in the same order as data")
+            # AutoGluon aligns known_covariates to the forecast index: items in the order of `data`, with exactly
+            # prediction_length rows each. Item i's horizon is therefore rows [i * H, (i + 1) * H).
             self.future_known_covariate_array = known_covariates[known_covariate_columns].to_numpy(dtype=np.float32)
-            self.future_known_indptr = known_covariates.get_indptr()
-            if not np.all(np.diff(self.future_known_indptr) == prediction_length):
-                raise ValueError(
-                    f"known_covariates must contain exactly prediction_length={prediction_length} rows per item"
-                )
 
     def __len__(self):
         return len(self.indptr) - 1  # noqa
@@ -104,14 +98,12 @@ class T0InferenceDataset(torch.utils.data.Dataset):
             )
             values[batch_idx, :, left:context_length] = np.where(np.isnan(history), 0.0, history)
             mask[batch_idx, :, left:context_length] = np.where(np.isnan(history), MaskType.MISSING, MaskType.VALID)
-            if num_past:
-                values[batch_idx, 1 + num_known :, left:context_length] = np.nan_to_num(history[1 + num_known :])
             group_ids[batch_idx, :, left:] = batch_idx
             variate_type[batch_idx, :, left:] = row_types[:, None]
             if num_known:
-                assert self.future_known_covariate_array is not None and self.future_known_indptr is not None
-                future_start, future_end = self.future_known_indptr[item_idx : item_idx + 2]
-                future = self.future_known_covariate_array[future_start:future_end].T
+                assert self.future_known_covariate_array is not None
+                future_start = item_idx * self.prediction_length
+                future = self.future_known_covariate_array[future_start : future_start + self.prediction_length].T
                 values[batch_idx, 1 : 1 + num_known, context_length:] = np.where(np.isnan(future), 0.0, future)
                 mask[batch_idx, 0, context_length:] = MaskType.WITHHELD
                 mask[batch_idx, 1 : 1 + num_known, context_length:] = np.where(
