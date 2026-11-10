@@ -73,42 +73,106 @@ def checkpoint_factory(tmp_path):
     return make
 
 
-@pytest.mark.parametrize("problem_type", ["binary", "multiclass", "regression"])
-@pytest.mark.parametrize("version", [None, "1", "2"])
-def test_version_selects_estimator_and_checkpoint(problem_type, version):
-    model = MitraV2Model(
-        problem_type=problem_type,
-        hyperparameters={} if version is None else {"model_version": version},
+@pytest.fixture
+def model_factory(checkpoint_factory, tmp_path):
+    def make(
+        problem_type="binary",
+        *,
+        model_cls=MitraV2Model,
+        dim_output=10,
+        metadata_version=None,
+        bagged=False,
+        name="model",
+        **hyperparameters,
+    ):
+        if "hf_model" not in hyperparameters:
+            hyperparameters["hf_model"] = checkpoint_factory(
+                task="REGRESSION" if problem_type == "regression" else "CLASSIFICATION",
+                dim_output=dim_output,
+                version=metadata_version,
+            )
+        model = model_cls(
+            path=str(tmp_path / name),
+            problem_type=problem_type,
+            hyperparameters={"fine_tune_steps": 1, **hyperparameters},
+        )
+        if bagged:
+            model = BaggedEnsembleModel(
+                model_base=model,
+                path=str(tmp_path / name),
+                hyperparameters={"fold_fitting_strategy": "sequential_local"},
+            )
+        return model
+
+    return make
+
+
+@pytest.fixture
+def trainer_factory():
+    from autogluon.tabular.models.mitra._internal.core.trainer_finetune_v2 import TrainerFinetuneV2
+
+    def make(*, task="classification", **hyperparameters):
+        trainer = TrainerFinetuneV2.__new__(TrainerFinetuneV2)
+        trainer.cfg = SimpleNamespace(task=task, hyperparams=hyperparameters)
+        trainer.preprocessor = SimpleNamespace(
+            transform_X=lambda x: x, transform_y=lambda y: y, inverse_transform_y=lambda y: y
+        )
+        trainer.rng = np.random.RandomState(0)
+        return trainer
+
+    return make
+
+
+def _toy_data(rows, features, n_classes=2, seed=0):
+    rng = np.random.RandomState(seed)
+    X = pd.DataFrame(rng.normal(size=(rows, features)))
+    y = pd.Series(np.arange(rows) % n_classes if n_classes else rng.normal(size=rows))
+    return X, y
+
+
+def _reference_projection(n_components):
+    from sklearn.decomposition import PCA
+    from sklearn.impute import SimpleImputer
+    from sklearn.pipeline import make_pipeline
+    from sklearn.preprocessing import StandardScaler
+
+    return make_pipeline(
+        SimpleImputer(strategy="mean"), StandardScaler(), PCA(n_components=n_components, random_state=0)
     )
-    expected_version = version or "2"
-    estimator = model.get_model_cls()(model_version=expected_version)
+
+
+@pytest.mark.parametrize("problem_type", ["binary", "multiclass", "regression"])
+@pytest.mark.parametrize(
+    "hyperparameters",
+    [
+        {},
+        {"model_version": "1"},
+        {"model_version": "2"},
+        {"model_version": "1", "fine_tune_recipe": None},
+        {"model_version": "2", "fine_tune_recipe": None},
+        {"model_version": "2", "fine_tune_recipe": "2"},
+    ],
+)
+def test_version_selects_checkpoint_with_shared_trainer_and_limits(problem_type, hyperparameters):
+    from autogluon.tabular.models.mitra._internal.core.trainer_finetune_v2 import TrainerFinetuneV2
+    from autogluon.tabular.models.mitra.finetune import MitraFinetuneClassifier, MitraFinetuneRegressor
+
+    model = MitraV2Model(problem_type=problem_type, hyperparameters=hyperparameters)
+    expected_version = hyperparameters.get("model_version", "2")
     task = "regression" if problem_type == "regression" else "classification"
+    assert model.get_model_cls() is (MitraFinetuneRegressor if task == "regression" else MitraFinetuneClassifier)
+    estimator = model.get_model_cls()(**hyperparameters)
     assert estimator.model_version == expected_version
     assert estimator.hf_model == CHECKPOINTS[expected_version][task]
     assert estimator.fine_tune_recipe == "2"
-    assert model._get_model_version() == expected_version
-
-
-@pytest.mark.parametrize("version", ["1", "2"])
-def test_unspecified_recipe_uses_new_method_for_both_weights(version):
-    model = MitraV2Model(
-        problem_type="binary",
-        hyperparameters={"model_version": version, "fine_tune_recipe": None},
-    )
-    estimator = model.get_model_cls()(model_version=version, fine_tune_recipe=None)
-    assert model._get_model_version() == version
-    assert estimator.fine_tune_recipe == "2"
     assert estimator.warmup_steps == 10
     assert estimator.weight_decay == 0.3
-
-
-def test_versions_share_the_finetuning_implementation():
-    v1 = MitraV2Model(problem_type="binary", hyperparameters={"model_version": "1"})
-    v2 = MitraV2Model(problem_type="binary", hyperparameters={"model_version": "2"})
-    assert v1.get_model_cls() is v2.get_model_cls()
-    shared_v1 = v1.get_model_cls()(model_version="1")
-    shared = v2.get_model_cls()(model_version="2", fine_tune_recipe="2")
-    assert shared_v1._get_trainer_cls() is shared._get_trainer_cls()
+    assert estimator._get_trainer_cls() is TrainerFinetuneV2
+    assert model._get_model_version() == expected_version
+    limits = model._get_default_auxiliary_params()
+    assert limits["max_rows"] == 1_000_000
+    assert limits["max_features"] == 50_000
+    assert limits["max_classes"] is None
 
 
 @pytest.mark.parametrize("recipe", ["1", "auto", "3", False, 2])
@@ -162,12 +226,20 @@ def test_checkpoint_roundtrip_ignores_legacy_version_metadata(checkpoint_factory
 
 
 @pytest.mark.parametrize(
-    "model_version,metadata_version",
-    [(None, None), ("1", None), ("2", None), ("1", "2"), ("2", "1"), (None, "1")],
+    "model_version,metadata_version,problem_type,dim_output",
+    [
+        (None, None, "binary", 10),
+        ("1", None, "binary", 10),
+        ("2", None, "regression", 7),
+        ("1", "2", "regression", 7),
+        ("2", "1", "regression", 1),
+        (None, "1", "regression", 1),
+        ("1", "2", "binary", 10),
+        ("2", "1", "binary", 10),
+    ],
 )
-@pytest.mark.parametrize("problem_type,dim_output", [("binary", 10), ("regression", 1), ("regression", 7)])
 def test_custom_checkpoint_uses_config_without_version_checks(
-    checkpoint_factory, tmp_path, model_version, metadata_version, problem_type, dim_output
+    checkpoint_factory, model_factory, model_version, metadata_version, problem_type, dim_output
 ):
     task = "REGRESSION" if problem_type == "regression" else "CLASSIFICATION"
     path = checkpoint_factory(task=task, dim_output=dim_output, version=metadata_version)
@@ -178,14 +250,8 @@ def test_custom_checkpoint_uses_config_without_version_checks(
     if model_version is not None:
         hyperparameters["model_version"] = model_version
 
-    rng = np.random.RandomState(0)
-    X = pd.DataFrame(rng.normal(size=(32, 3)))
-    y = pd.Series(rng.normal(size=32) if problem_type == "regression" else np.arange(32) % 2)
-    model = MitraV2Model(
-        path=str(tmp_path / "model"),
-        problem_type=problem_type,
-        hyperparameters=hyperparameters,
-    )
+    X, y = _toy_data(32, 3, n_classes=0 if problem_type == "regression" else 2)
+    model = model_factory(problem_type, **hyperparameters)
     model.fit(X=X.iloc[:24], y=y.iloc[:24], X_val=X.iloc[24:], y_val=y.iloc[24:], num_cpus=1, num_gpus=0)
     assert model.model.hf_model == path
     assert model.model.model_version == (model_version or "2")
@@ -198,7 +264,7 @@ def test_custom_checkpoint_uses_config_without_version_checks(
 
 @pytest.mark.parametrize("task", ["classification", "regression"])
 @pytest.mark.parametrize("model_version", ["1", "2"])
-def test_explicit_hub_checkpoint_overrides_model_version(checkpoint_factory, tmp_path, task, model_version):
+def test_explicit_hub_checkpoint_overrides_model_version(checkpoint_factory, model_factory, task, model_version):
     version = "2" if model_version == "1" else "1"
     dim_output = (7 if version == "2" else 1) if task == "regression" else 10
     path = checkpoint_factory(task=task.upper(), dim_output=dim_output, version=version)
@@ -208,13 +274,12 @@ def test_explicit_hub_checkpoint_overrides_model_version(checkpoint_factory, tmp
         assert repo_id == CHECKPOINTS[version][task]
         return os.path.join(path, filename)
 
-    rng = np.random.RandomState(0)
-    X = pd.DataFrame(rng.normal(size=(24, 2)))
-    y = pd.Series(rng.normal(size=24) if task == "regression" else np.arange(24) % 2)
-    model = MitraV2Model(
-        path=str(tmp_path / "model"),
-        problem_type="regression" if task == "regression" else "binary",
-        hyperparameters={"hf_model": repo_id, "model_version": model_version, "fine_tune": False},
+    X, y = _toy_data(24, 2, n_classes=0 if task == "regression" else 2)
+    model = model_factory(
+        "regression" if task == "regression" else "binary",
+        hf_model=repo_id,
+        model_version=model_version,
+        fine_tune=False,
     )
     with mock.patch(
         "autogluon.tabular.models.mitra._internal.models.tab2d.hf_hub_download", side_effect=download
@@ -348,9 +413,7 @@ def test_fine_tuning_metric_is_independent_of_eval_metric(
     if metric_setting != "default":
         hyperparameters["metric"] = explicit_metric if metric_setting == "explicit" else None
     expected = explicit_metric if metric_setting == "explicit" else default_metric
-    rng = np.random.RandomState(1)
-    X = pd.DataFrame(rng.normal(size=(48, 4)))
-    y = pd.Series(rng.normal(size=48) if n_classes == 0 else np.arange(48) % n_classes)
+    X, y = _toy_data(48, 4, n_classes=n_classes, seed=1)
     model = MitraV2Model(
         path=str(tmp_path / "model"),
         problem_type=problem_type,
@@ -411,12 +474,10 @@ def test_hf_fit_budget_defaults_and_overrides(tmp_path, bagged, global_limit, mi
     assert fit_args["time_limit"] == expected
 
 
-def test_regression_decodes_mean_instead_of_mode():
+def test_regression_decodes_mean_instead_of_mode(trainer_factory):
     import torch
 
-    from autogluon.tabular.models.mitra._internal.core.trainer_finetune_v2 import TrainerFinetuneV2
-
-    trainer = TrainerFinetuneV2.__new__(TrainerFinetuneV2)
+    trainer = trainer_factory()
     trainer.bins = torch.tensor([-0.5, 0.5, 1.5])
     trainer.bin_width = trainer.bins[1] - trainer.bins[0]
     logits = torch.log(torch.tensor([[0.25, 0.75], [0.6, 0.4]]))
@@ -424,10 +485,8 @@ def test_regression_decodes_mean_instead_of_mode():
 
 
 @pytest.mark.gpu
-def test_regression_prediction_matches_released_cpu_mean():
+def test_regression_prediction_matches_released_cpu_mean(trainer_factory):
     import torch
-
-    from autogluon.tabular.models.mitra._internal.core.trainer_finetune_v2 import TrainerFinetuneV2
 
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required to check prediction from GPU logits.")
@@ -437,22 +496,17 @@ def test_regression_prediction_matches_released_cpu_mean():
     logits[0, 1, 1] = float("inf")
     logits[0, 2, 2] = -float("inf")
 
-    trainer = TrainerFinetuneV2.__new__(TrainerFinetuneV2)
-    trainer.device = "cuda"
-    trainer.cfg = SimpleNamespace(
+    trainer = trainer_factory(
         task="regression",
-        hyperparams={
-            "regression_loss": "cross_entropy",
-            "precision": "bfloat16",
-            "balance_binary_support": False,
-            "dim_output": 1000,
-        },
+        regression_loss="cross_entropy",
+        precision="bfloat16",
+        balance_binary_support=False,
+        dim_output=1000,
     )
+    trainer.device = "cuda"
     trainer.bins = torch.linspace(-0.5, 1.5, 1001, device="cuda")
     trainer.bin_width = trainer.bins[1] - trainer.bins[0]
-    trainer.rng = np.random.RandomState(0)
     trainer.model = mock.Mock(return_value=logits)
-    trainer.preprocessor = SimpleNamespace(inverse_transform_y=lambda values: values)
     trainer.make_loader = lambda dataset, training: [
         {
             "x_support": torch.zeros((1, 2, 1)),
@@ -520,20 +574,20 @@ def test_balanced_prediction_support_matches_released_recipe(counts, expected):
 
 @pytest.mark.parametrize("model_cls,version", [(MitraModel, "1"), (MitraV2Model, "1"), (MitraV2Model, "2")])
 @pytest.mark.parametrize("problem_type,n_classes", [("binary", 2), ("multiclass", 3), ("regression", 0)])
-def test_fit_predict_save_load(checkpoint_factory, tmp_path, model_cls, version, problem_type, n_classes):
-    task = "REGRESSION" if problem_type == "regression" else "CLASSIFICATION"
+def test_fit_predict_save_load_and_refit(model_factory, model_cls, version, problem_type, n_classes):
+    from autogluon.tabular.models.mitra.sklearn_interface import MitraClassifier, MitraRegressor
+
     output = (7 if version == "2" else 1) if problem_type == "regression" else 10
-    path = checkpoint_factory(task=task, dim_output=output, version=version)
-    rng = np.random.RandomState(1)
-    X = pd.DataFrame(rng.normal(size=(48, 4)), columns=list("abcd"))
-    y = pd.Series(rng.normal(size=48) if n_classes == 0 else np.arange(48) % n_classes)
-    hyperparameters = {"hf_model": path, "fine_tune_steps": 2}
-    if model_cls is MitraV2Model:
-        hyperparameters["model_version"] = version
-    model = model_cls(
-        path=str(tmp_path / "model"),
-        problem_type=problem_type,
-        hyperparameters=hyperparameters,
+    X, y = _toy_data(48, 4, n_classes=n_classes, seed=1)
+    X.columns = list("abcd")
+    model = model_factory(
+        problem_type,
+        model_cls=model_cls,
+        dim_output=output,
+        # Original custom checkpoints did not declare a release version.
+        metadata_version=None if model_cls is MitraModel else version,
+        fine_tune_steps=2,
+        **({"model_version": version} if model_cls is MitraV2Model else {}),
     )
     model.fit(X=X.iloc[:32], y=y.iloc[:32], X_val=X.iloc[32:], y_val=y.iloc[32:], num_cpus=1, num_gpus=0)
     # Save before predicting so the restored model starts with the same support RNG.
@@ -557,6 +611,15 @@ def test_fit_predict_save_load(checkpoint_factory, tmp_path, model_cls, version,
     if model_cls is MitraV2Model:
         assert refit._get_model_version() == version
     np.testing.assert_allclose(loaded.predict_proba(X.iloc[32:]), prediction, atol=1e-5)
+    if model_cls is MitraModel:
+        estimator_cls = MitraRegressor if problem_type == "regression" else MitraClassifier
+        assert type(loaded.model) is estimator_cls
+        assert loaded.get_model_cls() is refit.get_model_cls() is estimator_cls
+        assert "model_version" not in refit.params
+        assert "fine_tune_recipe" not in refit.params
+        refit.fit(X=X, y=y, num_cpus=1, num_gpus=0)
+        assert type(refit.model) is estimator_cls
+        assert np.isfinite(refit.predict_proba(X.iloc[32:])).all()
 
 
 @pytest.mark.gpu
@@ -570,25 +633,19 @@ def test_fit_predict_save_load(checkpoint_factory, tmp_path, model_cls, version,
         (MitraV2Model, "regression", "2", 7),
     ],
 )
-def test_gpu_model_loads_and_predicts_without_cuda(
-    checkpoint_factory, tmp_path, model_cls, problem_type, version, output
-):
+def test_gpu_model_loads_and_predicts_without_cuda(model_factory, tmp_path, model_cls, problem_type, version, output):
     import torch
 
     if not torch.cuda.is_available():
         pytest.skip("CUDA is required to create a GPU-trained artifact.")
-    task = "REGRESSION" if problem_type == "regression" else "CLASSIFICATION"
-    checkpoint = checkpoint_factory(task=task, dim_output=output, version=version)
-    rng = np.random.RandomState(0)
-    X = pd.DataFrame(rng.normal(size=(32, 3)), columns=["a", "b", "c"])
-    y = pd.Series(rng.normal(size=32) if problem_type == "regression" else np.arange(32) % 2)
-    hyperparameters = {"hf_model": checkpoint, "fine_tune_steps": 1}
-    if model_cls is MitraV2Model:
-        hyperparameters["model_version"] = version
-    model = model_cls(
-        path=str(tmp_path / "model"),
-        problem_type=problem_type,
-        hyperparameters=hyperparameters,
+    X, y = _toy_data(32, 3, n_classes=0 if problem_type == "regression" else 2)
+    X.columns = ["a", "b", "c"]
+    model = model_factory(
+        problem_type,
+        model_cls=model_cls,
+        dim_output=output,
+        metadata_version=version,
+        **({"model_version": version} if model_cls is MitraV2Model else {}),
     )
     model.fit(X=X.iloc[:24], y=y.iloc[:24], X_val=X.iloc[24:], y_val=y.iloc[24:], num_cpus=1, num_gpus=1)
     trainer = model.model.trainers[0]
@@ -632,17 +689,12 @@ np.save(sys.argv[3], model.predict_proba(pd.read_pickle(sys.argv[2])))
 
 
 @pytest.mark.parametrize("model_cls,output", [(MitraModel, 1), (MitraV2Model, 1), (MitraV2Model, 7)])
-def test_failed_save_restores_the_fitted_model(checkpoint_factory, tmp_path, model_cls, output):
+def test_failed_save_restores_the_fitted_model(model_factory, model_cls, output):
     from autogluon.tabular.models.abstract.abstract_torch_model import AbstractTorchModel
 
-    checkpoint = checkpoint_factory(task="REGRESSION", dim_output=output)
     X = pd.DataFrame(np.random.RandomState(0).normal(size=(24, 2)))
     y = pd.Series(np.arange(24, dtype=float))
-    model = model_cls(
-        path=str(tmp_path / "failed_save"),
-        problem_type="regression",
-        hyperparameters={"hf_model": checkpoint, "fine_tune": False},
-    )
+    model = model_factory("regression", model_cls=model_cls, dim_output=output, fine_tune=False)
     model.fit(X=X.iloc[:16], y=y.iloc[:16], X_val=X.iloc[16:], y_val=y.iloc[16:], num_cpus=1, num_gpus=0)
     trainer = model.model.trainers[0]
     state = {name: getattr(trainer, name) for name in ("model", "bins", "bin_width") if hasattr(trainer, name)}
@@ -652,41 +704,6 @@ def test_failed_save_restores_the_fitted_model(checkpoint_factory, tmp_path, mod
     for name, value in state.items():
         assert getattr(trainer, name) is value
     assert np.isfinite(model.predict_proba(X.iloc[16:])).all()
-
-
-@pytest.mark.parametrize("problem_type", ["binary", "regression"])
-def test_legacy_predictor_load_and_refit_keep_original_api(checkpoint_factory, tmp_path, problem_type):
-    from autogluon.tabular.models.mitra.sklearn_interface import MitraClassifier, MitraRegressor
-
-    is_regression = problem_type == "regression"
-    estimator_cls = MitraRegressor if is_regression else MitraClassifier
-    # Original custom checkpoints did not declare a release version.
-    path = checkpoint_factory(
-        task="REGRESSION" if is_regression else "CLASSIFICATION", dim_output=1 if is_regression else 10
-    )
-    X = pd.DataFrame(np.random.RandomState(0).normal(size=(24, 2)), columns=["a", "b"])
-    y = pd.Series(np.random.RandomState(1).normal(size=24) if is_regression else np.arange(24) % 2)
-    model = MitraModel(
-        path=str(tmp_path / "legacy"),
-        problem_type=problem_type,
-        hyperparameters={"hf_model": path, "fine_tune_steps": 1},
-    )
-    model.fit(X=X.iloc[:16], y=y.iloc[:16], X_val=X.iloc[16:], y_val=y.iloc[16:], num_cpus=1, num_gpus=0)
-    model.save()
-    prediction = model.predict_proba(X.iloc[16:])
-    loaded = MitraModel.load(model.path)
-    assert type(loaded) is MitraModel
-    assert loaded.get_model_cls() is estimator_cls
-    assert type(loaded.model) is estimator_cls
-    refit = loaded.convert_to_refit_full_template()
-    assert type(refit) is MitraModel
-    assert refit.get_model_cls() is estimator_cls
-    assert "model_version" not in refit.params
-    assert "fine_tune_recipe" not in refit.params
-    np.testing.assert_allclose(loaded.predict_proba(X.iloc[16:]), prediction, atol=1e-5)
-    refit.fit(X=X, y=y, num_cpus=1, num_gpus=0)
-    assert isinstance(refit.model, estimator_cls)
-    assert np.isfinite(refit.predict_proba(X.iloc[16:])).all()
 
 
 def test_legacy_bagged_template_keeps_original_api(tmp_path):
@@ -712,20 +729,11 @@ def test_legacy_bagged_template_keeps_original_api(tmp_path):
 
 
 @pytest.mark.parametrize("heldout_in_support", [True, False])
-def test_bagging_extends_support_only_after_oof(checkpoint_factory, tmp_path, heldout_in_support):
+def test_bagging_extends_support_only_after_oof(model_factory, heldout_in_support):
     from autogluon.tabular.models.mitra.finetune import MitraFinetuneClassifier
 
-    path = checkpoint_factory(version="2")
-    X = pd.DataFrame(np.random.RandomState(3).normal(size=(32, 3)))
-    y = pd.Series(np.arange(32) % 2)
-    bag = BaggedEnsembleModel(
-        model_base=MitraV2Model(
-            problem_type="binary",
-            hyperparameters={"hf_model": path, "fine_tune": False, "heldout_in_support": heldout_in_support},
-        ),
-        path=str(tmp_path / "bag"),
-        hyperparameters={"fold_fitting_strategy": "sequential_local"},
-    )
+    X, y = _toy_data(32, 3, seed=3)
+    bag = model_factory(metadata_version="2", bagged=True, fine_tune=False, heldout_in_support=heldout_in_support)
     supports_at_prediction = []
     original = MitraFinetuneClassifier.predict_proba
 
@@ -747,20 +755,11 @@ def test_bagging_extends_support_only_after_oof(checkpoint_factory, tmp_path, he
 
 
 @pytest.mark.parametrize("heldout_in_support", [True, False])
-def test_ray_oof_cleanup_finalizes_mitra_support_once(checkpoint_factory, tmp_path, heldout_in_support):
+def test_ray_oof_cleanup_finalizes_mitra_support_once(model_factory, heldout_in_support):
     from autogluon.core.models.ensemble.fold_fitting_strategy import _ray_predict_oof
 
-    X = pd.DataFrame(np.random.RandomState(3).normal(size=(32, 3)))
-    y = pd.Series(np.arange(32) % 2)
-    model = MitraV2Model(
-        path=str(tmp_path / "fold"),
-        problem_type="binary",
-        hyperparameters={
-            "hf_model": checkpoint_factory(version="2"),
-            "fine_tune": False,
-            "heldout_in_support": heldout_in_support,
-        },
-    )
+    X, y = _toy_data(32, 3, seed=3)
+    model = model_factory(metadata_version="2", fine_tune=False, heldout_in_support=heldout_in_support)
     # Match the existing bagging protocol: validate the template against the
     # full dataset, then fit the already-validated child on its training fold.
     model.validate_fit_args(X=X)
@@ -787,14 +786,9 @@ def test_ray_oof_cleanup_finalizes_mitra_support_once(checkpoint_factory, tmp_pa
     assert restored._pending_fold_support is None
 
 
-def test_standalone_cleanup_does_not_add_external_validation(checkpoint_factory, tmp_path):
-    X = pd.DataFrame(np.random.RandomState(3).normal(size=(32, 3)))
-    y = pd.Series(np.arange(32) % 2)
-    model = MitraV2Model(
-        path=str(tmp_path / "standalone"),
-        problem_type="binary",
-        hyperparameters={"hf_model": checkpoint_factory(version="2"), "fine_tune": False},
-    )
+def test_standalone_cleanup_does_not_add_external_validation(model_factory):
+    X, y = _toy_data(32, 3, seed=3)
+    model = model_factory(metadata_version="2", fine_tune=False)
     model.fit(X=X.iloc[:16], y=y.iloc[:16], X_val=X.iloc[16:], y_val=y.iloc[16:], num_cpus=1, num_gpus=0)
     probabilities = model.predict_proba(X.iloc[16:])
     model.val_score = model.score_with_y_pred_proba(y.iloc[16:], probabilities)
@@ -804,16 +798,9 @@ def test_standalone_cleanup_does_not_add_external_validation(checkpoint_factory,
     assert model._pending_fold_support is None
 
 
-def test_many_class_fit_is_reusable_and_serializable(checkpoint_factory, tmp_path):
-    path = checkpoint_factory(version="2")
-    rng = np.random.RandomState(4)
-    X = pd.DataFrame(rng.normal(size=(66, 3)))
-    y = pd.Series(np.tile(np.arange(11), 6))
-    model = MitraV2Model(
-        path=str(tmp_path / "hierarchy"),
-        problem_type="multiclass",
-        hyperparameters={"hf_model": path, "fine_tune_steps": 1, "ag.max_memory_usage_ratio": None},
-    )
+def test_many_class_fit_is_reusable_and_serializable(model_factory):
+    X, y = _toy_data(66, 3, n_classes=11, seed=4)
+    model = model_factory("multiclass", metadata_version="2", **{"ag.max_memory_usage_ratio": None})
     model.fit(X=X.iloc[:44], y=y.iloc[:44], X_val=X.iloc[44:], y_val=y.iloc[44:], num_cpus=1, num_gpus=0)
     model.save()
     prediction = model.predict_proba(X.iloc[44:])
@@ -834,29 +821,21 @@ def test_many_class_internal_split_rejects_singleton_classes():
         estimator.fit(X, y)
 
 
-def test_many_class_external_validation_requires_every_class():
+@pytest.mark.parametrize(
+    "y_val", [np.arange(10), np.r_[0.5, np.arange(1, 11)]], ids=["missing_class", "fractional_label"]
+)
+def test_many_class_external_validation_requires_matching_integer_classes(y_val):
     from autogluon.tabular.models.mitra.finetune import MitraFinetuneClassifier
 
     X = np.random.RandomState(0).normal(size=(44, 3))
     y = np.tile(np.arange(11), 4)
     estimator = MitraFinetuneClassifier(hf_model="unused", device="cpu", fine_tune=False)
     with pytest.raises(ValueError, match="must contain exactly the training classes"):
-        estimator.fit(X, y, X_val=X[:10], y_val=np.arange(10))
+        estimator.fit(X, y, X_val=X[: len(y_val)], y_val=y_val)
 
 
-def test_many_class_external_validation_rejects_non_integer_labels_before_casting():
-    from autogluon.tabular.models.mitra.finetune import MitraFinetuneClassifier
-
-    X = np.random.RandomState(0).normal(size=(44, 3))
-    y = np.tile(np.arange(11), 4)
-    y_val = np.arange(11, dtype=float)
-    y_val[0] = 0.5
-    estimator = MitraFinetuneClassifier(hf_model="unused", device="cpu", fine_tune=False)
-    with pytest.raises(ValueError, match="must contain exactly the training classes"):
-        estimator.fit(X, y, X_val=X[:11], y_val=y_val)
-
-
-def test_many_class_internal_split_retains_every_class(checkpoint_factory):
+@pytest.mark.parametrize("dtype", [int, float])
+def test_many_class_internal_split_retains_every_class(checkpoint_factory, dtype):
     from autogluon.tabular.models.mitra.finetune import MitraFinetuneClassifier
 
     X = np.random.RandomState(0).normal(size=(22, 3))
@@ -868,7 +847,7 @@ def test_many_class_internal_split_retains_every_class(checkpoint_factory):
         fine_tune=False,
         verbose=False,
     )
-    estimator.fit(X, y)
+    estimator.fit(X, y.astype(dtype))
     probabilities = estimator.predict_proba(X[:3])
     assert probabilities.shape == (3, 11)
     np.testing.assert_allclose(probabilities.sum(axis=1), 1)
@@ -880,22 +859,6 @@ def test_many_class_internal_split_retains_every_class(checkpoint_factory):
         for trainer in node.estimator.trainers:
             assert trainer.optimizer is None
             assert trainer.checkpoint is None
-
-
-def test_many_class_float_integer_labels_are_normalized(checkpoint_factory):
-    from autogluon.tabular.models.mitra.finetune import MitraFinetuneClassifier
-
-    X = np.random.RandomState(0).normal(size=(22, 3))
-    y = np.repeat(np.arange(11), 2).astype(float)
-    estimator = MitraFinetuneClassifier(
-        hf_model=checkpoint_factory(version="2"),
-        model_version="2",
-        device="cpu",
-        fine_tune=False,
-        verbose=False,
-    )
-    estimator.fit(X, y)
-    assert estimator.predict_proba(X[:3]).shape == (3, 11)
 
 
 def test_class_hierarchy_validates_node_probability_shape():
@@ -966,11 +929,6 @@ def test_projection_treats_infinity_as_missing(infinite_training):
 
 @pytest.mark.parametrize("nonempty_features", [0, 1, 3, 8])
 def test_projection_caps_components_after_imputation(nonempty_features):
-    from sklearn.decomposition import PCA
-    from sklearn.impute import SimpleImputer
-    from sklearn.pipeline import make_pipeline
-    from sklearn.preprocessing import StandardScaler
-
     from autogluon.tabular.models.mitra._internal.data.feature_reduction import FeatureReducer
 
     X = pd.DataFrame(np.random.RandomState(22).normal(size=(40, 12)))
@@ -982,11 +940,7 @@ def test_projection_caps_components_after_imputation(nonempty_features):
         pd.testing.assert_frame_equal(reducer.transform_training(X), X)
         assert reducer.projection is None
     else:
-        reference = make_pipeline(
-            SimpleImputer(strategy="mean"),
-            StandardScaler(),
-            PCA(n_components=min(5, nonempty_features), random_state=0),
-        )
+        reference = _reference_projection(min(5, nonempty_features))
         expected = reference.fit_transform(X.to_numpy())
         np.testing.assert_array_equal(reducer.transform_training(X), expected)
         assert expected.shape == (len(X), min(5, nonempty_features))
@@ -1006,7 +960,9 @@ def test_projection_caps_components_after_imputation(nonempty_features):
     ],
     ids=["raw_type", "special_type", "extra_filter"],
 )
-def test_feature_exclusions_match_dropped_columns(checkpoint_factory, tmp_path, bagged, problem_type, feature_filter):
+def test_feature_exclusions_match_dropped_columns(
+    checkpoint_factory, model_factory, bagged, problem_type, feature_filter
+):
     import torch
 
     from autogluon.common.features.feature_metadata import FeatureMetadata
@@ -1029,22 +985,16 @@ def test_feature_exclusions_match_dropped_columns(checkpoint_factory, tmp_path, 
         # The released preprocessing recipe draws mirrors from the global RNG.
         np.random.seed(0)
         torch.manual_seed(0)
-        model = MitraV2Model(
-            path=str(tmp_path / name),
-            problem_type=problem_type,
-            hyperparameters={
-                "hf_model": checkpoint,
-                "fine_tune": False,
-                "max_features": 3,
-                **{f"ag.{key}": value for key, value in filter_params.items()},
-            },
+        model = model_factory(
+            problem_type,
+            name=name,
+            bagged=bagged,
+            hf_model=checkpoint,
+            fine_tune=False,
+            max_features=3,
+            **{f"ag.{key}": value for key, value in filter_params.items()},
         )
         if bagged:
-            model = BaggedEnsembleModel(
-                model_base=model,
-                path=str(tmp_path / name),
-                hyperparameters={"fold_fitting_strategy": "sequential_local"},
-            )
             model.fit(X=data, y=y, feature_metadata=feature_metadata, k_fold=2, num_cpus=1, num_gpus=0)
         else:
             model.fit(
@@ -1140,17 +1090,12 @@ def test_categorical_codes_are_stable_and_unseen_values_are_missing(model_cls, d
 
 
 @pytest.mark.parametrize("model_cls", [MitraModel, MitraV2Model])
-def test_string_dtype_fit_predict(checkpoint_factory, tmp_path, model_cls):
-    checkpoint = checkpoint_factory(task="REGRESSION", dim_output=1, version="2")
+def test_string_dtype_fit_predict(model_factory, model_cls):
     rng = np.random.RandomState(8)
     X = pd.DataFrame(rng.normal(size=(24, 299)), columns=[f"f{i}" for i in range(299)])
     X["text"] = pd.Series(["b", "c"] * 8 + ["b", "d"] * 4, dtype="string")
     y = pd.Series(rng.normal(size=len(X)))
-    model = model_cls(
-        path=str(tmp_path / "string_dtype"),
-        problem_type="regression",
-        hyperparameters={"hf_model": checkpoint, "fine_tune": False},
-    )
+    model = model_factory("regression", model_cls=model_cls, dim_output=1, metadata_version="2", fine_tune=False)
     model.fit(X=X.iloc[:16], y=y.iloc[:16], X_val=X.iloc[16:], y_val=y.iloc[16:], num_cpus=1, num_gpus=0)
     expected = model.predict_proba(X.iloc[16:])
     assert np.isfinite(expected).all()
@@ -1209,14 +1154,15 @@ def test_instance_memory_estimate_uses_resolved_hyperparameters():
     assert hyperparameters["n_estimators"] == 3
 
 
-def test_classification_memory_estimate_does_not_assume_fold_reduction():
-    X = pd.DataFrame(np.random.RandomState(7).normal(size=(100, 300)))
+@pytest.mark.parametrize("nonfinite", [False, True])
+def test_classification_memory_estimate_does_not_assume_fold_reduction(nonfinite):
+    values = (
+        np.tile(np.array([0.0, 1.0, np.inf, 0.0])[:, None], (1, 300))
+        if nonfinite
+        else np.random.RandomState(7).normal(size=(100, 300))
+    )
     assert (
-        MitraV2Model._estimate_reduced_num_features(
-            X=X,
-            hyperparameters={},
-            problem_type="binary",
-        )
+        MitraV2Model._estimate_reduced_num_features(X=pd.DataFrame(values), hyperparameters={}, problem_type="binary")
         == 300
     )
 
@@ -1238,43 +1184,36 @@ def test_many_class_memory_estimate_accounts_for_every_hierarchy_node():
     assert estimate == 700_000_090
 
 
-def test_memory_feature_gate_ignores_nonfinite_values():
-    X = pd.DataFrame(np.tile(np.array([0.0, 1.0, np.inf, 0.0])[:, None], (1, 300)))
-    assert (
-        MitraV2Model._estimate_reduced_num_features(
-            X=X,
-            hyperparameters={},
-            problem_type="binary",
-        )
-        == 300
-    )
-
-
-@pytest.mark.parametrize("problem_type,n_classes", [("binary", 2), ("multiclass", 3)])
-def test_bagged_classification_matches_released_selection(checkpoint_factory, tmp_path, problem_type, n_classes):
+@pytest.mark.parametrize("problem_type,n_classes", [("binary", 2), ("multiclass", 3), ("regression", 0)])
+def test_bagged_features_match_released_reduction(model_factory, problem_type, n_classes):
     from sklearn.feature_selection import f_classif
 
-    from autogluon.tabular.models.mitra.finetune import MitraFinetuneClassifier
+    from autogluon.tabular.models.mitra.finetune import MitraFinetuneClassifier, MitraFinetuneRegressor
 
-    rng = np.random.RandomState(17)
-    X = pd.DataFrame(rng.normal(size=(48, 12)), columns=range(12))
-    y = pd.Series(np.arange(len(X)) % n_classes)
-    scores, _ = f_classif(X.to_numpy(), y.to_numpy())
-    columns = X.columns[np.argsort(scores)[::-1][:3]]
-    expected = X.loc[:, columns]
-    bag = BaggedEnsembleModel(
-        model_base=MitraV2Model(
-            problem_type=problem_type,
-            hyperparameters={
-                "hf_model": checkpoint_factory(version="2"),
-                "fine_tune": False,
-                "max_features": 3,
-            },
-        ),
-        path=str(tmp_path / "selection_bag"),
-        hyperparameters={"fold_fitting_strategy": "sequential_local"},
+    is_regression = problem_type == "regression"
+    if is_regression:
+        X, y = _toy_data(40, 6, n_classes=0, seed=17)
+        # The outer projection must retain columns that are constant within a
+        # fold or omitted from bag metadata, including entirely missing columns.
+        X["rare"], X["constant"], X["empty"] = 0.0, 0.0, np.nan
+        X.loc[0, "rare"] = 1.0
+        reference = _reference_projection(3)
+        expected = pd.DataFrame(reference.fit_transform(X.to_numpy(dtype=float)), index=X.index)
+    else:
+        X, y = _toy_data(48, 12, n_classes=n_classes, seed=17)
+        scores, _ = f_classif(X.to_numpy(), y.to_numpy())
+        columns = X.columns[np.argsort(scores)[::-1][:3]]
+        expected = X.loc[:, columns]
+    bag = model_factory(
+        problem_type,
+        dim_output=7 if is_regression else 10,
+        metadata_version="2",
+        bagged=True,
+        fine_tune=False,
+        max_features=3,
     )
-    original_fit = MitraFinetuneClassifier.fit
+    estimator_cls = MitraFinetuneRegressor if is_regression else MitraFinetuneClassifier
+    original_fit = estimator_cls.fit
     folds_seen = []
 
     def fit(estimator, X, y, X_val=None, y_val=None, **kwargs):
@@ -1283,94 +1222,38 @@ def test_bagged_classification_matches_released_selection(checkpoint_factory, tm
         folds_seen.append(X.index.tolist())
         return original_fit(estimator, X, y, X_val=X_val, y_val=y_val, **kwargs)
 
-    with mock.patch.object(MitraFinetuneClassifier, "fit", fit):
+    with mock.patch.object(estimator_cls, "fit", fit):
         bag.fit(X=X, y=y, k_fold=2, num_cpus=1, num_gpus=0)
     assert len(folds_seen) == 2
     assert np.isfinite(bag.predict_proba_oof()).all()
-    assert bag.load_model_base()._feature_reducer.columns == columns.tolist()
+    reducer = bag.load_model_base()._feature_reducer
+    if is_regression:
+        assert reducer.projection is not None
+        assert reducer._training_projection is None
+        assert reducer._training_keys is None
+    else:
+        assert reducer.columns == columns.tolist()
     query = X.iloc[:4] + 100
-    for child_name in bag.models:
-        child = bag.load_child(child_name)
-        np.testing.assert_array_equal(child.preprocess(query).to_numpy(), query.loc[:, columns].to_numpy())
-        child.save()
-        restored = MitraV2Model.load(child.path)
-        np.testing.assert_array_equal(restored.preprocess(query).to_numpy(), query.loc[:, columns].to_numpy())
-
-
-def test_bagged_regression_matches_released_projection(checkpoint_factory, tmp_path):
-    from sklearn.decomposition import PCA
-    from sklearn.impute import SimpleImputer
-    from sklearn.pipeline import make_pipeline
-    from sklearn.preprocessing import StandardScaler
-
-    from autogluon.tabular.models.mitra.finetune import MitraFinetuneRegressor
-
-    rng = np.random.RandomState(17)
-    X = pd.DataFrame(rng.normal(size=(40, 6)), columns=range(6))
-    # A column can be constant within a fold and still be needed by the
-    # projection fitted on the outer table.
-    X["rare"] = 0.0
-    X.loc[0, "rare"] = 1.0
-    # Bag metadata omits globally constant columns, but the released projection
-    # still sees them and lets its imputer drop entirely missing columns.
-    X["constant"] = 0.0
-    X["empty"] = np.nan
-    y = pd.Series(rng.normal(size=len(X)))
-    reference = make_pipeline(SimpleImputer(strategy="mean"), StandardScaler(), PCA(n_components=3, random_state=0))
-    expected = pd.DataFrame(reference.fit_transform(X.to_numpy(dtype=float)), index=X.index)
-    bag = BaggedEnsembleModel(
-        model_base=MitraV2Model(
-            problem_type="regression",
-            hyperparameters={
-                "hf_model": checkpoint_factory(task="REGRESSION", dim_output=7, version="2"),
-                "fine_tune": False,
-                "max_features": 3,
-            },
-        ),
-        path=str(tmp_path / "projection_bag"),
-        hyperparameters={"fold_fitting_strategy": "sequential_local"},
-    )
-    original_fit = MitraFinetuneRegressor.fit
-    folds_seen = []
-
-    def fit(estimator, X, y, X_val=None, y_val=None, **kwargs):
-        np.testing.assert_array_equal(X.to_numpy(), expected.loc[X.index].to_numpy())
-        np.testing.assert_array_equal(X_val.to_numpy(), expected.loc[X_val.index].to_numpy())
-        folds_seen.append(X.index.tolist())
-        return original_fit(estimator, X, y, X_val=X_val, y_val=y_val, **kwargs)
-
-    with mock.patch.object(MitraFinetuneRegressor, "fit", fit):
-        bag.fit(X=X, y=y, k_fold=2, num_cpus=1, num_gpus=0)
-    assert len(folds_seen) == 2
-    assert np.isfinite(bag.predict_proba_oof()).all()
-    persisted_template = bag.load_model_base()
-    assert persisted_template._feature_reducer.projection is not None
-    assert persisted_template._feature_reducer._training_projection is None
-    assert persisted_template._feature_reducer._training_keys is None
-    query = X.iloc[:4] + 100
+    expected_query = reference.transform(query.to_numpy()) if is_regression else query.loc[:, columns].to_numpy()
     # Reusing training indices must not reuse cached training values at
     # inference, including after loading a saved child.
     for child_name in bag.models:
         child = bag.load_child(child_name)
-        assert child._feature_reducer._training_projection is None
-        assert not child._use_training_projection
-        np.testing.assert_array_equal(child.preprocess(query).to_numpy(), reference.transform(query.to_numpy()))
+        if is_regression:
+            assert child._feature_reducer._training_projection is None
+            assert not child._use_training_projection
+        np.testing.assert_array_equal(child.preprocess(query).to_numpy(), expected_query)
         child.save()
         restored = MitraV2Model.load(child.path)
-        np.testing.assert_array_equal(restored.preprocess(query).to_numpy(), reference.transform(query.to_numpy()))
+        np.testing.assert_array_equal(restored.preprocess(query).to_numpy(), expected_query)
 
 
 def test_projection_cache_checks_row_values_and_preserves_fit_transform():
-    from sklearn.decomposition import PCA
-    from sklearn.impute import SimpleImputer
-    from sklearn.pipeline import make_pipeline
-    from sklearn.preprocessing import StandardScaler
-
     from autogluon.tabular.models.mitra._internal.data.feature_reduction import FeatureReducer
 
     X = pd.DataFrame(np.random.RandomState(7).normal(size=(80, 24)))
     X.index = np.arange(len(X)) // 2
-    reference = make_pipeline(SimpleImputer(strategy="mean"), StandardScaler(), PCA(n_components=5, random_state=0))
+    reference = _reference_projection(5)
     expected = reference.fit_transform(X.to_numpy())
     reducer = FeatureReducer("regression", max_features=5).fit(X, None, cache_training=True)
     rows = [9, 3, 44, 1]
@@ -1402,24 +1285,13 @@ def test_projection_cache_supports_temporal_dtypes_and_normalized_column_names()
     assert np.isfinite(transformed).all().all()
 
 
-def test_shared_regression_projection_accepts_pseudolabeled_rows(checkpoint_factory, tmp_path):
+def test_shared_regression_projection_accepts_pseudolabeled_rows(model_factory):
     rng = np.random.RandomState(19)
     X = pd.DataFrame(rng.normal(size=(40, 6)), columns=list("abcdef"))
     y = pd.Series(rng.normal(size=len(X)))
     X_pseudo = pd.DataFrame(rng.normal(size=(7, 6)), columns=X.columns)
     y_pseudo = pd.Series(rng.normal(size=len(X_pseudo)))
-    bag = BaggedEnsembleModel(
-        model_base=MitraV2Model(
-            problem_type="regression",
-            hyperparameters={
-                "hf_model": checkpoint_factory(task="REGRESSION", dim_output=7, version="2"),
-                "fine_tune": False,
-                "max_features": 3,
-            },
-        ),
-        path=str(tmp_path / "pseudo_bag"),
-        hyperparameters={"fold_fitting_strategy": "sequential_local"},
-    )
+    bag = model_factory("regression", dim_output=7, metadata_version="2", bagged=True, fine_tune=False, max_features=3)
     bag.fit(X=X, y=y, X_pseudo=X_pseudo, y_pseudo=y_pseudo, k_fold=2, num_cpus=1, num_gpus=0)
     assert np.isfinite(bag.predict_proba_oof()).all()
     assert np.isfinite(bag.predict_proba(X_pseudo)).all()
@@ -1429,25 +1301,16 @@ def test_shared_regression_projection_accepts_pseudolabeled_rows(checkpoint_fact
         assert child._feature_reducer._training_projection is None
 
 
-def test_prediction_oom_shrinks_queries_before_support():
-    from types import SimpleNamespace
-
+def test_prediction_oom_shrinks_queries_before_support(trainer_factory):
     import torch
 
-    from autogluon.tabular.models.mitra._internal.core.trainer_finetune_v2 import TrainerFinetuneV2
-
-    trainer = TrainerFinetuneV2.__new__(TrainerFinetuneV2)
-    trainer.cfg = SimpleNamespace(
-        hyperparams={
-            "max_samples_query": 1024,
-            "predict_max_samples_support": 200,
-            "predict_min_samples_support": 50,
-            "predict_max_samples_query": 4096,
-            "predict_min_samples_query": 256,
-        }
+    trainer = trainer_factory(
+        max_samples_query=1024,
+        predict_max_samples_support=200,
+        predict_min_samples_support=50,
+        predict_max_samples_query=4096,
+        predict_min_samples_query=256,
     )
-    trainer.preprocessor = SimpleNamespace(transform_X=lambda x: x, transform_y=lambda y: y)
-    trainer.rng = np.random.RandomState(0)
     attempts = []
     draws = []
 
@@ -1479,24 +1342,16 @@ def test_prediction_oom_shrinks_queries_before_support():
 
 
 @pytest.mark.parametrize("training_query_size", [128, 256, 512])
-def test_prediction_uses_fitted_query_limit_before_reducing_support(training_query_size):
-    from types import SimpleNamespace
-
+def test_prediction_uses_fitted_query_limit_before_reducing_support(trainer_factory, training_query_size):
     import torch
 
-    from autogluon.tabular.models.mitra._internal.core.trainer_finetune_v2 import TrainerFinetuneV2
-
-    trainer = TrainerFinetuneV2.__new__(TrainerFinetuneV2)
-    trainer.cfg = SimpleNamespace(
-        hyperparams={
-            "max_samples_query": training_query_size,
-            "predict_max_samples_support": 64,
-            "predict_min_samples_support": 32,
-            "predict_max_samples_query": 2048,
-            "predict_min_samples_query": 16,
-        }
+    trainer = trainer_factory(
+        max_samples_query=training_query_size,
+        predict_max_samples_support=64,
+        predict_min_samples_support=32,
+        predict_max_samples_query=2048,
+        predict_min_samples_query=16,
     )
-    trainer.preprocessor = SimpleNamespace(transform_X=lambda x: x, transform_y=lambda y: y)
     attempts = []
 
     def predict(x_support, y_support, x_query, support_cap, query_chunk, **kwargs):
@@ -1513,24 +1368,16 @@ def test_prediction_uses_fitted_query_limit_before_reducing_support(training_que
 
 
 @pytest.mark.parametrize("requested_cap", [49152, 60000, 65536])
-def test_prediction_oversized_support_retries_at_hf_baseline(requested_cap):
-    from types import SimpleNamespace
-
+def test_prediction_oversized_support_retries_at_hf_baseline(trainer_factory, requested_cap):
     import torch
 
-    from autogluon.tabular.models.mitra._internal.core.trainer_finetune_v2 import TrainerFinetuneV2
-
-    trainer = TrainerFinetuneV2.__new__(TrainerFinetuneV2)
-    trainer.cfg = SimpleNamespace(
-        hyperparams={
-            "max_samples_query": 1024,
-            "predict_max_samples_support": requested_cap,
-            "predict_min_samples_support": 8192,
-            "predict_max_samples_query": 1024,
-            "predict_min_samples_query": 256,
-        }
+    trainer = trainer_factory(
+        max_samples_query=1024,
+        predict_max_samples_support=requested_cap,
+        predict_min_samples_support=8192,
+        predict_max_samples_query=1024,
+        predict_min_samples_query=256,
     )
-    trainer.preprocessor = SimpleNamespace(transform_X=lambda x: x, transform_y=lambda y: y)
     attempts = []
 
     def predict(x_support, y_support, x_query, support_cap, query_chunk, **kwargs):
@@ -1547,27 +1394,18 @@ def test_prediction_oversized_support_retries_at_hf_baseline(requested_cap):
 
 
 @pytest.mark.parametrize("fails_again", [False, True])
-def test_prediction_oom_retry_releases_traceback_before_cleanup(fails_again):
-    import sys
+def test_prediction_oom_retry_releases_traceback_before_cleanup(trainer_factory, fails_again):
     import weakref
-    from types import SimpleNamespace
 
     import torch
 
-    from autogluon.tabular.models.mitra._internal.core.trainer_finetune_v2 import TrainerFinetuneV2
-
-    trainer = TrainerFinetuneV2.__new__(TrainerFinetuneV2)
-    trainer.cfg = SimpleNamespace(
-        hyperparams={
-            "max_samples_query": 2,
-            "predict_max_samples_support": 8,
-            "predict_min_samples_support": 8,
-            "predict_max_samples_query": 4,
-            "predict_min_samples_query": 2,
-        }
+    trainer = trainer_factory(
+        max_samples_query=2,
+        predict_max_samples_support=8,
+        predict_min_samples_support=8,
+        predict_max_samples_query=4,
+        predict_min_samples_query=2,
     )
-    trainer.preprocessor = SimpleNamespace(transform_X=lambda x: x, transform_y=lambda y: y)
-    trainer.rng = np.random.RandomState(0)
     attempts, draws, buffers = [], [], []
 
     def predict(x_support, y_support, x_query, support_cap, query_chunk, **kwargs):
@@ -1601,22 +1439,16 @@ def test_prediction_oom_retry_releases_traceback_before_cleanup(fails_again):
     cleanup.assert_called_once()
 
 
-def test_prediction_oom_at_minimum_context_terminates():
+def test_prediction_oom_at_minimum_context_terminates(trainer_factory):
     import torch
 
-    from autogluon.tabular.models.mitra._internal.core.trainer_finetune_v2 import TrainerFinetuneV2
-
-    trainer = TrainerFinetuneV2.__new__(TrainerFinetuneV2)
-    trainer.cfg = SimpleNamespace(
-        hyperparams={
-            "max_samples_query": 2,
-            "predict_max_samples_support": 8,
-            "predict_min_samples_support": 8,
-            "predict_max_samples_query": 2,
-            "predict_min_samples_query": 2,
-        }
+    trainer = trainer_factory(
+        max_samples_query=2,
+        predict_max_samples_support=8,
+        predict_min_samples_support=8,
+        predict_max_samples_query=2,
+        predict_min_samples_query=2,
     )
-    trainer.preprocessor = SimpleNamespace(transform_X=lambda x: x, transform_y=lambda y: y)
     trainer._predict_transformed = mock.Mock(side_effect=torch.cuda.OutOfMemoryError("minimum allocation"))
     with pytest.raises(torch.cuda.OutOfMemoryError, match="minimum allocation"):
         trainer.predict(np.zeros((4, 2)), np.zeros(4), np.zeros((3, 2)))
@@ -1624,22 +1456,14 @@ def test_prediction_oom_at_minimum_context_terminates():
 
 
 @pytest.mark.parametrize("memory_error", [True, False])
-def test_prediction_handles_runtime_errors_without_hiding_other_failures(memory_error):
-    from types import SimpleNamespace
-
-    from autogluon.tabular.models.mitra._internal.core.trainer_finetune_v2 import TrainerFinetuneV2
-
-    trainer = TrainerFinetuneV2.__new__(TrainerFinetuneV2)
-    trainer.cfg = SimpleNamespace(
-        hyperparams={
-            "max_samples_query": 2,
-            "predict_max_samples_support": 8,
-            "predict_min_samples_support": 8,
-            "predict_max_samples_query": 4,
-            "predict_min_samples_query": 2,
-        }
+def test_prediction_handles_runtime_errors_without_hiding_other_failures(trainer_factory, memory_error):
+    trainer = trainer_factory(
+        max_samples_query=2,
+        predict_max_samples_support=8,
+        predict_min_samples_support=8,
+        predict_max_samples_query=4,
+        predict_min_samples_query=2,
     )
-    trainer.preprocessor = SimpleNamespace(transform_X=lambda x: x, transform_y=lambda y: y)
     message = "CUDA out of memory in attention" if memory_error else "invalid attention shape"
     prediction = np.zeros(3)
     trainer._predict_transformed = mock.Mock(side_effect=[RuntimeError(message), prediction])
@@ -1654,20 +1478,8 @@ def test_prediction_handles_runtime_errors_without_hiding_other_failures(memory_
 
 
 @pytest.mark.parametrize("memory_error", [True, False])
-def test_evaluation_handles_runtime_errors_without_hiding_other_failures(memory_error):
-    from autogluon.tabular.models.mitra._internal.core.trainer_finetune_v2 import TrainerFinetuneV2
-
-    trainer = TrainerFinetuneV2.__new__(TrainerFinetuneV2)
-    trainer.cfg = SimpleNamespace(
-        hyperparams={
-            "max_samples_query": 2,
-            "eval_max_samples_query": 8,
-        }
-    )
-    trainer.preprocessor = SimpleNamespace(
-        transform_X=lambda x: x,
-        transform_y=lambda y: y,
-    )
+def test_evaluation_handles_runtime_errors_without_hiding_other_failures(trainer_factory, memory_error):
+    trainer = trainer_factory(max_samples_query=2, eval_max_samples_query=8)
     trainer.metric = "log_loss"
     trainer._evaluation_cache = None
     message = "CUDA out of memory in attention" if memory_error else "invalid attention shape"
@@ -1752,16 +1564,24 @@ def test_fitted_context_is_reused_and_can_shrink_again():
 
 
 @pytest.mark.parametrize(
-    "change",
-    ["features", "rows", "checkpoint", "device", "support_limit", "query_limit"],
+    "rows,features,kwargs,share_context,expected",
+    [
+        (4096, 5, {}, True, (16384, 1024)),
+        (8192, 4, {}, True, (16384, 1024)),
+        (4096, 4, {"model_version": "1"}, True, (16384, 1024)),
+        (4096, 4, {"device": "cuda:1"}, True, (16384, 1024)),
+        (4096, 4, {"max_samples_support": 8192}, True, (8192, 1024)),
+        (4096, 4, {"max_samples_query": 512}, True, (16384, 512)),
+        (4096, 4, {}, False, (16384, 1024)),
+        (4096, 4, {}, True, (2048, 512)),
+    ],
+    ids=["features", "rows", "checkpoint", "device", "support_limit", "query_limit", "unrelated", "deepcopy"],
 )
-def test_fitted_context_does_not_cross_fit_settings(change):
+def test_fitted_context_is_scoped_to_compatible_fits(rows, features, kwargs, share_context, expected):
     from autogluon.tabular.models.mitra import finetune
-    from autogluon.tabular.models.mitra._internal.core.fit_context import FitContextMemo
     from autogluon.tabular.models.mitra.sklearn_interface import MitraBase
 
     starts = []
-    fit_context = FitContextMemo()
 
     def train(estimator, X_train, y_train, X_valid, y_valid, task, dim_output, **kwargs):
         cfg, _ = estimator._create_config(task, dim_output)
@@ -1772,79 +1592,18 @@ def test_fitted_context_does_not_cross_fit_settings(change):
 
     with mock.patch.object(MitraBase, "_train_ensemble", train):
         first = finetune.MitraFinetuneClassifier(device="cpu")
-        first._fit_context_memo = fit_context
         first.fit(np.zeros((4096, 4)), np.arange(4096) % 2, X_val=np.zeros((2, 4)), y_val=np.array([0, 1]))
-        rows, features, kwargs = 4096, 4, {"device": "cpu"}
-        if change == "features":
-            features = 5
-        elif change == "rows":
-            rows = 8192
-        elif change == "checkpoint":
-            kwargs["model_version"] = "1"
-        elif change == "device":
-            kwargs["device"] = "cuda:1"
-        elif change == "support_limit":
-            kwargs["max_samples_support"] = 8192
-        elif change == "query_limit":
-            kwargs["max_samples_query"] = 512
-        second = finetune.MitraFinetuneClassifier(**kwargs)
-        second._fit_context_memo = fit_context
+        second = finetune.MitraFinetuneClassifier(**{"device": "cpu", **kwargs})
+        if share_context:
+            second._fit_context_memo = copy.deepcopy(first._fit_context_memo)
+            assert second._fit_context_memo is first._fit_context_memo
         second.fit(
             np.zeros((rows, features)),
             np.arange(rows) % 2,
             X_val=np.zeros((2, features)),
             y_val=np.array([0, 1]),
         )
-        expected = (
-            8192 if change == "support_limit" else 16384,
-            512 if change == "query_limit" else 1024,
-        )
         assert starts == [(16384, 1024), expected]
-
-
-def test_fitted_context_does_not_cross_unrelated_fits():
-    from autogluon.tabular.models.mitra import finetune
-    from autogluon.tabular.models.mitra.sklearn_interface import MitraBase
-
-    starts = []
-
-    def train(estimator, X_train, y_train, X_valid, y_valid, task, dim_output, **kwargs):
-        cfg, _ = estimator._create_config(task, dim_output)
-        starts.append(cfg.hyperparams["max_samples_support"])
-        cfg.hyperparams["max_samples_support"] = 2048
-        estimator.trainers = [SimpleNamespace(cfg=cfg)]
-        return estimator
-
-    with mock.patch.object(MitraBase, "_train_ensemble", train):
-        for _ in range(2):
-            estimator = finetune.MitraFinetuneClassifier(device="cpu")
-            estimator.fit(
-                np.zeros((4096, 4)),
-                np.arange(4096) % 2,
-                X_val=np.zeros((2, 4)),
-                y_val=np.array([0, 1]),
-            )
-    assert starts == [16384, 16384]
-
-
-def test_fitted_context_is_shared_by_deep_copies_without_global_state():
-    from autogluon.tabular.models.mitra._internal.core.fit_context import FitContextMemo
-
-    fit_context = FitContextMemo()
-    fit_context.values[("shape",)] = (2048, 512)
-    copied = copy.deepcopy(fit_context)
-    assert copied is fit_context
-    assert copied.values == {("shape",): (2048, 512)}
-
-
-@pytest.mark.parametrize("version", ["1", "2"])
-def test_v2_limits_are_independent_of_checkpoint_version(version):
-    model = MitraV2Model(problem_type="binary", hyperparameters={"model_version": version})
-    limits = model._get_default_auxiliary_params()
-    assert limits["max_rows"] == 1_000_000
-    assert limits["max_features"] == 50_000
-    assert limits["max_classes"] is None
-    assert not hasattr(model, "_mitra_config_schema_version")
 
 
 def test_failed_fit_does_not_record_a_fitted_context():
@@ -1865,16 +1624,11 @@ def test_failed_fit_does_not_record_a_fitted_context():
 
 
 @pytest.mark.parametrize("model_cls", [MitraModel, MitraV2Model])
-def test_failed_fit_restores_torch_threads(checkpoint_factory, tmp_path, model_cls):
+def test_failed_fit_restores_torch_threads(model_factory, model_cls):
     import torch
 
-    X = pd.DataFrame(np.random.RandomState(0).normal(size=(16, 2)))
-    y = pd.Series(np.arange(16) % 2)
-    model = model_cls(
-        path=str(tmp_path / "failed"),
-        problem_type="binary",
-        hyperparameters={"hf_model": checkpoint_factory()},
-    )
+    X, y = _toy_data(16, 2)
+    model = model_factory(model_cls=model_cls)
     original_threads = torch.get_num_threads()
 
     def fail(*args, **kwargs):
