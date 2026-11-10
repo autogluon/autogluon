@@ -81,7 +81,7 @@ tabular_presets_dict = dict(
         "set_best_to_refit_full": True,
         "save_bag_folds": False,
     },
-    # Medium predictive accuracy with very fast inference and very fast training time. ~20x faster training than `good_quality`.
+    # Medium predictive accuracy with very fast training time. ~20x faster training than `good_quality`.
     # This is the default preset in AutoGluon, but should generally only be used for quick prototyping, as `good_quality` results in significantly better predictive accuracy with similar inference time.
     # Aliases: medium, medium_quality_faster_train
     medium_quality={"auto_stack": False},
