@@ -1581,6 +1581,19 @@ class TimeSeriesPredictor:
         """Returns a dictionary of objects each describing an attribute of the training process and trained models."""
         return self._learner.get_info(include_model_info=True)
 
+    def save_space(self) -> None:
+        """Reduce the disk usage of the predictor by deleting cached data and predictions not needed for inference.
+
+        This removes the cached training and validation data as well as the cached predictions stored during
+        training. It has no impact on inference accuracy, but disables functionality that relies on the cached
+        data, such as :meth:`~autogluon.timeseries.TimeSeriesPredictor.refit_full`.
+
+        It is recommended to call this method if the only remaining goal is to use the predictor for inference on
+        new data, especially when the training data was large.
+        """
+        self._assert_is_fit("save_space")
+        self._trainer.save_space()
+
     @property
     def model_best(self) -> str:
         """Returns the name of the best model from trainer."""
