@@ -129,6 +129,7 @@ class TabularPredictor:
 
         Otherwise, options for classification:
             ['accuracy', 'balanced_accuracy', 'log_loss', 'f1', 'f1_macro', 'f1_micro', 'f1_weighted',
+            'f2', 'f2_macro', 'f2_micro', 'f2_weighted',
             'roc_auc', 'roc_auc_ovo', 'roc_auc_ovo_macro', 'roc_auc_ovo_weighted', 'roc_auc_ovr', 'roc_auc_ovr_macro', 'roc_auc_ovr_micro',
             'roc_auc_ovr_weighted', 'average_precision', 'precision', 'precision_macro', 'precision_micro', 'precision_weighted',
             'recall', 'recall_macro', 'recall_micro', 'recall_weighted', 'mcc', 'pac_score']

@@ -2,7 +2,17 @@ import numpy as np
 import pytest
 import sklearn
 
-from autogluon.core.metrics import confusion_matrix, log_loss, quadratic_kappa, roc_auc
+from autogluon.core.metrics import (
+    confusion_matrix,
+    f2,
+    f2_macro,
+    f2_micro,
+    f2_weighted,
+    get_metric,
+    log_loss,
+    quadratic_kappa,
+    roc_auc,
+)
 from autogluon.core.metrics.softclass_metrics import soft_log_loss
 
 
@@ -241,3 +251,34 @@ def test_quadratic_kappa():
     preds = np.array([[0.8, 0.1, 0.1], [0.7, 0.1, 0.2], [0.1, 0.8, 0.1], [0.1, 0.1, 0.8]])
     value = quadratic_kappa(actuals, preds)
     assert value == 0.25
+
+
+def test_f2_score_with_sklearn():
+    y_true = np.array([0, 1, 1, 0, 1, 1, 0, 0, 1, 0])
+    y_pred = np.array([0, 1, 0, 0, 1, 0, 0, 1, 1, 0])
+
+    expected_f2 = sklearn.metrics.fbeta_score(y_true, y_pred, beta=2)
+    actual_f2 = f2(y_true, y_pred)
+    assert np.isclose(actual_f2, expected_f2)
+
+    # Test via get_metric
+    assert get_metric("f2")(y_true, y_pred) == actual_f2
+    assert get_metric("f2_macro")(y_true, y_pred) == f2_macro(y_true, y_pred)
+    assert get_metric("f2_micro")(y_true, y_pred) == f2_micro(y_true, y_pred)
+    assert get_metric("f2_weighted")(y_true, y_pred) == f2_weighted(y_true, y_pred)
+
+    # Multiclass test
+    y_true_mc = np.array([0, 1, 2, 0, 1, 2, 0, 1, 2])
+    y_pred_mc = np.array([0, 2, 1, 0, 1, 1, 0, 1, 2])
+    assert np.isclose(
+        f2_macro(y_true_mc, y_pred_mc),
+        sklearn.metrics.fbeta_score(y_true_mc, y_pred_mc, beta=2, average="macro"),
+    )
+    assert np.isclose(
+        f2_micro(y_true_mc, y_pred_mc),
+        sklearn.metrics.fbeta_score(y_true_mc, y_pred_mc, beta=2, average="micro"),
+    )
+    assert np.isclose(
+        f2_weighted(y_true_mc, y_pred_mc),
+        sklearn.metrics.fbeta_score(y_true_mc, y_pred_mc, beta=2, average="weighted"),
+    )
