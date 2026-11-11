@@ -976,3 +976,117 @@ class TestMultilayerEnsembleTraining:
             assert predictions is not None
             assert len(predictions) > 0
             assert not predictions.isna().all().all()
+
+
+def test_when_hpo_configurations_fail_then_warning_logged_with_first_traceback(tmp_path, caplog):
+    trainer = TimeSeriesTrainer(path=str(tmp_path), prediction_length=3)
+    mock_model = mock.MagicMock(spec=ETSModel)
+    mock_model.name = "TestModel"
+
+    dummy_child = mock.MagicMock(spec=ETSModel)
+    dummy_child.name = "TestModel/T2"
+    dummy_child.val_score = -1.0
+
+    analysis = {
+        "config_history": {0: {"hp": 1}, 1: {"hp": 2}, 2: {"hp": 3}, 3: {"hp": 4}},
+        "training_history": {
+            0: [{"failed": True, "traceback": "ValueError: invalid parameter value 1"}],
+            1: [{"failed": False, "validation_performance": -1.0}],
+            2: [{"failed": True, "traceback": "ValueError: invalid parameter value 3"}],
+            3: [{"failed": False, "validation_performance": -1.5}],
+        },
+    }
+    hpo_models = {
+        "TestModel/T2": {"path": "TestModel/T2", "val_score": -1.0, "hyperparameters": {"hp": 2}},
+        "TestModel/T4": {"path": "TestModel/T4", "val_score": -1.5, "hyperparameters": {"hp": 4}},
+    }
+    mock_model.hyperparameter_tune.return_value = (hpo_models, analysis)
+
+    with (
+        mock.patch.object(Path, "exists", return_value=True),
+        mock.patch.object(trainer, "load_model", return_value=dummy_child),
+        mock.patch.object(trainer, "_add_model"),
+    ):
+        with caplog.at_level("WARNING"):
+            trainer.tune_model_hyperparameters(
+                model=mock_model,
+                train_data=DUMMY_TS_DATAFRAME,
+            )
+
+    assert "2/4 (50%) model configurations failed during HPO." in caplog.text
+    assert (
+        "The exception that caused the first model to fail is:\nValueError: invalid parameter value 1" in caplog.text
+    )
+
+
+def test_when_ray_hpo_configurations_fail_then_warning_logged(tmp_path, caplog):
+    trainer = TimeSeriesTrainer(path=str(tmp_path), prediction_length=3)
+    mock_model = mock.MagicMock(spec=ETSModel)
+    mock_model.name = "TestModel"
+
+    dummy_child = mock.MagicMock(spec=ETSModel)
+    dummy_child.name = "TestModel/T2"
+    dummy_child.val_score = -1.0
+
+    class MockRayAnalysis:
+        def __init__(self):
+            self.results = {
+                "t1": {"failed": True, "traceback": "RuntimeError: ray worker failed"},
+                "t2": {"failed": False, "validation_performance": -1.0},
+            }
+
+    analysis = MockRayAnalysis()
+    hpo_models = {
+        "TestModel/T2": {"path": "TestModel/T2", "val_score": -1.0, "hyperparameters": {"hp": 2}},
+    }
+    mock_model.hyperparameter_tune.return_value = (hpo_models, analysis)
+
+    with (
+        mock.patch.object(Path, "exists", return_value=True),
+        mock.patch.object(trainer, "load_model", return_value=dummy_child),
+        mock.patch.object(trainer, "_add_model"),
+    ):
+        with caplog.at_level("WARNING"):
+            trainer.tune_model_hyperparameters(
+                model=mock_model,
+                train_data=DUMMY_TS_DATAFRAME,
+            )
+
+    assert "1/2 (50%) model configurations failed during HPO." in caplog.text
+    assert "The exception that caused the first model to fail is:\nRuntimeError: ray worker failed" in caplog.text
+
+
+def test_when_no_hpo_configurations_fail_then_no_warning_logged(tmp_path, caplog):
+    trainer = TimeSeriesTrainer(path=str(tmp_path), prediction_length=3)
+    mock_model = mock.MagicMock(spec=ETSModel)
+    mock_model.name = "TestModel"
+
+    dummy_child = mock.MagicMock(spec=ETSModel)
+    dummy_child.name = "TestModel/T1"
+    dummy_child.val_score = -1.0
+
+    analysis = {
+        "config_history": {0: {"hp": 1}, 1: {"hp": 2}},
+        "training_history": {
+            0: [{"failed": False, "validation_performance": -1.0}],
+            1: [{"failed": False, "validation_performance": -1.5}],
+        },
+    }
+    hpo_models = {
+        "TestModel/T1": {"path": "TestModel/T1", "val_score": -1.0, "hyperparameters": {"hp": 1}},
+        "TestModel/T2": {"path": "TestModel/T2", "val_score": -1.5, "hyperparameters": {"hp": 2}},
+    }
+    mock_model.hyperparameter_tune.return_value = (hpo_models, analysis)
+
+    with (
+        mock.patch.object(Path, "exists", return_value=True),
+        mock.patch.object(trainer, "load_model", return_value=dummy_child),
+        mock.patch.object(trainer, "_add_model"),
+    ):
+        with caplog.at_level("WARNING"):
+            trainer.tune_model_hyperparameters(
+                model=mock_model,
+                train_data=DUMMY_TS_DATAFRAME,
+            )
+
+    assert "failed during HPO" not in caplog.text

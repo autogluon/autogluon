@@ -289,7 +289,7 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
 
         tuning_start_time = time.time()
         with disable_tqdm():
-            hpo_models, _ = model.hyperparameter_tune(
+            hpo_models, analysis = model.hyperparameter_tune(
                 train_data=train_data,
                 val_data=val_data,
                 hyperparameter_tune_kwargs=hyperparameter_tune_kwargs,
@@ -322,6 +322,39 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
             model_names_trained.append(model_hpo.name)
 
         logger.info(f"\tTrained {len(model_names_trained)} models while tuning {model.name}.")
+
+        total_trials = None
+        num_failed = 0
+        first_failure_traceback = None
+        if isinstance(analysis, dict) and "config_history" in analysis:
+            total_trials = len(analysis["config_history"])
+            training_history = analysis.get("training_history", {})
+            for trial_id in sorted(analysis["config_history"].keys()):
+                trial_results = training_history.get(trial_id, [])
+                trial_failed = False
+                for res in trial_results:
+                    if isinstance(res, dict):
+                        if res.get("failed", False) or bool(res.get("traceback")):
+                            trial_failed = True
+                        if res.get("traceback") and first_failure_traceback is None:
+                            first_failure_traceback = res["traceback"]
+                if trial_failed:
+                    num_failed += 1
+        elif hasattr(analysis, "results") and isinstance(analysis.results, dict):
+            total_trials = len(analysis.results)
+            for trial_id, details in analysis.results.items():
+                if isinstance(details, dict):
+                    if details.get("failed", False) or bool(details.get("traceback")):
+                        num_failed += 1
+                    if details.get("traceback") and first_failure_traceback is None:
+                        first_failure_traceback = details["traceback"]
+
+        if total_trials is not None and num_failed > 0:
+            pct_failed = round((num_failed / total_trials) * 100)
+            msg = f"\t{num_failed}/{total_trials} ({pct_failed}%) model configurations failed during HPO."
+            if first_failure_traceback is not None:
+                msg += f" The exception that caused the first model to fail is:\n{first_failure_traceback}"
+            logger.warning(msg)
 
         if len(model_names_trained) > 0:
             trained_model_results = [hpo_models[model_name] for model_name in model_names_trained]
