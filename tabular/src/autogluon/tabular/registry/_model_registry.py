@@ -76,8 +76,23 @@ class ModelRegistry:
                 f"\n\tConflicting  Class: {self._key_to_cls_map[model_cls.ag_key]}"
                 f"\n\tConflicting ag_key: {model_cls.ag_key}"
             )
+        aliases = getattr(model_cls, "ag_aliases", ())
+        if isinstance(aliases, str):
+            aliases = (aliases,)
+        assert isinstance(aliases, (list, tuple, set)), f"ag_aliases must be a collection of strings: {aliases}"
+        for alias in aliases:
+            assert isinstance(alias, str), f"Alias must be a string, got {type(alias)}: {alias}"
+            if alias in self._key_to_cls_map:
+                raise AssertionError(
+                    f"Cannot register alias that shares a key or alias with an already registered model class."
+                    f"\n\t        New  Class: {model_cls}"
+                    f"\n\tConflicting  Class: {self._key_to_cls_map[alias]}"
+                    f"\n\tConflicting  Alias: {alias}"
+                )
         self._model_cls_list.append(model_cls)
         self._key_to_cls_map[model_cls.ag_key] = model_cls
+        for alias in aliases:
+            self._key_to_cls_map[alias] = model_cls
 
     def remove(self, model_cls: Type[AbstractModel]):
         """
@@ -86,6 +101,11 @@ class ModelRegistry:
         assert self.exists(model_cls), f"Cannot remove model_cls that isn't registered: {model_cls}"
         self._model_cls_list = [m for m in self._model_cls_list if m != model_cls]
         self._key_to_cls_map.pop(model_cls.ag_key)
+        aliases = getattr(model_cls, "ag_aliases", ())
+        if isinstance(aliases, str):
+            aliases = (aliases,)
+        for alias in aliases:
+            self._key_to_cls_map.pop(alias, None)
 
     @property
     def model_cls_list(self) -> list[Type[AbstractModel]]:
@@ -94,6 +114,26 @@ class ModelRegistry:
     @property
     def keys(self) -> list[str]:
         return [self.key(model_cls) for model_cls in self.model_cls_list]
+
+    @property
+    def all_keys(self) -> list[str]:
+        return list(self._key_to_cls_map.keys())
+
+    def aliases(self, model_cls: Type[AbstractModel]) -> tuple[str, ...]:
+        assert self.exists(model_cls), f"Model class must be registered: {model_cls}"
+        aliases = getattr(model_cls, "ag_aliases", ())
+        if isinstance(aliases, str):
+            aliases = (aliases,)
+        return tuple(aliases)
+
+    @property
+    def aliases_map(self) -> dict[str, str]:
+        """Returns a mapping from alias to the canonical ag_key."""
+        result = {}
+        for model_cls in self._model_cls_list:
+            for alias in self.aliases(model_cls):
+                result[alias] = model_cls.ag_key
+        return result
 
     def key_to_cls_map(self) -> dict[str, Type[AbstractModel]]:
         return self._key_to_cls_map
