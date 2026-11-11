@@ -97,10 +97,13 @@ def get_leaderboard_pareto_frontier(
 
 
 def shuffle_df_rows(X: DataFrame, seed: int = 0, reset_index=True) -> DataFrame:
-    """Returns DataFrame with rows shuffled based on seed value."""
+    """Returns DataFrame with rows shuffled based on seed value.
+
+    The rows are permuted (each row appears exactly once) with a local random generator,
+    so the global numpy random state is left untouched.
+    """
     row_count = X.shape[0]
-    np.random.seed(get_numpy_seed(seed))
-    rand_shuffle = np.random.randint(0, row_count, size=row_count)
+    rand_shuffle = np.random.RandomState(get_numpy_seed(seed)).permutation(row_count)
     X_shuffled = X.iloc[rand_shuffle]
     if reset_index:
         X_shuffled.reset_index(inplace=True, drop=True)
