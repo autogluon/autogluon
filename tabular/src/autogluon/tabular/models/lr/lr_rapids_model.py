@@ -28,10 +28,15 @@ class LinearRapidsModel(RapidsModelMixin, LinearModel):
     def _get_model_type(self):
         penalty = get_penalty(self.params)
         try_import_rapids_cuml()
-        from cuml.linear_model import Lasso, LogisticRegression, Ridge
+        from cuml.linear_model import ElasticNet, Lasso, LogisticRegression, Ridge
 
         if self.problem_type == REGRESSION:
-            model_type = Lasso if penalty == "L1" else Ridge
+            if penalty == "L1":
+                model_type = Lasso
+            elif penalty == "ELASTICNET":
+                model_type = ElasticNet
+            else:
+                model_type = Ridge
         else:
             model_type = LogisticRegression
         return model_type
@@ -89,15 +94,20 @@ class LinearRapidsModel(RapidsModelMixin, LinearModel):
         filtered_params = {k: v for k, v in self.params.items() if k not in cuml_incompatible_params}
 
         # Handle parameter conversions for cuML
+        penalty = get_penalty(self.params)
         if self.problem_type == REGRESSION:
             # Convert sklearn's C parameter to cuML's alpha
             if "C" in self.params:
                 filtered_params["alpha"] = 1.0 / self.params["C"]
+            if penalty == "ELASTICNET" and "l1_ratio" not in filtered_params:
+                filtered_params["l1_ratio"] = self.params.get("l1_ratio", 0.5)
         else:
-            filtered_params["penalty"] = get_penalty(self.params).lower()
+            filtered_params["penalty"] = penalty.lower()
             # For classification, keep C parameter
             if "C" in self.params:
                 filtered_params["C"] = self.params["C"]
+            if penalty == "ELASTICNET" and "l1_ratio" not in filtered_params:
+                filtered_params["l1_ratio"] = self.params.get("l1_ratio", 0.5)
 
         # Create and fit cuML model - let cuML handle its own error messages
         self.model = model_cls(**filtered_params)
