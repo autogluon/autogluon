@@ -84,10 +84,10 @@ class FAISSNeighborsRegressor:
         X = np.ascontiguousarray(X)
         if X.ndim == 1:
             X = X[np.newaxis]
-        D, I = self.index.search(X, self.n_neighbors)
-        outputs = np.squeeze(self.y[I])
+        distances, indices = self.index.search(X, self.n_neighbors)
+        outputs = self.y[indices]
 
-        weights = _get_weights(D, self.weights)
+        weights = _get_weights(distances, self.weights)
 
         if weights is None:
             y_pred = np.mean(outputs, axis=1)
@@ -164,9 +164,9 @@ class FAISSNeighborsClassifier:
         X = np.ascontiguousarray(X)
         if X.ndim == 1:
             X = X[np.newaxis]
-        D, I = self.index.search(X, self.n_neighbors)
-        outputs = np.squeeze(self.labels[I])
-        weights = _get_weights(D, self.weights)
+        distances, indices = self.index.search(X, self.n_neighbors)
+        outputs = self.labels[indices]
+        weights = _get_weights(distances, self.weights)
         if weights is None:
             y_pred, _ = mode(outputs, axis=1)
         else:
@@ -178,11 +178,11 @@ class FAISSNeighborsClassifier:
         X = np.ascontiguousarray(X)
         if X.ndim == 1:
             X = X[np.newaxis]
-        D, I = self.index.search(X, self.n_neighbors)
-        outputs = np.squeeze(self.labels[I])
-        weights = _get_weights(D, self.weights)
+        distances, indices = self.index.search(X, self.n_neighbors)
+        outputs = self.labels[indices]
+        weights = _get_weights(distances, self.weights)
         if weights is None:
-            weights = np.ones_like(I)
+            weights = np.ones_like(indices)
 
         probabilities = np.empty((X.shape[0], len(self.classes)), dtype=np.float64)
         for k, class_k in enumerate(self.classes):
