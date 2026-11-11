@@ -44,7 +44,6 @@ class InterpretableTabularPredictor(TabularPredictor):
 
     def _validate_fit_extra_kwargs(self, kwargs, extra_valid_keys=None) -> dict:
         kwargs = super()._validate_fit_extra_kwargs(kwargs=kwargs, extra_valid_keys=extra_valid_keys)
-        print(kwargs)
         if "num_bag_folds" in kwargs and kwargs["num_bag_folds"] is not None and kwargs["num_bag_folds"] > 1:
             raise ValueError(f"{self.__class__.__name__} does not support `num_bag_folds`.")
         if "num_bag_sets" in kwargs and kwargs["num_bag_sets"] is not None and kwargs["num_bag_sets"] > 1:
