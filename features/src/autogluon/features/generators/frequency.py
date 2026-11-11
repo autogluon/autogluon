@@ -107,10 +107,7 @@ class FrequencyFeatureGenerator(AbstractFeatureGenerator):
 
     def _fit_transform(self, X: pd.DataFrame, y: pd.Series, **kwargs) -> Tuple[pd.DataFrame, dict]:
         self._fit(X, y, **kwargs)
-        X_out = self._transform(X)
-
-        if self.keep_original:
-            X_out = pd.concat([X, X_out], axis=1)
+        X_out = self._transform(X)  # keeps the original features if `keep_original`, as for any other data
 
         # if self.log:
         #     type_group_map_special = {R_FLOAT: list(self.freq_maps.keys())}
