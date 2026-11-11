@@ -26,7 +26,7 @@ class TextNgramFeatureGenerator(AbstractFeatureGenerator):
 
     Parameters
     ----------
-    vectorizer : :class:`sklearn.feature_extraction.text.CountVectorizer` or :class:`sklearn.feature_extraction.text.TfidfVectorizer`, default CountVectorizer(min_df=30, ngram_range=(1, 3), max_features=10000, dtype=np.uint8)  # noqa
+    vectorizer : :class:`sklearn.feature_extraction.text.CountVectorizer` or :class:`sklearn.feature_extraction.text.TfidfVectorizer`, default CountVectorizer(min_df=30, ngram_range=(1, 3), max_features=10000, dtype=np.uint16)  # noqa
         sklearn CountVectorizer which is used to generate the ngrams given the text data.
         Can also specify a TfidfVectorizer, but note that memory usage will increase by 4-8x relative to CountVectorizer.
     vectorizer_strategy : str, default 'combined'

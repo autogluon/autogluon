@@ -90,3 +90,19 @@ def test_text_ngram_feature_generator_categorical_nan(generator_helper, data_hel
     )
 
     assert expected_output_data_feat_total == list(output_data["__nlp__._total_"].values)
+
+
+def test_text_ngram_feature_generator_default_vectorizer_counts_do_not_overflow():
+    """An n-gram occurring 256 or more times in a row keeps its count with the default vectorizer.
+
+    Its counts used to be uint8, so a word occurring 300 times was counted 44 times.
+    """
+    import pandas as pd
+
+    texts = [f"word filler{i} and some more text" for i in range(40)] + [" ".join(["word"] * 300)]
+    input_data = pd.DataFrame({"text": texts})
+
+    output_data = TextNgramFeatureGenerator().fit_transform(input_data)
+
+    assert output_data["__nlp__.word"].iloc[-1] == 300
+    assert (output_data["__nlp__.word"].iloc[:-1] == 1).all()

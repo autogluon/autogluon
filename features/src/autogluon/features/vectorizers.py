@@ -5,7 +5,9 @@ from sklearn.feature_extraction.text import CountVectorizer
 
 
 def vectorizer_auto_ml_default():
-    return CountVectorizer(min_df=30, ngram_range=(1, 3), max_features=10000, dtype=np.uint8)
+    # uint16: sklearn casts the counts to `dtype`, so with uint8 a count of 256 or more wrapped around (300 -> 44).
+    # The output is uint16 either way, since the uint16 `_total_` column is appended to the counts.
+    return CountVectorizer(min_df=30, ngram_range=(1, 3), max_features=10000, dtype=np.uint16)
 
 
 def get_ngram_freq(vectorizer, transform_matrix):
