@@ -626,12 +626,20 @@ def _ray_fit(
     fold_model_local_save_path = os.path.join(bagged_ensemble_model_path, fold_model.name)
     fold_model.set_contexts(fold_model_local_save_path)
     if isinstance(X, str) and isinstance(y, str):
+        logger.warning(
+            "Loading pickle data from file paths. Pickle deserialization can execute arbitrary code. "
+            "Only use file paths from trusted sources. Paths: X=%s, y=%s", X, y
+        )
         with open(X, "rb") as X_f, open(y, "rb") as y_f:
             X = pickle.load(X_f)
             y = pickle.load(y_f)
     is_pseudo = False
     if X_pseudo is not None and y_pseudo is not None:
         if isinstance(X_pseudo, str) and isinstance(y_pseudo, str):
+            logger.warning(
+                "Loading pickle pseudo data from file paths. Pickle deserialization can execute arbitrary code. "
+                "Only use file paths from trusted sources. Paths: X_pseudo=%s, y_pseudo=%s", X_pseudo, y_pseudo
+            )
             with open(X_pseudo, "rb") as X_pseudo_f, open(y_pseudo, "rb") as y_pseudo_f:
                 X_pseudo = pickle.load(X_pseudo_f)
                 y_pseudo = pickle.load(y_pseudo_f)
