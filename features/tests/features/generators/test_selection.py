@@ -159,3 +159,59 @@ def test_non_numeric_columns_delegate_to_pandas():
 
     # The constant filter does support non-numeric input, and keeps both columns here.
     assert SpearmanFeatureSelector._is_non_constant(X).tolist() == [True, True]
+
+
+@pytest.mark.parametrize("dtype", ["int64", "uint64", "Int64", "UInt64"])
+def test_large_integer_features_are_not_constant(dtype):
+    X = pd.DataFrame(
+        {
+            "signal": pd.Series([2**53, 2**53 + 1] * 3, dtype=dtype),
+            "constant": pd.Series([2**53] * 6, dtype=dtype),
+            "float": [0.0] * 6,
+        }
+    )
+    y = pd.Series([0, 1] * 3)
+    generator = SpearmanFeatureSelector(max_features=1)
+
+    assert generator._is_non_constant(X).tolist() == [True, False, False]
+    pd.testing.assert_frame_equal(generator.fit_transform(X, y), X[["signal"]])
+
+
+@pytest.mark.parametrize("dtype", ["Int64", "UInt64", "Float64"])
+def test_nullable_numeric_constant_filter(dtype):
+    X = pd.DataFrame(
+        {
+            "signal": pd.Series([1, pd.NA, 2], dtype=dtype),
+            "constant": pd.Series([1, pd.NA, 1], dtype=dtype),
+            "missing": pd.Series([pd.NA] * 3, dtype=dtype),
+        }
+    )
+
+    assert SpearmanFeatureSelector._is_non_constant(X).tolist() == [True, False, False]
+
+
+@pytest.mark.parametrize(
+    "dtype, missing",
+    [("int64", False), ("uint64", False), ("Int64", False), ("UInt64", False), ("Int64", True), ("UInt64", True)],
+)
+@pytest.mark.parametrize("kwargs", [{"threshold": 0.99}, {"max_features": 1, "preserve_order": False}])
+def test_large_integer_features_retain_their_spearman_ranks(dtype, missing, kwargs):
+    signal = pd.Series([2**53, 2**53 + 1] * 3, dtype=dtype)
+    if missing:
+        signal.iloc[[1, 4]] = pd.NA
+    X = pd.DataFrame({"signal": signal, "float": [0.0, 0.0, 1.0, 1.0, 2.0, 2.0]})
+    y = pd.Series([0, 1] * 3)
+    generator = SpearmanFeatureSelector(**kwargs)
+
+    assert generator._abs_spearman(X, y)["signal"] == pytest.approx(1.0)
+    pd.testing.assert_frame_equal(generator.fit_transform(X, y), X[["signal"]])
+
+
+@pytest.mark.parametrize("dtype", ["int64", "uint64", "Int64", "UInt64"])
+def test_large_integer_target_retains_its_spearman_ranks(dtype):
+    X = pd.DataFrame({"signal": [0.0, 1.0] * 3, "float": [0.0, 0.0, 1.0, 1.0, 2.0, 2.0]})
+    y = pd.Series([2**53, 2**53 + 1] * 3, dtype=dtype)
+    generator = SpearmanFeatureSelector(threshold=0.99)
+
+    assert generator._abs_spearman(X, y)["signal"] == pytest.approx(1.0)
+    pd.testing.assert_frame_equal(generator.fit_transform(X, y), X[["signal"]])
