@@ -2961,7 +2961,10 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
                 is_ray_worker=is_ray_worker,
             ):
                 model_names_trained.append(model.name)
-            if self.low_memory:
+                if self.low_memory:
+                    del model
+            else:
+                self._delete_failed_fit_files(model)
                 del model
         if exception is not None:
             if self._check_raise_exception(
