@@ -1572,7 +1572,7 @@ class BaggedEnsembleModel(AbstractModel):
 
     def _load_child_from_disk(self, model_name: str, verbose: bool = False) -> AbstractModel:
         child_path = self.create_contexts(os.path.join(self.path, model_name))
-        return self._child_type.load(path=child_path, verbose=verbose)
+        return self._child_type.load(path=child_path, reset_paths=True, verbose=verbose)
 
     def add_child(self, model: AbstractModel | str, add_child_times: bool = False, add_child_resources: bool = False):
         """
