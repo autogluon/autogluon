@@ -59,6 +59,9 @@ class MitraModel(AbstractTorchModel):
         if ResourceManager.get_gpu_count_torch(cuda_only=True) > 0:
             logger.log(15, "Using CUDA GPU")
             return "cuda"
+        elif ResourceManager.get_gpu_count_torch() > 0:
+            logger.log(15, "Using MPS GPU")
+            return "mps"
         else:
             return "cpu"
 

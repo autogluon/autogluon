@@ -35,7 +35,7 @@ class TrainerFinetune(BaseEstimator):
         self.rng = rng
         self.verbose = verbose
         self.device = device
-        self.model = model.to(self.device, non_blocking=True)
+        self.model = self._move_model_to_device(model=model, device=self.device)
         self.n_classes = n_classes
 
         self.loss = get_loss(self.cfg)
@@ -73,9 +73,15 @@ class TrainerFinetune(BaseEstimator):
 
         self.metric = self.cfg.hyperparams["metric"]
 
+    @staticmethod
+    def _move_model_to_device(model: torch.nn.Module, device: str) -> torch.nn.Module:
+        # Asynchronous CPU-to-MPS transfers can corrupt the copied parameters.
+        non_blocking = torch.device(device).type != "mps"
+        return model.to(device=device, non_blocking=non_blocking)
+
     def set_device(self, device: str):
         self.device = device
-        self.model = self.model.to(device=device, non_blocking=True)
+        self.model = self._move_model_to_device(model=self.model, device=device)
 
     def post_fit_optimize(self):
         # Minimize memory usage post-fit
