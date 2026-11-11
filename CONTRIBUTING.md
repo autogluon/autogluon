@@ -151,6 +151,4 @@ Automated benchmarking should only be performed for changes that are likely to i
 
 ## Licensing
 
-This project uses the Apache 2.0 license. See the [LICENSE](https://github.com/autogluon/autogluon/blob/master/LICENSE) file for details. We will ask you to confirm the licensing of your contribution.
-
-We may ask you to sign a [Contributor License Agreement (CLA)](http://en.wikipedia.org/wiki/Contributor_License_Agreement) for larger changes.
+This project uses the Apache 2.0 license. See the [LICENSE](https://github.com/autogluon/autogluon/blob/master/LICENSE) file for details.
