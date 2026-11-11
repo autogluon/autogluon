@@ -34,6 +34,7 @@ install_requires = [
     "pandas",
     "pyarrow",
     "boto3",
+    "openpyxl",  # Excel (.xlsx) loading/saving via pd.read_excel / df.to_excel
     "psutil",
     "tqdm",
     "requests",
