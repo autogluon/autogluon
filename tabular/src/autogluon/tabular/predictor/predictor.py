@@ -94,6 +94,20 @@ from ..version import __version__
 logger = logging.getLogger(__name__)  # return autogluon root logger
 
 
+def _warn_if_s3_path(path: str, class_name: str = "TabularPredictor") -> None:
+    """Warn that S3 paths are not supported for the predictor ``path`` argument.
+
+    AutoGluon does not fully support S3 paths for predictor artifacts (for example,
+    deleting models does not work and files are repeatedly downloaded during fit),
+    so using one silently leads to buggy behavior. Emit a warning instead.
+    """
+    if isinstance(path, str) and path.lower().startswith("s3://"):
+        logger.warning(
+            f"Warning: S3 paths are not supported for the `path` argument in {class_name}. "
+            "Use a local path and upload the trained predictor to S3 manually if needed."
+        )
+
+
 # Extra TODOs (Stretch): Can occur post v1.0
 # TODO: make core_kwargs a kwargs argument to predictor.fit
 # TODO: add aux_kwargs to predictor.fit
@@ -278,6 +292,7 @@ class TabularPredictor:
             )
         self._validate_init_kwargs(kwargs)
         path = setup_outputdir(path=path, default_base_path=kwargs.get("default_base_path"))
+        _warn_if_s3_path(path)
 
         learner_type = kwargs.get("learner_type", DefaultLearner)
         learner_kwargs = kwargs.get("learner_kwargs", dict())
@@ -6180,6 +6195,7 @@ class TabularPredictor:
             version_current = None
 
         path = setup_outputdir(path, warn_if_exist=False)  # replace ~ with absolute path if it exists
+        _warn_if_s3_path(path)
         try:
             version_saved = cls._load_version_file(path=path)
         except:
