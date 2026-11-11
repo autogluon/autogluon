@@ -385,7 +385,13 @@ def test_when_train_data_has_static_or_dynamic_feat_then_leaderboard_works(
     assert ("score_test" in leaderboard.columns) == pred_data_present
 
 
-def test_when_features_are_all_nan_and_learner_is_loaded_then_mode_or_median_are_imputed(temp_model_path):
+def test_when_features_are_all_nan_and_learner_is_loaded_then_cats_and_static_are_imputed_reals_preserved(
+    temp_model_path,
+):
+    """Learner-level feature generator fills categorical and static features; real dynamic covariates keep NaNs.
+
+    Real covariate imputation is delegated to each model (see allow_nan_covariates tag).
+    """
     covariates_cat = ["known_cat", "past_cat"]
     covariates_real = ["known_real", "past_real"]
     data = get_data_frame_with_covariates(
@@ -419,9 +425,9 @@ def test_when_features_are_all_nan_and_learner_is_loaded_then_mode_or_median_are
     with mock.patch("autogluon.timeseries.trainer.TimeSeriesTrainer.predict") as trainer_predict:
         loaded_learner.predict(data_with_nan, known_covariates=known_covariates_with_nan)
         trainer_predict_call_args = trainer_predict.call_args[1]
-        imputed_data = trainer_predict_call_args["data"]
-        imputed_known_covariates = trainer_predict_call_args["known_covariates"]
-        imputed_static = imputed_data.static_features
+        transformed_data = trainer_predict_call_args["data"]
+        transformed_known_covariates = trainer_predict_call_args["known_covariates"]
+        transformed_static = transformed_data.static_features
 
     def get_mode(series: pd.Series):
         # series.mode() can result in ties. We copy tiebreaking logic from CategoryFeatureGenerator
@@ -429,15 +435,15 @@ def test_when_features_are_all_nan_and_learner_is_loaded_then_mode_or_median_are
 
     for col in covariates_cat:
         column_mode_train = get_mode(data_transformed[col])
-        assert (imputed_data[col] == column_mode_train).all()
+        assert (transformed_data[col] == column_mode_train).all()
         if col in known_covariates_names:
-            assert (imputed_known_covariates[col] == column_mode_train).all()
+            assert (transformed_known_covariates[col] == column_mode_train).all()
 
+    # Real dynamic covariates are left as NaN at the learner boundary
     for col in covariates_real:
-        column_median_train = data_transformed[col].median()
-        assert np.allclose(imputed_data[col], column_median_train)
+        assert transformed_data[col].isna().all()
         if col in known_covariates_names:
-            assert np.allclose(imputed_known_covariates[col], column_median_train)
+            assert transformed_known_covariates[col].isna().all()
 
-    assert (imputed_static["static_cat"] == get_mode(data_transformed.static_features["static_cat"])).all()
-    assert np.allclose(imputed_static["static_real"], data_transformed.static_features["static_real"].median())
+    assert (transformed_static["static_cat"] == get_mode(data_transformed.static_features["static_cat"])).all()
+    assert np.allclose(transformed_static["static_real"], data_transformed.static_features["static_real"].median())
