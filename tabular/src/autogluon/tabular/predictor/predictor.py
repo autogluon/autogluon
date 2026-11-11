@@ -7492,8 +7492,8 @@ def _dystack(
     holdout_data=Union[str, pd.DataFrame, None],
 ):
     """Perform a sub-fit of a TabularPredictor on the provided input data and arguments for a TabularPredictor. To perform the sub-fit, the `self._learner` is
-    used for fitting and predicting. After the sub-fit, `self._learner` is reset to its original state and the results of the sub-fit is returned. The sub-fit's
-    training and validation data depends on the arguments in ds_fit_kwargs and holdout_data specified at `fit()`."""
+    used for fitting and predicting. After the sub-fit, whether or not it succeeds, the predictor is reset to its original state and the results of the
+    sub-fit is returned. The sub-fit's training and validation data depends on the arguments in ds_fit_kwargs and holdout_data specified at `fit()`."""
     holdout_frac = ds_fit_kwargs.get("holdout_frac", None)
     train_indices = ds_fit_kwargs.get("train_indices", None)
     if holdout_frac is not None:
@@ -7518,7 +7518,12 @@ def _dystack(
     # A sub-fit in its own process starts from default settings there.
     predictor._apply_global_settings(predictor._learner.global_settings)
     predictor._apply_model_class_settings(predictor._learner.model_class_settings)
-    learner_og = copy.deepcopy(predictor._learner)
+    # The sub-fit fits `predictor` itself, which is the caller's predictor when the sub-fit runs in this process (ray
+    # unavailable, or `memory_safe_fits=False`). Its state is restored on every exit, with a copy of the learner that the
+    # sub-fit fits in place: left behind by a failed sub-fit, the fit learner made the main fit raise "Learner is
+    # already fit.". The other attributes the sub-fit sets, such as `_trainer` and `_decision_threshold`, describe the
+    # sub-fit as well.
+    predictor_state_og = dict(vars(predictor), _learner=copy.deepcopy(predictor._learner))
 
     ag_fit_kwargs["X"] = train_data
     ag_fit_kwargs["time_limit"] = time_limit
@@ -7528,26 +7533,28 @@ def _dystack(
     predictor._learner.set_contexts(path_context=ds_fit_context)
     logger.log(20, "Running DyStack sub-fit ...")
     try:
-        predictor._fit(ag_fit_kwargs=ag_fit_kwargs, ag_post_fit_kwargs=ag_post_fit_kwargs)
-    except Exception as e:
-        return False, None, e
+        try:
+            predictor._fit(ag_fit_kwargs=ag_fit_kwargs, ag_post_fit_kwargs=ag_post_fit_kwargs)
+        except Exception as e:
+            return False, None, e
 
-    if not predictor.model_names():
-        logger.log(
-            20, "Unable to determine stacked overfitting. AutoGluon's sub-fit did not successfully train any models!"
-        )
-        stacked_overfitting = False
-        ho_leaderboard = None
-    else:
-        leaderboard_kwargs = dict()
-        if predictor.model_best in predictor.model_refit_map(inverse=True):
-            leaderboard_kwargs = dict(refit_full=True, set_refit_score_to_parent=True)
-        # Determine stacked overfitting
-        ho_leaderboard = predictor.leaderboard(data=val_data, **leaderboard_kwargs).reset_index(drop=True)
-        stacked_overfitting = check_stacked_overfitting_from_leaderboard(ho_leaderboard)
-
-    del predictor._learner
-    predictor._learner = learner_og
+        if not predictor.model_names():
+            logger.log(
+                20,
+                "Unable to determine stacked overfitting. AutoGluon's sub-fit did not successfully train any models!",
+            )
+            stacked_overfitting = False
+            ho_leaderboard = None
+        else:
+            leaderboard_kwargs = dict()
+            if predictor.model_best in predictor.model_refit_map(inverse=True):
+                leaderboard_kwargs = dict(refit_full=True, set_refit_score_to_parent=True)
+            # Determine stacked overfitting
+            ho_leaderboard = predictor.leaderboard(data=val_data, **leaderboard_kwargs).reset_index(drop=True)
+            stacked_overfitting = check_stacked_overfitting_from_leaderboard(ho_leaderboard)
+    finally:
+        vars(predictor).clear()
+        vars(predictor).update(predictor_state_og)
 
     if clean_up_fits:
         logger.log(20, f"Deleting DyStack predictor artifacts (clean_up_fits={clean_up_fits}) ...")
