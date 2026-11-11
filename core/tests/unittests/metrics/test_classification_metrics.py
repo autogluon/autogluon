@@ -2,7 +2,16 @@ import numpy as np
 import pytest
 import sklearn
 
-from autogluon.core.metrics import confusion_matrix, log_loss, quadratic_kappa, roc_auc
+from autogluon.core.metrics import (
+    average_precision_macro,
+    average_precision_micro,
+    average_precision_weighted,
+    confusion_matrix,
+    get_metric,
+    log_loss,
+    quadratic_kappa,
+    roc_auc,
+)
 from autogluon.core.metrics.softclass_metrics import soft_log_loss
 
 
@@ -241,3 +250,57 @@ def test_quadratic_kappa():
     preds = np.array([[0.8, 0.1, 0.1], [0.7, 0.1, 0.2], [0.1, 0.8, 0.1], [0.1, 0.1, 0.8]])
     value = quadratic_kappa(actuals, preds)
     assert value == 0.25
+
+
+def test_multiclass_average_precision():
+    y_true = np.array([0, 1, 2, 0, 1, 2, 0, 2])
+    y_pred = np.array([
+        [0.7, 0.2, 0.1],
+        [0.1, 0.8, 0.1],
+        [0.2, 0.2, 0.6],
+        [0.6, 0.3, 0.1],
+        [0.3, 0.5, 0.2],
+        [0.1, 0.1, 0.8],
+        [0.8, 0.1, 0.1],
+        [0.2, 0.3, 0.5],
+    ])
+    y_true_bin = (y_true[:, None] == np.arange(3)).astype(int)
+
+    # Check macro
+    expected_macro = sklearn.metrics.average_precision_score(y_true_bin, y_pred, average="macro")
+    actual_macro = average_precision_macro(y_true, y_pred)
+    assert np.isclose(actual_macro, expected_macro)
+
+    # Check alias
+    alias_scorer = get_metric("average_precision", problem_type="multiclass")
+    assert np.isclose(alias_scorer(y_true, y_pred), expected_macro)
+
+    # Check micro
+    expected_micro = sklearn.metrics.average_precision_score(y_true_bin, y_pred, average="micro")
+    actual_micro = average_precision_micro(y_true, y_pred)
+    assert np.isclose(actual_micro, expected_micro)
+
+    # Check weighted
+    expected_weighted = sklearn.metrics.average_precision_score(y_true_bin, y_pred, average="weighted")
+    actual_weighted = average_precision_weighted(y_true, y_pred)
+    assert np.isclose(actual_weighted, expected_weighted)
+
+    # Check sample_weight
+    sample_weight = np.array([1.0, 0.5, 2.0, 1.5, 0.8, 1.2, 0.9, 1.1])
+    expected_sw = sklearn.metrics.average_precision_score(y_true_bin, y_pred, average="macro", sample_weight=sample_weight)
+    actual_sw = average_precision_macro(y_true, y_pred, sample_weight=sample_weight)
+    assert np.isclose(actual_sw, expected_sw)
+
+    # Check missing class in y_true (e.g. class 2 not in y_true)
+    y_true_missing = np.array([0, 1, 0, 1])
+    y_pred_3cls = np.array([
+        [0.7, 0.2, 0.1],
+        [0.1, 0.8, 0.1],
+        [0.8, 0.1, 0.1],
+        [0.2, 0.7, 0.1],
+    ])
+    y_true_bin_missing = (y_true_missing[:, None] == np.arange(3)).astype(int)
+    expected_missing = sklearn.metrics.average_precision_score(y_true_bin_missing, y_pred_3cls, average="macro")
+    actual_missing = average_precision_macro(y_true_missing, y_pred_3cls)
+    assert np.isclose(actual_missing, expected_missing)
+

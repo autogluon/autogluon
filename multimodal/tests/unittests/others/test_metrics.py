@@ -148,6 +148,10 @@ def test_f1_metrics_for_multiclass(eval_metric):
         (None, None, None, True, "ndcg", "recall"),
         ("feature_extraction", None, None, False, None, None),
         ("feature_extraction", "f1", None, False, None, None),
+        ("multiclass", "average_precision", None, False, "average_precision", "average_precision"),
+        ("multiclass", "average_precision_macro", None, False, "average_precision_macro", "average_precision_macro"),
+        ("multiclass", "average_precision_micro", None, False, "average_precision_micro", "accuracy"),
+        ("multiclass", "average_precision_weighted", None, False, "average_precision_weighted", "average_precision_weighted"),
     ],
 )
 def test_infer_metrics(
@@ -163,6 +167,35 @@ def test_infer_metrics(
     )
     assert eval_metric_name == target_eval_metric_name
     assert validation_metric_name == target_validation_metric_name
+
+
+@pytest.mark.parametrize(
+    "metric_name,average",
+    [
+        ("average_precision", "macro"),
+        ("average_precision_macro", "macro"),
+        ("average_precision_weighted", "weighted"),
+    ],
+)
+def test_get_torchmetric_multiclass_average_precision(metric_name, average):
+    metric, custom_func = get_torchmetric(metric_name=metric_name, num_classes=3, problem_type="multiclass")
+    assert custom_func is None
+    import torchmetrics.classification
+    assert isinstance(metric, torchmetrics.classification.MulticlassAveragePrecision)
+    assert metric.average == average
+
+
+def test_get_torchmetric_binary_average_precision():
+    metric, custom_func = get_torchmetric(metric_name="average_precision", num_classes=2, problem_type="binary")
+    assert custom_func is None
+    import torchmetrics.classification
+    assert isinstance(metric, torchmetrics.classification.BinaryAveragePrecision)
+
+
+def test_get_torchmetric_average_precision_micro_raises():
+    with pytest.raises(ValueError, match="Average precision with micro averaging is not supported"):
+        get_torchmetric(metric_name="average_precision_micro", num_classes=3, problem_type="multiclass")
+
 
 
 # Once eval metric is customized, shall not use the fallback eval

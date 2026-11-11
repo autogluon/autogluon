@@ -128,6 +128,9 @@ SPEARMANR = "spearmanr"
 QUADRATIC_KAPPA = "quadratic_kappa"
 ROC_AUC = "roc_auc"
 AVERAGE_PRECISION = "average_precision"
+AVERAGE_PRECISION_MACRO = "average_precision_macro"
+AVERAGE_PRECISION_MICRO = "average_precision_micro"
+AVERAGE_PRECISION_WEIGHTED = "average_precision_weighted"
 LOG_LOSS = "log_loss"
 CROSS_ENTROPY = "cross_entropy"
 COSINE_EMBEDDING_LOSS = "cosine_embedding_loss"
@@ -160,6 +163,9 @@ METRIC_MODE_MAP = {
     R2: MAX,
     QUADRATIC_KAPPA: MAX,
     ROC_AUC: MAX,
+    AVERAGE_PRECISION: MAX,
+    AVERAGE_PRECISION_MACRO: MAX,
+    AVERAGE_PRECISION_WEIGHTED: MAX,
     LOG_LOSS: MIN,
     CROSS_ENTROPY: MIN,
     PEARSONR: MAX,
