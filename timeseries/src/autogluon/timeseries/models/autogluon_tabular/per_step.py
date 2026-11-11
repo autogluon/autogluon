@@ -7,7 +7,7 @@ from typing import Any, Callable, Literal, Type
 import numpy as np
 import pandas as pd
 import scipy.stats
-from joblib import Parallel, cpu_count, delayed
+from joblib import Parallel, cpu_count, delayed, effective_n_jobs
 
 from autogluon.common.loaders import load_pkl
 from autogluon.common.savers import save_pkl
@@ -114,11 +114,21 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
 
     @property
     def _ag_to_nixtla(self) -> dict:
-        return {
+        mapping = {
             self.target: MLF_TARGET,
             TimeSeriesDataFrame.ITEMID: MLF_ITEMID,
             TimeSeriesDataFrame.TIMESTAMP: MLF_TIMESTAMP,
         }
+        # Use metadata so fit and predict choose the same aliases even if their frames contain different columns.
+        occupied = set(self.covariate_metadata.all_features) | set(mapping)
+        for reserved_name in [MLF_ITEMID, MLF_TIMESTAMP, MLF_TARGET]:
+            if reserved_name in occupied and reserved_name not in mapping:
+                alias = f"__{reserved_name}"
+                while alias in occupied:
+                    alias = f"_{alias}"
+                mapping[reserved_name] = alias
+                occupied.add(alias)
+        return mapping
 
     def _get_default_hyperparameters(self):
         return {
@@ -357,7 +367,7 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
                 model_cls=self._model_cls,
                 model_hyperparameters=model_hyperparameters,
             )
-        n_jobs = min(self._n_jobs, self.prediction_length, cpu_count(only_physical_cores=True))
+        n_jobs = min(effective_n_jobs(self._n_jobs), self.prediction_length, cpu_count(only_physical_cores=True))
 
         num_cpus_per_model = max(cpu_count(only_physical_cores=True) // n_jobs, 1)
         if time_limit is not None:
@@ -489,7 +499,7 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
             model_cls=self._model_cls,
             date_features=self._date_features,
         )
-        n_jobs = min(self._n_jobs, self.prediction_length, cpu_count(only_physical_cores=True))
+        n_jobs = min(effective_n_jobs(self._n_jobs), self.prediction_length, cpu_count(only_physical_cores=True))
         predictions_per_step = Parallel(n_jobs=n_jobs)(
             delayed(self._predict_with_single_model)(
                 step=step,
