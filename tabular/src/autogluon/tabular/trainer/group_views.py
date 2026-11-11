@@ -106,7 +106,7 @@ def group_codes(X: pd.DataFrame, group_on: list[str]) -> np.ndarray:
     if len(group_on) == 1:
         values = X[group_on[0]]
     else:
-        values = X[group_on].astype(str).agg("||".join, axis=1)
+        values = pd.MultiIndex.from_frame(X[group_on])
     codes, _ = pd.factorize(values, sort=False)
     return codes.astype(np.int64)
 
@@ -157,6 +157,8 @@ def _group_mode(column: pd.Series, group: np.ndarray, n_groups: int) -> pd.Serie
     else:
         codes, uniques = pd.factorize(column, sort=True)
     known = codes >= 0
+    if not known.any():
+        return column.iloc[:0].reindex(range(n_groups))
     counts = pd.DataFrame({"g": group[known], "c": codes[known]}).value_counts().reset_index(name="n")
     best = counts.sort_values(["g", "n", "c"], ascending=[True, False, True]).drop_duplicates("g")
     mode = np.full(n_groups, -1, dtype=np.int64)
