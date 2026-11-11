@@ -26,6 +26,7 @@ install_requires = [
     "numpy",
     "scipy",
     "pandas",
+    "pandas<3",  # until gluonts and statsforecast support pandas 3 (#5730); the shared range allows it elsewhere
     "torch",
     "lightning",
     "transformers[sentencepiece]",
