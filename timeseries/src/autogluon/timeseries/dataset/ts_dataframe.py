@@ -475,6 +475,10 @@ class TimeSeriesDataFrame(pd.DataFrame):
 
             If some items have an irregular frequency or if different items have different frequencies, returns string
             ``IRREG``.
+
+            Items with fewer than 3 timestamps (too few for pandas to infer a frequency) count as regular if their
+            timestamps lie on the frequency inferred from the other items and, for 2 timestamps, are exactly one
+            period apart. If no item has enough timestamps to infer a frequency, returns ``IRREG``.
         """
         ts_df = self
         if num_items is not None and ts_df.num_items > num_items:
@@ -491,6 +495,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
 
         frequencies = []
         irregular_items = []
+        short_items = []
         for i in range(len(indptr) - 1):
             start, end = indptr[i], indptr[i + 1]
             item_timestamps = timestamps[start:end]
@@ -507,11 +512,28 @@ class TimeSeriesDataFrame(pd.DataFrame):
                     inferred_freq = candidate_freq.freqstr
 
             if inferred_freq is None:
-                irregular_items.append(item_ids[i])
+                if len(item_timestamps) < 3:
+                    # pandas needs at least 3 timestamps to infer a frequency, so we check these items against the
+                    # frequency of the other items below
+                    short_items.append(i)
+                else:
+                    irregular_items.append(item_ids[i])
             else:
                 frequencies.append(inferred_freq)
 
         unique_freqs = list(set(frequencies))
+        if len(unique_freqs) == 1:
+            offset = pd.tseries.frequencies.to_offset(unique_freqs[0])
+            for i in short_items:
+                item_timestamps = timestamps[indptr[i] : indptr[i + 1]]
+                if not all(offset.is_on_offset(ts) for ts in item_timestamps) or (
+                    len(item_timestamps) == 2 and item_timestamps[0] + offset != item_timestamps[1]
+                ):
+                    irregular_items.append(item_ids[i])
+        elif len(unique_freqs) == 0:
+            # Without any item long enough to infer the frequency, we cannot tell if the short items are regular
+            irregular_items.extend(item_ids[i] for i in short_items)
+
         if len(unique_freqs) != 1 or len(irregular_items) > 0:
             if raise_if_irregular:
                 if irregular_items:
