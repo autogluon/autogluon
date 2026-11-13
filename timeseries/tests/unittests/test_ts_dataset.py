@@ -298,7 +298,35 @@ IRREGULAR_TIME_INDEXES = [
         ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:01:00"],
         ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:01:00"],
     ],
+    [
+        ["2020-01-01 00:00:00", "2020-01-02 00:00:00", "2020-01-03 00:00:00"],
+        ["2020-01-01 00:00:00", "2020-01-03 00:00:00"],
+    ],
+    [
+        ["2020-01-01 00:00:00", "2020-02-01 00:00:00", "2020-03-01 00:00:00"],
+        ["2020-01-15 00:00:00"],
+    ],
 ]
+
+
+@pytest.mark.parametrize(
+    "short_item_timestamps",
+    [
+        ["2020-01-02"],
+        ["2020-01-02", "2020-01-03"],
+    ],
+)
+def test_when_some_items_have_too_few_timestamps_to_infer_freq_then_freq_is_inferred_from_other_items(
+    short_item_timestamps,
+):
+    regular_timestamps = pd.date_range("2020-01-01", periods=5, freq="D")
+    df = pd.DataFrame(
+        [(0, t, 1.0) for t in regular_timestamps] + [(1, pd.Timestamp(t), 1.0) for t in short_item_timestamps],
+        columns=[ITEMID, TIMESTAMP, "target"],
+    )
+    ts_df = TimeSeriesDataFrame.from_data_frame(df)
+    assert ts_df.infer_frequency(raise_if_irregular=True) == "D"
+    assert ts_df.freq == "D"
 
 
 @pytest.mark.parametrize("irregular_index", IRREGULAR_TIME_INDEXES)
