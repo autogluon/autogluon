@@ -501,8 +501,12 @@ class PerStepTabularModel(AbstractTimeSeriesModel):
             )
             for step, suffix in enumerate(self._relative_paths_to_models)
         )
+        quantile_predictions = np.stack(predictions_per_step, axis=1).reshape([-1, len(self.quantile_levels)])
+        # Quantile regression models can produce crossing quantiles, so we sort the predictions across quantile levels
+        order = np.argsort(self.quantile_levels)
+        quantile_predictions[:, order] = np.sort(quantile_predictions[:, order], axis=1)
         predictions = pd.DataFrame(
-            np.stack(predictions_per_step, axis=1).reshape([-1, len(self.quantile_levels)]),
+            quantile_predictions,
             columns=[str(q) for q in self.quantile_levels],
             index=self.get_forecast_horizon_index(data),
         )

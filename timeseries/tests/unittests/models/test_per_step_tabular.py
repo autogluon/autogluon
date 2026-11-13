@@ -81,6 +81,28 @@ def test_when_model_predicts_then_tabular_models_receive_correct_data_for_infere
             assert (X["ds"].values == item_ids_timestamp_for_step["timestamp"].values).all()
 
 
+@pytest.mark.parametrize("quantile_levels", [[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9], [0.9, 0.1, 0.5]])
+def test_when_tabular_models_predict_crossing_quantiles_then_forecast_quantiles_are_sorted(
+    per_step_tabular_model_class, quantile_levels
+):
+    data = DUMMY_TS_DATAFRAME.copy()
+    model = per_step_tabular_model_class(
+        prediction_length=3,
+        freq=data.freq,
+        eval_metric="WQL",
+        quantile_levels=quantile_levels,
+        hyperparameters=DUMMY_HYPERPARAMETERS,
+    )
+    model.fit(train_data=data)
+    with mock.patch("autogluon.core.models.dummy.dummy_model.DummyModel.predict") as mock_tabular_predict:
+        # Predictions decrease as the quantile level increases, so every pair of quantiles crosses
+        mock_tabular_predict.return_value = np.tile(-np.array(model.quantile_levels), (data.num_items, 1))
+        predictions = model.predict(data)
+    quantile_columns = [str(q) for q in sorted(quantile_levels)]
+    assert (np.diff(predictions[quantile_columns].to_numpy(), axis=1) >= 0).all()
+    assert (predictions["mean"] == predictions["0.5"]).all()
+
+
 @pytest.mark.parametrize("n_jobs", [2, -1])
 def test_when_n_jobs_provided_via_hyperparameters_then_it_is_stored_as_attribute(per_step_tabular_model_class, n_jobs):
     data = DUMMY_TS_DATAFRAME.copy()
