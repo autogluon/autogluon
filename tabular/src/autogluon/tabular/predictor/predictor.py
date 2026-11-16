@@ -589,7 +589,7 @@ class TabularPredictor:
                     Recommended for applications that require fast inference speed.
 
                 medium_quality={'auto_stack': False}
-                    Medium predictive accuracy with very fast inference and very fast training time. ~20x faster training than `good_quality`.
+                    Medium predictive accuracy with very fast training time. ~20x faster training than `good_quality`.
                     This is the default preset in AutoGluon, but should generally only be used for quick prototyping, as `good_quality` results in significantly better predictive accuracy and faster inference time.
 
                 experimental_quality_v120={'auto_stack': True, 'dynamic_stacking': 'auto', 'hyperparameters': 'experimental', 'fit_strategy': 'parallel', 'num_gpus': 0}
