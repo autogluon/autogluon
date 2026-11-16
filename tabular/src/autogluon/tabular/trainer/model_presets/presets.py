@@ -42,6 +42,7 @@ VALID_AG_ARGS_KEYS = {
     "name_suffix",
     "name_bag_suffix",
     "model_type",
+    "ensemble_type",
     "priority",
     "problem_types",
     "disable_in_hpo",
@@ -346,6 +347,7 @@ def model_factory(
     )
 
     if ensemble_kwargs is not None:
+        ensemble_type = model[AG_ARGS].get("ensemble_type", ensemble_type)
         ensemble_kwargs_model = copy.deepcopy(ensemble_kwargs)
         ensemble_kwargs_model["hyperparameters"] = ensemble_kwargs_model.get("hyperparameters", {})
         if ensemble_kwargs_model["hyperparameters"] is None:

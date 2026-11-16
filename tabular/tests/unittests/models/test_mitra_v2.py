@@ -41,6 +41,255 @@ def test_factory_keeps_v2_default_and_explicit_legacy_api(tmp_path, bagged, mode
     assert estimator.hf_model == CHECKPOINTS[expected_version]["regression"]
 
 
+@pytest.mark.parametrize("problem_type,n_classes", [("binary", 2), ("multiclass", 3), ("regression", None)])
+def test_mitra_flat_bag_budget_and_other_model_factory_unchanged(tmp_path, problem_type, n_classes):
+    from autogluon.core.models import StackerEnsembleModel
+    from autogluon.core.models.ensemble.fold_fitting_strategy import SequentialLocalFoldFittingStrategy
+    from autogluon.tabular.models.mitra.ensemble import MitraStackerEnsembleModel
+    from autogluon.tabular.models.mitra.fold_fitting_strategy import MitraSequentialLocalFoldFittingStrategy
+    from autogluon.tabular.trainer.model_presets.presets import get_preset_models
+
+    metric = "root_mean_squared_error" if problem_type == "regression" else "log_loss"
+    models, _ = get_preset_models(
+        path=str(tmp_path),
+        problem_type=problem_type,
+        eval_metric=metric,
+        hyperparameters={"MITRA": {}, MitraModel: {}},
+        ensemble_kwargs={},
+    )
+    native = next(model for model in models if type(model.model_base) is MitraV2Model)
+    legacy = next(model for model in models if type(model.model_base) is MitraModel)
+    assert type(native) is MitraStackerEnsembleModel
+    assert type(legacy) is StackerEnsembleModel
+    X, y = _toy_data(30, 3, n_classes=n_classes or 0)
+    kwargs = native.initialize(X=X, y=y, num_classes=n_classes)
+    kwargs = native._preprocess_fit_args(**kwargs, num_cpus=1, num_gpus=0)
+    assert kwargs["time_limit"] == 3600
+    assert not native._node_bagging
+    for bag, expected in (
+        (native, MitraSequentialLocalFoldFittingStrategy),
+        (legacy, SequentialLocalFoldFittingStrategy),
+    ):
+        bag.params["fold_fitting_strategy"] = "sequential_local"
+        assert bag._get_fold_fitting_strategy(model_base=bag.model_base, num_gpus=0) is expected
+
+
+@pytest.mark.parametrize("elapsed", [100, 470, 3600, 3601])
+def test_mitra_fold_budget_accounts_for_slow_startup(elapsed):
+    from autogluon.core.utils.exceptions import TimeLimitExceeded
+    from autogluon.tabular.models.mitra.fold_fitting_strategy import MitraSequentialLocalFoldFittingStrategy
+
+    strategy = object.__new__(MitraSequentialLocalFoldFittingStrategy)
+    strategy.time_start, strategy.time_limit, strategy.time_limit_fold_ratio = 0, 3600, 0.8
+    context = dict(
+        fold=(np.arange(8), np.arange(2)),
+        folds_finished=1,
+        folds_left=7,
+        folds_to_fit=8,
+        is_last_fold=False,
+        model_name_suffix="S1F2",
+        random_seed=1,
+    )
+    with mock.patch("time.time", return_value=elapsed):
+        if elapsed >= 3600:
+            with pytest.raises(TimeLimitExceeded):
+                strategy._get_fold_time_limit(context)
+        else:
+            assert strategy._get_fold_time_limit(context) == (3600 - elapsed) / 7 * 0.8
+        strategy.time_limit = None
+        assert strategy._get_fold_time_limit(context) is None
+
+
+@pytest.mark.parametrize("save_bag_folds", [False, True])
+def test_mitra_scores_completed_fold_after_slow_startup(save_bag_folds):
+    from autogluon.core.models.ensemble.fold_fitting_strategy import SequentialLocalFoldFittingStrategy
+    from autogluon.core.utils.exceptions import TimeLimitExceeded
+    from autogluon.tabular.models.mitra.fold_fitting_strategy import MitraSequentialLocalFoldFittingStrategy
+
+    strategy = object.__new__(MitraSequentialLocalFoldFittingStrategy)
+    strategy.time_start, strategy.time_limit = 0, 3600
+    strategy.X, strategy.y = _toy_data(8, 2)
+    strategy.bagged_ensemble_model = SimpleNamespace(save_bag_folds=save_bag_folds)
+    context = dict(
+        fold=(np.arange(2, 8), np.arange(2)),
+        folds_finished=0,
+        folds_left=8,
+        folds_to_fit=8,
+        is_last_fold=False,
+        model_name_suffix="S1F1",
+        random_seed=0,
+    )
+    predictions = np.array([0.2, 0.8])
+    child = mock.Mock()
+    child.predict_proba.return_value = predictions
+    child.score_with_y_pred_proba.return_value = -0.5
+    weights = child.model
+    with mock.patch("time.time", return_value=470):
+        with pytest.raises(TimeLimitExceeded):
+            SequentialLocalFoldFittingStrategy._predict_oof(strategy, child, context)
+        child.predict_proba.assert_not_called()
+        fitted, actual = strategy._predict_oof(child, context)
+    assert fitted is child and actual is predictions and child.val_score == -0.5
+    pd.testing.assert_frame_equal(child.predict_proba.call_args.args[0], strategy.X.iloc[:2])
+    pd.testing.assert_series_equal(child.score_with_y_pred_proba.call_args.kwargs["y"], strategy.y.iloc[:2])
+    child.predict_proba.assert_called_once()
+    child.reduce_memory_size.assert_called_once_with(remove_fit=True, remove_info=False, requires_save=True)
+    assert child.model is (weights if save_bag_folds else None)
+    assert strategy.time_limit == 3600
+
+
+def test_mitra_hierarchy_node_bags_with_rare_classes_and_roundtrip(checkpoint_factory, tmp_path):
+    from autogluon.tabular.models.mitra._internal.data.class_hierarchy import ClassHierarchy
+    from autogluon.tabular.models.mitra.ensemble import MitraStackerEnsembleModel
+    from autogluon.tabular.trainer.model_presets.presets import get_preset_models
+
+    X, y = _toy_data(24, 3, n_classes=12)
+    X["row_id"] = np.arange(len(X))
+    X_val, y_val = _toy_data(12, 3, n_classes=12, seed=1)
+    X_val["row_id"] = 1000 + np.arange(len(X_val))
+    subtree = ClassHierarchy(12, seed=0).nodes[1]
+    for frame, target in ((X, y), (X_val, y_val)):
+        frame["node_missing"] = np.where(subtree.mask(target.to_numpy()), 0.0, 1.0)
+        frame.loc[target == subtree.classes[0], "node_missing"] = np.nan
+        frame["category"] = np.where(np.arange(len(frame)) % 2, "alpha", "beta")
+        # This level is rare on training alone, but occurs twice when the
+        # official validation features are included in node preprocessing.
+        frame.loc[frame.index[target == subtree.classes[0]][0], "category"] = "rare"
+        frame["category"] = frame["category"].astype("category")
+    models, _ = get_preset_models(
+        path=str(tmp_path / "models"),
+        problem_type="multiclass",
+        eval_metric="log_loss",
+        hyperparameters={
+            "MITRA": {
+                "hf_model": checkpoint_factory(),
+                "fine_tune_steps": 1,
+            }
+        },
+        ensemble_kwargs={},
+    )
+    model = models[0]
+    caller_numpy_state = np.random.get_state()
+    model.fit(
+        X=X,
+        y=y,
+        X_val=X_val,
+        y_val=y_val,
+        k_fold=3,
+        num_cpus=1,
+        num_gpus=0,
+        time_limit=90,
+    )
+    assert type(model) is MitraStackerEnsembleModel
+    np.testing.assert_array_equal(np.random.get_state()[1], caller_numpy_state[1])
+    assert np.random.get_state()[2:] == caller_numpy_state[2:]
+    assert model.n_children == 1
+    assert model.has_oof
+    hierarchy = model.load_child(model.models[0])
+    assert len(hierarchy.model.nodes) == 3
+    leaf = hierarchy.model.nodes[1]
+    leaf_features = leaf.feature_generator.transform(X.loc[leaf.mask(y.to_numpy())])
+    assert set(leaf_features["node_missing"].unique()) == {0, 1}
+    assert len(leaf_features["category"].cat.categories) == 3
+    assert not leaf_features["category"].isna().any()
+    for index, node in enumerate(hierarchy.model.nodes):
+        augmentation_stream = np.random.RandomState(hierarchy._hierarchy_seed + index)
+        bag = hierarchy._load_node(node)
+        assert bag.n_children == 3
+        assert bag.params["fold_fitting_strategy"] == "sequential_local"
+        for name in bag.models:
+            child = bag.load_child(name)
+            mirror = child.model.trainers[0].preprocessor.mirror
+            np.testing.assert_array_equal(mirror, augmentation_stream.choice([1, -1], size=mirror.shape))
+            assert len(child.model.y) == int(node.mask(y.to_numpy()).sum())
+            row_column = child.features.index("row_id")
+            assert not np.isin(child.model.X[:, row_column], X_val["row_id"]).any()
+    oof = model.predict_proba_oof()
+    assert oof.shape == (len(X), 12)
+    assert np.isfinite(oof).all()
+    assert np.allclose(oof.sum(axis=1), 1)
+    before = model.predict_proba(X_val)
+    assert before.shape == (len(X_val), 12)
+    assert np.allclose(before.sum(axis=1), 1)
+    model.save()
+    loaded = type(model).load(model.path)
+    np.testing.assert_allclose(loaded.predict_proba(X_val), before, atol=1e-6)
+    copied = model.convert_to_refit_full_via_copy()
+    np.testing.assert_allclose(copied.predict_proba(X_val), before, atol=1e-6)
+
+
+def test_hierarchy_uses_cached_oof_without_prediction_time_estimate(tmp_path):
+    from autogluon.core.models import AbstractModel
+    from autogluon.tabular.models.mitra.ensemble import MitraStackerEnsembleModel
+
+    class CachedOOFModel(AbstractModel):
+        def _more_tags(self):
+            return {**super()._more_tags(), "valid_oof": True}
+
+        def _fit(self, X, y, **kwargs):
+            self.model = True
+            self._oof = np.full((len(X), self.num_classes), 1 / self.num_classes, dtype=np.float32)
+
+        def _predict_proba(self, X, **kwargs):
+            assert len(X) != 500, "Cached OOF must not trigger the generic prediction-time estimate."
+            return np.full((len(X), self.num_classes), 1 / self.num_classes, dtype=np.float32)
+
+        def predict_proba_oof(self, **kwargs):
+            return self._oof
+
+    X, y = _toy_data(10008, 3, n_classes=12)
+    child = CachedOOFModel(
+        path=str(tmp_path), name="CachedHierarchy", problem_type="multiclass", eval_metric="log_loss"
+    )
+    model = MitraStackerEnsembleModel(model_base=child, path=str(tmp_path), name="HierarchyBag")
+    model.low_memory = False
+    model.initialize(X=X, y=y, num_classes=12)
+    model._node_bagging = True
+    model._fit_single(
+        X=X,
+        y=y,
+        model_base=model._get_model_base(),
+        use_child_oof=True,
+        time_limit=60,
+        num_cpus=1,
+        num_gpus=0,
+    )
+    assert model.has_oof
+    np.testing.assert_array_equal(model.predict_proba_oof(), model.models[0].predict_proba_oof())
+
+
+def test_hierarchy_oof_preserves_hf_sampling_state(model_factory):
+    import torch
+
+    from autogluon.tabular.models.mitra.ensemble import _MitraHierarchyNodeModel, _node_random_context
+
+    X, y = _toy_data(24, 3)
+    model = model_factory(model_cls=_MitraHierarchyNodeModel, fine_tune=False)
+    model.fit(X=X.iloc[:16], y=y.iloc[:16], X_val=X.iloc[16:], y_val=y.iloc[16:], num_cpus=1, num_gpus=0)
+    sampler = model.model.trainers[0].rng
+    sampler_before = copy.deepcopy(sampler)
+    numpy_before = np.random.get_state()
+    torch_before = torch.get_rng_state()
+    assert model.val_score is None
+    first = model.predict_proba(X.iloc[16:])
+    np.testing.assert_array_equal(first, model.predict_proba(X.iloc[16:]))
+    np.testing.assert_array_equal(sampler.get_state()[1], sampler_before.get_state()[1])
+    assert sampler.get_state()[2] == sampler_before.get_state()[2]
+    np.testing.assert_array_equal(np.random.get_state()[1], numpy_before[1])
+    assert np.random.get_state()[2] == numpy_before[2]
+    assert torch.equal(torch.get_rng_state(), torch_before)
+
+    # A hierarchy's scoped seeding must restore the next AutoGluon model's
+    # random state when its fit finishes.
+    with _node_random_context(device="cpu", seed=7):
+        expected = (np.random.rand(4), torch.rand(4))
+    with _node_random_context(device="cpu", seed=7):
+        np.testing.assert_array_equal(np.random.rand(4), expected[0])
+        assert torch.equal(torch.rand(4), expected[1])
+    assert torch.equal(torch.get_rng_state(), torch_before)
+    np.testing.assert_array_equal(np.random.get_state()[1], numpy_before[1])
+
+
 @pytest.fixture
 def checkpoint_factory(tmp_path):
     import torch

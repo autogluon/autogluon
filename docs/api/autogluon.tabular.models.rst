@@ -318,6 +318,16 @@ for example, this allows two hours:
        time_limit=7200,
    )
 
+For classification with more than ten classes, supplying ``tuning_data`` with
+``use_bag_holdout=True`` enables separate bagging at each hierarchy node.
+Each node uses the external validation rows for checkpoint selection, and its
+bag receives a default budget of 3,600 seconds. The node probabilities are
+averaged before they are combined into full-class predictions. AutoGluon's
+global ``time_limit`` still limits the complete fit. Validation rows are not
+added to inference support. Node folds run sequentially by default, with a
+separate random stream for each node, matching HF's default API.
+Grouped and custom folds retain a separate hierarchy inside each outer fold.
+
 ``MitraV2Model`` uses the new fine-tuning method for both checkpoint versions.
 ``model_version`` selects the default checkpoint. An explicit ``hf_model``
 takes precedence. The legacy v1 API is the separate

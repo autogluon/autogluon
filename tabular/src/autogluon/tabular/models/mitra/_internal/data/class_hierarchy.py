@@ -71,12 +71,16 @@ class ClassHierarchy:
         return node
 
     def predict_proba(self, X):
-        result = np.zeros((len(X), self.n_classes), dtype=np.float64)
+        return self.combine_probabilities(len(X), lambda node: node.estimator.predict_proba(X))
+
+    def combine_probabilities(self, n_rows, predict_node):
+        """Compose node probabilities, allowing a node to be a bagged model."""
+        result = np.zeros((n_rows, self.n_classes), dtype=np.float64)
 
         def visit(node, mass):
             probabilities = _normalized_probabilities(
-                node.estimator.predict_proba(X),
-                n_rows=len(X),
+                predict_node(node),
+                n_rows=n_rows,
                 n_classes=len(node.groups),
             )
             for i, (group, child) in enumerate(zip(node.groups, node.children)):
@@ -86,5 +90,5 @@ class ClassHierarchy:
                 else:
                     visit(child, group_mass)
 
-        visit(self.root, np.ones(len(X)))
-        return _normalized_probabilities(result, n_rows=len(X), n_classes=self.n_classes)
+        visit(self.root, np.ones(n_rows))
+        return _normalized_probabilities(result, n_rows=n_rows, n_classes=self.n_classes)

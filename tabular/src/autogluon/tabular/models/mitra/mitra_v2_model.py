@@ -19,9 +19,12 @@ class MitraV2Model(MitraModel):
     checkpoint selected by ``model_version``. The checkpoint's ``config.json``
     defines the architecture; release metadata is not required.
 
-    A fit defaults to 3,600 seconds shared across bag folds. AutoGluon's global
-    ``time_limit`` can impose a shorter limit. Override the budget with
-    ``ag.max_time_limit`` and, for bagging, ``ag.ens.ag.max_time_limit``.
+    A fit defaults to 3,600 seconds shared across bag folds. For classification
+    above ten classes, bagging with an external validation set fits a separate
+    bag at each hierarchy node, with a 3,600-second budget per node. AutoGluon's
+    global ``time_limit`` still caps the entire fit. ``ag.max_time_limit`` and
+    ``ag.ens.ag.max_time_limit`` impose model and ensemble limits.
+    Grouped or custom folds retain the hierarchy within each outer bag fold.
 
     The v2 defaults use 50 fine-tuning steps, 10 warmup steps, and weight decay 0.3.
     The learning rate is 3e-6 for binary datasets with at most 16,384 training rows
@@ -49,8 +52,13 @@ class MitraV2Model(MitraModel):
     }
     _default_ag_args_ensemble_extra = {
         "fold_fitting_strategy": "auto",
-        "ag.max_time_limit": 3600,
     }
+
+    @classmethod
+    def _get_default_ag_args(cls):
+        from .ensemble import MitraStackerEnsembleModel
+
+        return {**super()._get_default_ag_args(), "ensemble_type": MitraStackerEnsembleModel}
 
     def _validate_fine_tune_recipe(self):
         recipe = self.params.get("fine_tune_recipe", self._user_params.get("fine_tune_recipe"))
