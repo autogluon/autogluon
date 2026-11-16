@@ -1,3 +1,4 @@
+import numpy as np
 import pandas as pd
 
 from autogluon.timeseries.dataset import TimeSeriesDataFrame
@@ -16,3 +17,12 @@ def in_sample_abs_seasonal_error(*, y_past: pd.Series, seasonal_period: int = 1)
 def in_sample_squared_seasonal_error(*, y_past: pd.Series, seasonal_period: int = 1) -> pd.Series:
     seasonal_diffs = _get_seasonal_diffs(y_past=y_past, seasonal_period=seasonal_period)
     return seasonal_diffs.pow(2.0).groupby(level=TimeSeriesDataFrame.ITEMID, sort=False).mean().fillna(1.0)
+
+
+def align_past_metric_to_items(past_metric: pd.Series, item_ids: pd.Index) -> np.ndarray:
+    """Align a per-item metric computed on past data with ``item_ids``.
+
+    Items without any past observations are missing from ``past_metric`` and get the default value 1.0, same as items
+    whose past data is too short to compute the metric.
+    """
+    return past_metric.reindex(item_ids, fill_value=1.0).to_numpy()
