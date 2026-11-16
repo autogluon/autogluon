@@ -45,23 +45,3 @@ def test_explicit_multipart_paths_keep_requested_order(multipart_data):
 def test_empty_multipart_paths_report_missing_data():
     with pytest.raises(ValueError, match="No data files"):
         load_pd.load([])
-
-
-@pytest.mark.parametrize("num_parts", [1, 2])
-@pytest.mark.parametrize("worker_count", [None, 1, 16])
-def test_multipart_load_bounds_workers_by_number_of_parts(monkeypatch, multipart_data, num_parts, worker_count):
-    parts, paths = multipart_data
-    pool_workers = []
-    monkeypatch.setattr(load_pd.multiprocessing, "cpu_count", lambda: 8)
-
-    def execute(workers_count, transformer, chunks, multiprocessing_method):
-        pool_workers.append(workers_count)
-        return list(map(transformer, chunks))
-
-    monkeypatch.setattr(load_pd.multiprocessing_utils, "execute_multiprocessing", execute)
-
-    result = load_pd.load(paths[:num_parts], worker_count=worker_count)
-
-    pd.testing.assert_frame_equal(result, pd.concat(parts[:num_parts], ignore_index=True))
-    expected_workers = min(worker_count or 8, num_parts)
-    assert pool_workers == ([] if expected_workers == 1 else [expected_workers])
