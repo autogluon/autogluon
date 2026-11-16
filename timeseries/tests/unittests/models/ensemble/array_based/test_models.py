@@ -47,3 +47,13 @@ class TestEnsembleModels:
         result = model._predict(ensemble_test_data)
         assert result is not None
         assert len(result) > 0
+
+    def test_given_data_with_covariates_when_predict_called_then_prediction_returned(
+        self, model_class, ensemble_data_with_covariates, ensemble_test_data
+    ):
+        model = model_class()
+        model.prediction_length = 5
+        model.fit(**ensemble_data_with_covariates)
+        result = model._predict(ensemble_test_data)
+        assert result is not None
+        assert len(result) > 0
