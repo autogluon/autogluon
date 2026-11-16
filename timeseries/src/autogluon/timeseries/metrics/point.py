@@ -8,7 +8,7 @@ import pandas as pd
 from autogluon.timeseries import TimeSeriesDataFrame
 
 from .abstract import TimeSeriesScorer
-from .utils import in_sample_abs_seasonal_error, in_sample_squared_seasonal_error
+from .utils import align_past_metric_to_items, in_sample_abs_seasonal_error, in_sample_squared_seasonal_error
 
 logger = logging.getLogger(__name__)
 
@@ -455,7 +455,8 @@ class MASE(TimeSeriesScorer):
         errors = np.abs(y_true - y_pred).reshape([-1, self.prediction_length])
         if self.horizon_weight is not None:
             errors *= self.horizon_weight
-        return self._safemean(errors / self._past_abs_seasonal_error.to_numpy()[:, None])
+        seasonal_error = align_past_metric_to_items(self._past_abs_seasonal_error, data_future.item_ids)
+        return self._safemean(errors / seasonal_error[:, None])
 
 
 class RMSSE(TimeSeriesScorer):
@@ -528,7 +529,8 @@ class RMSSE(TimeSeriesScorer):
         errors = ((y_true - y_pred) ** 2).reshape([-1, self.prediction_length])
         if self.horizon_weight is not None:
             errors *= self.horizon_weight
-        return np.sqrt(self._safemean(errors / self._past_squared_seasonal_error.to_numpy()[:, None]))
+        seasonal_error = align_past_metric_to_items(self._past_squared_seasonal_error, data_future.item_ids)
+        return np.sqrt(self._safemean(errors / seasonal_error[:, None]))
 
 
 class RMSLE(TimeSeriesScorer):

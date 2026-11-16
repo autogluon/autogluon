@@ -6,7 +6,7 @@ import pandas as pd
 from autogluon.timeseries.dataset import TimeSeriesDataFrame
 
 from .abstract import TimeSeriesScorer
-from .utils import in_sample_abs_seasonal_error
+from .utils import align_past_metric_to_items, in_sample_abs_seasonal_error
 
 
 class MQL(TimeSeriesScorer):
@@ -177,4 +177,5 @@ class SQL(TimeSeriesScorer):
         )
         if self.horizon_weight is not None:
             errors *= self.horizon_weight
-        return 2 * self._safemean(errors / self._past_abs_seasonal_error.to_numpy()[:, None])
+        seasonal_error = align_past_metric_to_items(self._past_abs_seasonal_error, data_future.item_ids)
+        return 2 * self._safemean(errors / seasonal_error[:, None])
