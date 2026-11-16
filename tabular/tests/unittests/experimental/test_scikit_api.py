@@ -10,15 +10,18 @@ from autogluon.tabular.testing import FitHelper
 
 
 @pytest.mark.parametrize("estimator_type", [TabularClassifier, TabularRegressor])
-@pytest.mark.parametrize("feature_type", ["numeric", "categorical", "datetime"])
-def test_scikit_predictions_preserve_dataframe_features(estimator_type, feature_type, tmp_path):
-    X = pd.DataFrame({"numeric_feature": np.arange(20, dtype=float), "other_feature": np.arange(20) % 3})
-    if feature_type == "categorical":
-        X["other_feature"] = pd.Series(["a", "b"] * 10, dtype="category")
-        X.loc[0, "numeric_feature"] = np.nan
-        X.loc[1, "other_feature"] = np.nan
-    elif feature_type == "datetime":
-        X["other_feature"] = pd.date_range("2020-01-01", periods=len(X))
+def test_scikit_predictions_preserve_dataframe_features(estimator_type, tmp_path):
+    # One frame with everything `check_array` could not pass through as a numeric array:
+    # a missing number, a categorical feature with a missing value, and a datetime feature.
+    X = pd.DataFrame(
+        {
+            "numeric_feature": np.arange(20, dtype=float),
+            "categorical_feature": pd.Series(["a", "b"] * 10, dtype="category"),
+            "datetime_feature": pd.date_range("2020-01-01", periods=20),
+        }
+    )
+    X.loc[0, "numeric_feature"] = np.nan
+    X.loc[1, "categorical_feature"] = np.nan
     y = np.arange(20) % 2
     estimator = estimator_type(
         path=str(tmp_path / "predictor"),
