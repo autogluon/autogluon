@@ -109,3 +109,4 @@ def test_a_model_with_a_nan_validation_score_is_not_trained(tmp_path):
     assert not [m for m in predictor.model_names() if m.startswith("Dummy")]
     assert predictor.model_best.startswith("WeightedEnsemble")
     assert np.isfinite(predictor.predict(_train(50))).all()
+    assert not os.path.exists(os.path.join(predictor._trainer.path, "Dummy"))
