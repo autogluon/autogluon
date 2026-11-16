@@ -81,7 +81,7 @@ def get_lags_for_frequency(
 
     Parameters
     ----------
-    freq_str
+    freq
         Frequency string of the form [multiple][granularity] such as "12H",
         "5min", "1D" etc.
     lag_ub
