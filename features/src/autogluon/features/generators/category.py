@@ -155,10 +155,10 @@ class CategoryFeatureGenerator(AbstractFeatureGenerator):
             categories = series.cat.categories
             codes = series.cat.codes.to_numpy()
             counts = np.bincount(codes[codes >= 0], minlength=len(categories))
-            # Categories by ascending count, ties in category-value order: the order
-            # `value_counts().sort_index().sort_values(kind="stable")` gives.
-            by_value = np.argsort(np.asarray(categories), kind="stable")
-            rank_order = by_value[np.argsort(counts[by_value], kind="stable")]
+            # Categories by ascending count, ties in category order: the order
+            # `value_counts().sort_index().sort_values(kind="stable")` gives. Comparing the category values instead
+            # would raise for categories of mixed types, such as True/False plus the "" filling missing values.
+            rank_order = np.argsort(counts, kind="stable")
             rank_index = categories[rank_order]
             rank_counts = counts[rank_order]
             if self._minimum_cat_count is not None:
