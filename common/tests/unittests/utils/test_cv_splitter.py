@@ -42,6 +42,16 @@ class TestCustomSplitsReturnValue:
         result = cv.split(X, y)
         assert result is splits
 
+    def test_lists_are_returned_as_arrays(self):
+        splits = [(train.tolist(), test.tolist()) for train, test in _two_fold_splits(10)]
+        cv = CVSplitter(n_splits=2, n_repeats=1, custom_splits=splits)
+        X, y = _make_data(10)
+        result = cv.split(X, y)
+        for (train, test), (train_in, test_in) in zip(result, splits):
+            assert isinstance(train, np.ndarray) and isinstance(test, np.ndarray)
+            np.testing.assert_array_equal(train, train_in)
+            np.testing.assert_array_equal(test, test_in)
+
     def test_two_folds_one_repeat(self):
         n = 10
         splits = _two_fold_splits(n)

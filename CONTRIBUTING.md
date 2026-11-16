@@ -89,7 +89,7 @@ GitHub provides additional documentation on [forking a repository](https://help.
     - VSCode: install `autoDocstring` and set `autoDocstring.docstringFormat` to `numpy`
     - PyCharm: configure docstring generation style to NumPy in the IDE settings
 
-- We encourage you to add your own unit tests, but please ensure they run quickly (unit tests should train models on small data-subsample with the lowest values of training iterations and time-limits that suffice to evaluate the intended functionality). You can run a specific unit test within a specific file like this:
+- Add unit tests for new functionality and for behavior that other changes could break, and ensure they run quickly (unit tests should train models on small data-subsample with the lowest values of training iterations and time-limits that suffice to evaluate the intended functionality). Do not add tests that only check that a specific fix is still in place; see [AGENTS.md](AGENTS.md). You can run a specific unit test within a specific file like this:
     ```
     python3 -m pytest path_to_file::test_mytest
     ```
@@ -122,13 +122,11 @@ In order to evaluate the value a model provides, our developer team will run ext
 We are actively working on ways to automate the evaluation of new model contributions, and hope to have this new logic ready by the end of 2025.
 
 ## Code of Conduct
-This project has adopted the [Amazon Open Source Code of Conduct](https://aws.github.io/code-of-conduct).
-For more information see the [Code of Conduct FAQ](https://aws.github.io/code-of-conduct-faq) or contact
-opensource-codeofconduct@amazon.com with any additional questions or comments.
+See [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
 
 
 ## Security Issue Notifications
-If you discover a potential security issue in this project we ask that you notify AWS/Amazon Security via our [vulnerability reporting page](http://aws.amazon.com/security/vulnerability-reporting/). Please do **not** create a public GitHub issue for a security vulnerability.
+To report a potential security issue, follow [SECURITY.md](SECURITY.md). Please do **not** create a public GitHub issue for a security vulnerability.
 
 
 ## Instructions for Project Maintainers
@@ -153,6 +151,4 @@ Automated benchmarking should only be performed for changes that are likely to i
 
 ## Licensing
 
-This project uses the Apache 2.0 license. See the [LICENSE](https://github.com/autogluon/autogluon/blob/master/LICENSE) file for details. We will ask you to confirm the licensing of your contribution.
-
-We may ask you to sign a [Contributor License Agreement (CLA)](http://en.wikipedia.org/wiki/Contributor_License_Agreement) for larger changes.
+This project uses the Apache 2.0 license. See the [LICENSE](https://github.com/autogluon/autogluon/blob/master/LICENSE) file for details.

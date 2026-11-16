@@ -12,9 +12,14 @@ from autogluon.tabular.testing import FitHelper
 toy_model_params = {"n_estimators": 1}
 
 
-def test_tabpfnv2():
+@pytest.mark.parametrize(
+    "model_hyperparameters",
+    # `fit_with_cache` writes into its network, so the fit owns it and the save keeps it, with its KV cache.
+    [toy_model_params, {**toy_model_params, "fit_mode": "fit_with_cache"}],
+    ids=["shared-network", "own-network-with-cache"],
+)
+def test_tabpfnv2(model_hyperparameters):
     model_cls = RealTabPFNv2Model
-    model_hyperparameters = toy_model_params
 
     FitHelper.verify_model(
         model_cls=model_cls,
@@ -83,6 +88,43 @@ def test_tabpfn_set_device_moves_inner_checkpoints():
     assert cached == {id(inner_model) for inner_model in model.model.models_}, (
         "models_ must reference the inference engine's cached checkpoints, not duplicates"
     )
+
+
+class _MovedEstimator:
+    """Records the device argument of every move."""
+
+    def __init__(self):
+        self.moves = []
+        self.models_ = []
+
+    def to(self, device):
+        self.moves.append(device)
+
+
+@pytest.mark.parametrize(
+    "fit_num_gpus, visible, back_on_cuda",
+    [
+        (3, 3, ["cuda:0", "cuda:1", "cuda:2"]),
+        (3, 2, ["cuda:0", "cuda:1"]),
+        (2, 1, "cuda"),
+        (1, 4, "cuda"),
+        (0, 4, "cuda"),
+        (None, 4, "cuda"),  # no fit metadata recorded
+    ],
+)
+def test_tabpfn_set_device_returns_a_multi_gpu_fit_to_its_gpus(monkeypatch, fit_num_gpus, visible, back_on_cuda):
+    """``save`` moves the model to the CPU and back to ``"cuda"``, and ``load`` to ``"cuda"``: a fit spread over
+    several GPUs goes back to as many of them as this process sees, not to the current GPU alone."""
+    monkeypatch.setattr(torch.cuda, "device_count", lambda: visible)
+    model = RealTabPFNv2Model(problem_type="binary", eval_metric=None)
+    model.model = _MovedEstimator()
+    if fit_num_gpus is not None:  # what `fit` records
+        model._fit_metadata, model._is_fit_metadata_registered = {"num_gpus": fit_num_gpus}, True
+
+    model._set_device("cpu")
+    model._set_device("cuda")
+
+    assert model.model.moves == ["cpu", back_on_cuda]
 
 
 def _fit_tabpfn(tmp_path, name, X, y, *, problem_type="binary", eval_metric="log_loss", hyperparameters=None):
@@ -218,10 +260,9 @@ def test_tabpfn_registry_capacity_bounds_the_shared_networks(tmp_path):
 
 def test_tabpfn_share_weights_off_loads_and_pickles_its_own_network(tmp_path, monkeypatch):
     """`model_class_settings={"REALTABPFN-V2": {"share_weights": False}}` restores tabpfn's own load
-    for that version only: no registry entry, the network in the pickle, a CPU round trip on save.
+    for that version only: no registry entry, the network saved with the model.
     """
     import os
-    import pickle
 
     import numpy as np
 
@@ -240,12 +281,64 @@ def test_tabpfn_share_weights_off_loads_and_pickles_its_own_network(tmp_path, mo
     assert isinstance(owned.model.model_path, str), "tabpfn's own load ran from the checkpoint path"
     expected = owned.predict_proba(X)
     saved_path = owned.save()
-    with open(os.path.join(saved_path, RealTabPFNv2Model.model_file_name), "rb") as f:
-        assert pickle.load(f).model.models_, "the network is in the pickle"
+    network_bytes = sum(t.numel() * t.element_size() for m in owned.model.models_ for t in m.state_dict().values())
+    tensors_path = os.path.join(saved_path, RealTabPFNv2Model.model_tensors_file_name)
+    assert os.path.getsize(tensors_path) >= network_bytes, "the network is saved with the model"
+    saved_bytes = os.path.getsize(tensors_path) + os.path.getsize(os.path.join(saved_path, owned.model_file_name))
+
+    def refuse(*args, **kwargs):
+        raise AssertionError("sizing the model serialized a tensor")
+
+    with monkeypatch.context() as patched:
+        patched.setattr(torch, "save", refuse)
+        memory_size = owned._get_memory_size()
+    assert network_bytes < memory_size <= saved_bytes, "the size counts the network without serializing it"
     loaded = RealTabPFNv2Model.load(saved_path)
     assert loaded.model.models_[0] is not owned.model.models_[0]
     np.testing.assert_allclose(loaded.predict_proba(X), expected, rtol=1e-5, atol=1e-6)
     assert not registry.report()["entries"]
+
+
+def test_tabpfn_saves_a_fit_where_it_is(tmp_path, monkeypatch):
+    """A fit that owns its network is saved without a move to the CPU and back, on one device or several, and
+    loads without the GPU it was saved from."""
+    import numpy as np
+
+    X, y = _classification_frame()
+    monkeypatch.setattr(RealTabPFNv2Model, "_class_settings", None, raising=False)
+    monkeypatch.setattr(RealTabPFNv2Model, "_class_settings_set", False, raising=False)
+    RealTabPFNv2Model.set_class_settings(share_weights=False)
+    model = _fit_tabpfn(tmp_path, "owned", X, y)
+    expected = model.predict_proba(X)
+    moves = []
+    set_device = RealTabPFNv2Model.set_device
+    monkeypatch.setattr(
+        RealTabPFNv2Model, "set_device", lambda self, device: moves.append(device) or set_device(self, device)
+    )
+
+    model.model.devices_ = (torch.device("cpu"), torch.device("cpu"))  # stands for a fit on two GPUs
+    model.save()
+    assert moves == [], "a fit on several devices is saved where it is, with one copy of each checkpoint"
+
+    # What a fit on one GPU records: the estimator's devices, the engine's per-device caches, the model's device.
+    cuda = torch.device("cuda")
+    model.model.devices_, model.model.device = (cuda,), "cuda"
+    caches = model.model.executor_.model_caches
+    assert caches, "the engine keeps its networks per device"
+    for cache in caches:
+        cache._models = {cuda: network for network in cache._models.values()}
+    model.device = model.device_train = "cuda"
+    moves.clear()
+    with monkeypatch.context() as patched:
+        patched.setattr(torch.serialization, "location_tag", lambda storage: "cuda:0")  # its storages too
+        saved_path = model.save()
+    assert moves == [], "a fit on one device stays where it is"
+
+    with monkeypatch.context() as patched:
+        patched.setattr(torch.cuda, "is_available", lambda: False)
+        loaded = RealTabPFNv2Model.load(saved_path)
+    assert moves == ["cpu"] and loaded.model.devices_ == (torch.device("cpu"),), "the load moves it to the CPU"
+    np.testing.assert_allclose(loaded.predict_proba(X), expected, rtol=1e-5, atol=1e-6)
 
 
 @pytest.mark.parametrize(

@@ -52,6 +52,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Literal
 
 from autogluon.core.models.abstract import _object_graph as graph
+from autogluon.core.models.abstract import _tensor_pickle
 from autogluon.core.models.abstract._shared_weights_registry import (
     WeightsKey,
     contains,
@@ -641,8 +642,8 @@ class _Attributes:
 
     The copy has no network, which is outside what a library's own ``__getstate__`` or
     ``__setstate__`` expects (one exports the network's configuration, another reloads it); the
-    weightless pickle is the estimator's attributes, tensors on the CPU, and the load puts the shared
-    network back through :func:`ensure_network`.
+    weightless pickle is the estimator's attributes, and the load puts the shared network back through
+    :func:`ensure_network`.
     """
 
     def __init__(self, estimator: Any) -> None:
@@ -654,14 +655,29 @@ class _Attributes:
 
 
 def getstate(model: Any, state: dict[str, Any]) -> dict[str, Any]:
-    """The model's state for the pickle: the estimator without the shared network, its other tensors on the CPU."""
+    """The model's state for the pickle: the estimator without the shared network.
+
+    A plain pickle gets the estimator's other tensors on the CPU, so it loads without CUDA. A pickle that
+    writes its tensors apart (``AbstractModel.save`` and the size estimate) leaves them on their device,
+    which spares a copy of each: the load restores them there, or on the CPU when that device is
+    missing, and :func:`ensure_network` moves them to the model's device.
+
+    A model loaded but not yet given its network back has no network to null, and its tensors are where
+    the load restored them, so a plain pickle copies them to the CPU as well.
+    """
     shared = model._shared_state
-    if owns_network(model) or model.model is None or shared.paths or not shared.component_ids:
+    if owns_network(model) or model.model is None or not shared.component_ids:
         return state
-    estimator, paths, moved = graph.detach_shared(model.model, shared_ids=shared.component_ids)
+    to_cpu = not _tensor_pickle.tensors_saved_apart()
     record = copy.copy(shared)
-    record.paths = paths
-    record.moved = moved
+    if shared.paths:
+        # The recorded ids belong to the process that saved the model, so nothing is nulled by identity.
+        estimator, _, moved = graph.detach_shared(model.model, to_cpu=to_cpu)
+        record.moved = [*shared.moved, *(path for path in moved if path not in shared.moved)]
+    else:
+        estimator, record.paths, record.moved = graph.detach_shared(
+            model.model, shared_ids=shared.component_ids, to_cpu=to_cpu
+        )
     state["model"] = _Attributes(estimator) if hasattr(estimator, "__dict__") else estimator
     state["_shared_state"] = record
     return state

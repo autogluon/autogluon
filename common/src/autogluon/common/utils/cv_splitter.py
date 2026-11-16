@@ -141,7 +141,10 @@ class CVSplitter:
                     f"custom_splits[{i}]: indices must be positional (0..{n_samples - 1}), "
                     f"but found range [{min(all_indices)}, {max(all_indices)}]."
                 )
-            return self.custom_splits
+            if all(isinstance(idx, np.ndarray) for split in self.custom_splits for idx in split):
+                return self.custom_splits
+            # other sequences (e.g. lists) as index arrays, like the splitters' folds
+            return [(np.asarray(train_idx), np.asarray(test_idx)) for train_idx, test_idx in self.custom_splits]
 
         splitter = self._splitter
         if isinstance(splitter, (RepeatedStratifiedKFold, StratifiedKFold)):
