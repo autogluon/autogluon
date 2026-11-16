@@ -91,7 +91,7 @@ class LinearRapidsModel(RapidsModelMixin, LinearModel):
         # Handle parameter conversions for cuML
         if self.problem_type == REGRESSION:
             # Convert sklearn's C parameter to cuML's alpha
-            if "C" in self.params:
+            if "alpha" not in filtered_params and "C" in self.params:
                 filtered_params["alpha"] = 1.0 / self.params["C"]
         else:
             filtered_params["penalty"] = get_penalty(self.params).lower()
