@@ -1,6 +1,13 @@
 import pytest
 
-from autogluon.timeseries.models import Chronos2Model, ChronosModel, PerStepTabularModel, Toto2Model, TotoModel
+from autogluon.timeseries.models import (
+    Chronos2Model,
+    ChronosModel,
+    PerStepTabularModel,
+    T0Model,
+    Toto2Model,
+    TotoModel,
+)
 
 from .common import (
     ALL_LOCAL_MODELS,
@@ -111,6 +118,19 @@ def patch_toto2_constructor():
     return patch_constructor(Toto2Model, extra_hyperparameters={"model_path": TOTO2_MODEL_PATH, "device": "cpu"})
 
 
+def patch_t0_constructor():
+    """Return T0Model constructor with a lightweight mock forecaster."""
+    from .test_t0 import MockT0Forecaster, noop
+
+    def t0_model(*args, **kwargs):
+        model = T0Model(*args, **kwargs)
+        model.load_model = noop
+        model._model = MockT0Forecaster()
+        return model
+
+    return t0_model
+
+
 @pytest.fixture(
     scope="session",
     params=(
@@ -149,6 +169,7 @@ def patch_toto2_constructor():
             ),
             patch_toto_constructor(),
             patch_toto2_constructor(),
+            patch_t0_constructor(),
         ]
     ),
 )
@@ -168,6 +189,7 @@ def model_class(request):
             patch_constructor(Chronos2Model, extra_hyperparameters={"model_path": CHRONOS2_MODEL_PATH}),
             patch_toto_constructor(),
             patch_toto2_constructor(),
+            patch_t0_constructor(),
         ]
     ),
 )

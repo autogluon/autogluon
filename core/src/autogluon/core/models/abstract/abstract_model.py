@@ -1,13 +1,10 @@
 from __future__ import annotations
 
 import copy
-import gc
 import inspect
 import logging
 import math
 import os
-import pickle
-import sys
 import time
 from abc import ABC, abstractmethod
 from pathlib import Path
@@ -68,6 +65,7 @@ from ...utils.exceptions import (
 from ...utils.loaders import load_json, load_pkl
 from ...utils.savers import save_json, save_pkl
 from ...utils.time import sample_df_for_time_func, time_func
+from . import _tensor_pickle
 from ._auxiliary_params import AuxiliaryParams, ParamsAuxDict
 from ._class_settings import ClassSettings
 from ._mutation_deprecated_dict import ParamsDict
@@ -265,6 +263,17 @@ class AbstractModel(ModelBase, Tunable):
     (GPU-mandatory models that cannot fit on CPU, e.g. RAPIDS)."""
 
     model_file_name = "model.pkl"
+    model_tensors_file_name = "model_tensors.pt"
+    """The torch tensors of the fitted model, which `save` writes beside `model_file_name` instead of into the pickle."""
+    pin_tensors_on_load: ClassVar[bool] = False
+    """Whether `load` puts the model's CPU tensors into pinned memory when CUDA is available.
+
+    For a model that keeps a large state on the CPU and streams it to the GPU when it predicts, such as an in-context
+    model's offloaded context cache. Each storage is copied from the memory-mapped tensor file straight into pinned
+    memory, without a pageable copy in between, and tensors that shared a storage keep sharing it. A storage that
+    cannot be pinned stays mapped from the file. torch's caching host allocator rounds each pinned block up to a power
+    of two and keeps freed blocks, so the pinned state can take up to twice its size; a model that pins a large state
+    caps that with `pinned_max_cached_size_mb` in `PYTORCH_CUDA_ALLOC_CONF`, set before CUDA starts."""
     model_info_name = "info.pkl"
     model_info_json_name = "info.json"
     learning_curve_file_name = "curves.json"
@@ -2143,6 +2152,8 @@ class AbstractModel(ModelBase, Tunable):
             This should generally be a directory path ending with a '/' character (or appropriate path separator value depending on OS).
             If None, self.path is used.
             The final model file is typically saved to os.path.join(path, self.model_file_name).
+            The model's torch tensors, if it holds any, are saved to os.path.join(path, self.model_tensors_file_name)
+            with `torch.save`, which writes each tensor once without the in-memory copies a pickle of it makes.
         verbose : bool, default True
             Whether to log the location of the saved file.
 
@@ -2163,7 +2174,12 @@ class AbstractModel(ModelBase, Tunable):
                     self._compiler.save(model=self.model, path=path)
             if self._compiler is not None and not self._compiler.save_in_pkl:
                 self.model = None  # Don't save model in pkl
-        save_pkl.save(path=file_path, object=self, verbose=verbose)
+        _tensor_pickle.save(
+            obj=self,
+            path=file_path,
+            tensors_path=os.path.join(path, self.model_tensors_file_name),
+            verbose=verbose,
+        )
         self.model = _model
         return path
 
@@ -2191,7 +2207,12 @@ class AbstractModel(ModelBase, Tunable):
             Loaded model object.
         """
         file_path = os.path.join(path, cls.model_file_name)
-        model = load_pkl.load(path=file_path, verbose=verbose)
+        model = _tensor_pickle.load(
+            path=file_path,
+            tensors_path=os.path.join(path, cls.model_tensors_file_name),
+            pin=cls.pin_tensors_on_load,
+            verbose=verbose,
+        )
         model._apply_settings_snapshots()
         if reset_paths:
             model.set_contexts(path)
@@ -2937,11 +2958,11 @@ class AbstractModel(ModelBase, Tunable):
 
     def get_memory_size(self, allow_exception: bool = False) -> int | None:
         """
-        Pickled the model object (self) and returns the size in bytes.
+        Pickles the model object (self) and returns the size in bytes.
         Will raise an exception if `self` cannot be pickled.
 
-        Note: This will temporarily double the memory usage of the model, as both the original and the pickled version will exist in memory.
-        This can lead to an out-of-memory error if the model is larger than the remaining available memory.
+        The pickle is streamed into a byte counter rather than held in memory, and torch tensors are counted at
+        the size of their storage without being serialized.
 
         Parameters
         ----------
@@ -2966,7 +2987,6 @@ class AbstractModel(ModelBase, Tunable):
             return self._get_memory_size()
 
     def _get_memory_size(self) -> int:
-        gc.collect()  # Try to avoid OOM error
         return self._get_pickled_size()
 
     def prepare_for_inference(self) -> None:
@@ -2981,8 +3001,8 @@ class AbstractModel(ModelBase, Tunable):
         """
 
     def _get_pickled_size(self) -> int:
-        """Size in bytes of the pickle of `self`."""
-        return sys.getsizeof(pickle.dumps(self, protocol=4))
+        """Size in bytes of the pickle of `self` plus the bytes of its torch tensors, which `save` writes apart."""
+        return _tensor_pickle.pickled_size(self)
 
     # TODO: Refine this
     def _estimate_dtypes_after_preprocessing_cheap(

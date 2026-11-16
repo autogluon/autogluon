@@ -64,6 +64,7 @@ from autogluon.core.utils.exceptions import (
 from autogluon.core.utils.feature_selection import FeatureSelector
 from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.savers import save_pkl
+from autogluon.features.utils import get_smallest_valid_dtype_int
 
 from .group_views import (
     GROUP_COLLAPSED_SUFFIX,
@@ -2693,6 +2694,12 @@ class AbstractTabularTrainer(AbstractTrainer[AbstractModel]):
         full_repeats[covered_idx] = repeats
         model._oof_pred_proba = full_oof
         model._oof_pred_model_repeats = full_repeats
+        if model.params.get("oof_per_fold", False):  # the folds' rows onto the full frame, the pooled arrays from them
+            row_dtype = get_smallest_valid_dtype_int(min_val=0, max_val=len(covered_rows) - 1)
+            rows = covered_idx[model._oof_per_fold["rows"]].astype(row_dtype)
+            model._oof_per_fold = {**model._oof_per_fold, "rows": rows, "n_rows": len(covered_rows)}
+            model._oof_per_fold_saved = None  # every fold's rows changed: saved again in full
+            model._oof_pred_proba, model._oof_pred_model_repeats = model._pooled_oof(model._oof_per_fold)
         if self.save_to_disk:
             model.save()
 
