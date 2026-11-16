@@ -337,7 +337,10 @@ class TimeSeriesModelBase(ModelBase, ABC):
         https://scikit-learn.org/stable/_sources/developers/develop.rst.txt.
 
         List of currently supported tags:
-        - allow_nan: Can the model handle data with missing values represented by np.nan?
+        - allow_nan: Can the model handle missing values in the **target** column represented by np.nan?
+        - allow_nan_covariates: Can the model handle missing values in real dynamic covariates (past/known)?
+            If False (default), real covariate NaNs are imputed in :meth:`preprocess` with ffill/bfill and the
+            training median. Models with native NaN support (e.g. Chronos-2) should set this to True.
         - can_refit_full: Does it make sense to retrain the model without validation data?
             See `autogluon.core.models.abstract._tags._DEFAULT_TAGS` for more details.
         - can_use_train_data: Can the model use train_data if it's provided to model.fit()?
@@ -345,6 +348,7 @@ class TimeSeriesModelBase(ModelBase, ABC):
         """
         return {
             "allow_nan": False,
+            "allow_nan_covariates": False,
             "can_refit_full": False,
             "can_use_train_data": True,
             "can_use_val_data": False,
@@ -439,6 +443,8 @@ class AbstractTimeSeriesModel(TimeSeriesModelBase, TimeSeriesTunable, metaclass=
         self.target_scaler: TargetScaler | None
         self.covariate_scaler: CovariateScaler | None
         self.covariate_regressor: CovariateRegressor | None
+        # Median of real dynamic covariates on train data; used when allow_nan_covariates is False
+        self._covariates_real_median: pd.Series | None = None
 
     def _initialize_transforms_and_regressor(self) -> None:
         self.target_scaler = get_target_scaler(self.get_hyperparameters().get("target_scaler"), target=self.target)
@@ -538,6 +544,12 @@ class AbstractTimeSeriesModel(TimeSeriesModelBase, TimeSeriesTunable, metaclass=
         start_time = time.monotonic()
         self._initialize_transforms_and_regressor()
 
+        # Impute real covariates before scalers/regressors so sklearn transforms see finite values.
+        # Models with allow_nan_covariates=True skip this and keep native NaN handling.
+        if not self._get_tags().get("allow_nan_covariates", False):
+            self._fit_real_covariate_imputer(train_data)
+            train_data, _ = self._impute_real_covariates(train_data, None)
+
         if self.target_scaler is not None:
             train_data = self.target_scaler.fit_transform(train_data)
 
@@ -560,6 +572,8 @@ class AbstractTimeSeriesModel(TimeSeriesModelBase, TimeSeriesTunable, metaclass=
             train_data, _ = self.preprocess(train_data, is_train=True)
 
         if self._get_tags()["can_use_val_data"] and val_data is not None:
+            if not self._get_tags().get("allow_nan_covariates", False):
+                val_data, _ = self._impute_real_covariates(val_data, None)
             if self.target_scaler is not None:
                 val_data = self.target_scaler.transform(val_data)
             if self.covariate_scaler is not None:
@@ -656,6 +670,12 @@ class AbstractTimeSeriesModel(TimeSeriesModelBase, TimeSeriesTunable, metaclass=
             data is given as a separate forecast item in the dictionary, keyed by the `item_id`s
             of input items.
         """
+        # Impute real covariates before scalers so transforms receive finite values
+        if not self._get_tags().get("allow_nan_covariates", False):
+            if self._covariates_real_median is None:
+                self._fit_real_covariate_imputer(data)
+            data, known_covariates = self._impute_real_covariates(data, known_covariates)
+
         if self.target_scaler is not None:
             data = self.target_scaler.fit_transform(data)
         if self.covariate_scaler is not None:
@@ -797,5 +817,55 @@ class AbstractTimeSeriesModel(TimeSeriesModelBase, TimeSeriesTunable, metaclass=
         is_train: bool = False,
         **kwargs,
     ) -> tuple[TimeSeriesDataFrame, TimeSeriesDataFrame | None]:
-        """Method that implements model-specific preprocessing logic."""
+        """Method that implements model-specific preprocessing logic.
+
+        By default, imputes real dynamic covariates when the model does not set ``allow_nan_covariates=True``.
+        Subclasses that override this method should call ``super().preprocess(...)`` first (or apply the same
+        covariate imputation) so that NaN covariates are handled consistently.
+        """
+        if not self._get_tags().get("allow_nan_covariates", False):
+            if is_train or self._covariates_real_median is None:
+                self._fit_real_covariate_imputer(data)
+            data, known_covariates = self._impute_real_covariates(data, known_covariates)
+        return data, known_covariates
+
+    def _fit_real_covariate_imputer(self, data: TimeSeriesDataFrame) -> None:
+        """Store train medians for real dynamic covariates used when imputing NaNs at predict time."""
+        real_cols = [c for c in self.covariate_metadata.covariates_real if c in data.columns]
+        if real_cols:
+            self._covariates_real_median = data[real_cols].median()
+        else:
+            self._covariates_real_median = pd.Series(dtype="float64")
+
+    def _impute_real_covariates(
+        self,
+        data: TimeSeriesDataFrame,
+        known_covariates: TimeSeriesDataFrame | None = None,
+    ) -> tuple[TimeSeriesDataFrame, TimeSeriesDataFrame | None]:
+        """Impute real past/known covariates with ffill, bfill, and train median (copy-safe)."""
+        real_cols = [c for c in self.covariate_metadata.covariates_real if c in data.columns]
+        if real_cols:
+            data = data.copy(deep=False)
+            filled = data[real_cols].fill_missing_values()
+            if filled.isna().any(axis=None):
+                median = self._covariates_real_median
+                if median is None:
+                    median = filled.median()
+                filled = filled.fillna(median)
+            for col in real_cols:
+                data[col] = filled[col]
+
+        if known_covariates is not None:
+            known_real = [c for c in self.covariate_metadata.known_covariates_real if c in known_covariates.columns]
+            if known_real:
+                known_covariates = known_covariates.copy(deep=False)
+                filled_known = known_covariates[known_real].fill_missing_values()
+                if filled_known.isna().any(axis=None):
+                    median = self._covariates_real_median
+                    if median is None:
+                        median = filled_known.median()
+                    filled_known = filled_known.fillna(median)
+                for col in known_real:
+                    known_covariates[col] = filled_known[col]
+
         return data, known_covariates
