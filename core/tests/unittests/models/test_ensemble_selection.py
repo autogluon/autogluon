@@ -111,3 +111,31 @@ def test_ensemble_selection_finite_scores_still_pick_better_model():
     assert ensemble.weights_[1] > ensemble.weights_[0]
     assert np.isclose(np.sum(ensemble.weights_), 1.0)
     assert np.isfinite(ensemble.train_score_)
+
+
+@pytest.mark.parametrize("shape", [(50,), (50, 3)])
+def test_weight_pred_probas_is_the_row_by_row_weighted_sum(shape):
+    """The weighted sum skips zero weights, leaves the inputs untouched and does not depend on the batch.
+
+    `np.sum` over the stacked predictions summed a single row in a different (pairwise) order than a batch of
+    rows once 8 or more models had a weight, so a row predicted alone could differ from the same row in a batch.
+    """
+    rng = np.random.default_rng(0)
+    pred_probas = [rng.random(shape, dtype=np.float32) for _ in range(12)]
+    pred_probas_before = [pred.copy() for pred in pred_probas]
+    weights = rng.random(12)
+    weights[[3, 7]] = 0
+    weights /= weights.sum()
+
+    out = EnsembleSelection.weight_pred_probas(pred_probas, weights)
+
+    expected = np.zeros(shape)
+    for pred, weight in zip(pred_probas, weights):
+        if weight != 0:
+            expected += pred * weight
+    assert np.array_equal(out, expected)
+    for pred, pred_before in zip(pred_probas, pred_probas_before):
+        assert np.array_equal(pred, pred_before)
+    for i in range(shape[0]):
+        out_row = EnsembleSelection.weight_pred_probas([pred[i : i + 1] for pred in pred_probas], weights)
+        assert np.array_equal(out_row, out[i : i + 1])

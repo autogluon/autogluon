@@ -34,8 +34,13 @@ class AbstractWeightedEnsemble:
 
     @staticmethod
     def weight_pred_probas(pred_probas, weights):
-        preds_norm = [pred * weight for pred, weight in zip(pred_probas, weights) if weight != 0]
-        preds_ensemble = np.sum(preds_norm, axis=0)
+        # Add the weighted predictions into one array instead of stacking them for `np.sum(..., axis=0)`, which
+        # copied every model's predictions into an (n_models, *shape) array and summed a single row in a different
+        # order than a batch of rows (so a row's result depended on the batch it was predicted in).
+        preds_ensemble = 0  # the first `+=` makes the array, the following ones add into it
+        for pred, weight in zip(pred_probas, weights):
+            if weight != 0:
+                preds_ensemble += np.asarray(pred) * weight
         return preds_ensemble
 
 
