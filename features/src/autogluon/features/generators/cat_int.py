@@ -25,7 +25,7 @@ class CategoricalInteractionFeatureGenerator(AbstractFeatureGenerator):
     Generate new categorical features by combining existing categorical features.
     Parameters
     ----------
-    max_order : int, default=2
+    max_order : int, default=3
         The maximum order of interactions to generate.
     max_new_feats : int, default=100
         Maximum number of new features to generate.
@@ -35,7 +35,7 @@ class CategoricalInteractionFeatureGenerator(AbstractFeatureGenerator):
         Whether to add frequency encoding for the new features.
     only_freq : bool, default=False
         Whether to only keep frequency encoded features.
-    min_cardinality : int, default=6
+    min_cardinality : int, default=2
         Minimum cardinality of categorical features to be considered for interaction generation.
     min_count : int, default=2
         Minimum count of the most frequent category in a new feature to be retained.
