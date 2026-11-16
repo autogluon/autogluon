@@ -68,6 +68,7 @@ def test_when_nullable_dtype_with_pd_na_then_na_not_chosen_as_true(series, expec
         (pd.Series(["a", "b"], dtype="category"), "category"),
         (pd.Series([True, False]), "bool"),
         (pd.Series(pd.to_datetime(["2020-01-01", "2020-01-02"])), "datetime"),
+        (pd.Series(pd.to_timedelta([1, 2], unit="s")), "timedelta"),
         (pd.Series(pd.arrays.SparseArray([0, 1, 0])), "int"),
     ],
 )

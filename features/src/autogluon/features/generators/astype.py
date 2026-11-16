@@ -6,7 +6,7 @@ from pandas import DataFrame
 
 from autogluon.common.features.feature_metadata import FeatureMetadata
 from autogluon.common.features.infer_types import get_bool_true_val, get_type_map_raw, get_type_map_real
-from autogluon.common.features.types import R_INT, S_BOOL
+from autogluon.common.features.types import R_INT, R_TIMEDELTA, S_BOOL
 from autogluon.common.utils.pandas_utils import get_constant_columns, get_two_valued_columns
 
 from .abstract import AbstractFeatureGenerator
@@ -60,6 +60,7 @@ class AsTypeFeatureGenerator(AbstractFeatureGenerator):
         self._type_map_real_opt: dict = None  # Optimized representation of data types, saves a few milliseconds during comparisons in online inference
         # self.inplace = inplace  # TODO, also add check if dtypes are same as expected and skip .astype
         self._int_features = None
+        self._timedelta_features = []
         self._bool_features = None
         self._convert_bool = convert_bool
         self._convert_bool_method_v2_threshold = convert_bool_method_v2_threshold
@@ -102,6 +103,13 @@ class AsTypeFeatureGenerator(AbstractFeatureGenerator):
             )
             X = X.astype(feature_map_to_update)
 
+        # Models cannot use timedelta64 columns, so durations become float seconds (NaT becomes NaN)
+        self._timedelta_features = self.feature_metadata_in.get_features(valid_raw_types=[R_TIMEDELTA])
+        if self._timedelta_features:
+            X = self._convert_timedelta(X)
+            for feature in self._timedelta_features:
+                self._type_map_real_opt[feature] = np.dtype("float64")
+
         self._bool_features = dict()
         if self._convert_bool:
             num_rows = len(X)
@@ -138,6 +146,8 @@ class AsTypeFeatureGenerator(AbstractFeatureGenerator):
         return X, type_group_map_special
 
     def _transform(self, X: DataFrame) -> DataFrame:
+        if self._timedelta_features:
+            X = self._convert_timedelta(X)
         if self._bool_features:
             X = self._convert_to_bool(X)
         # check if not same
@@ -168,6 +178,9 @@ class AsTypeFeatureGenerator(AbstractFeatureGenerator):
                     self._log_invalid_dtypes(X=X)
                     raise e
         return X
+
+    def _convert_timedelta(self, X: DataFrame) -> DataFrame:
+        return X.assign(**{f: pd.to_timedelta(X[f]).dt.total_seconds() for f in self._timedelta_features})
 
     def _log_invalid_dtypes(self, X: pd.DataFrame):
         """
@@ -317,6 +330,7 @@ class AsTypeFeatureGenerator(AbstractFeatureGenerator):
             for feature in features:
                 self._type_map_real_opt.pop(feature, None)
                 self._bool_features.pop(feature, None)
+            self._timedelta_features = [f for f in self._timedelta_features if f not in features]
             self._set_bool_features_val()
             self._int_features = np.array(self.feature_metadata_in.get_features(valid_raw_types=[R_INT]))
 
