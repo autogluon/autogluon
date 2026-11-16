@@ -19,7 +19,7 @@ To run the example:
 ### 2. Datasets
 
 We borrowed 11 tabular datasets provided by [1], and use identically the same abbreviation as Table 1 in the original paper [1] to name each datasets.
-The datasets provided by https://github.com/Yura52/tabular-dl-revisiting-models are all in `Numpy.darray` format (can be downloaded from https://www.dropbox.com/s/o53umyg6mn3zhxy/data.tar.gz?dl=1).
+The datasets provided by https://github.com/yandex-research/rtdl-revisiting-models are all in `Numpy.darray` format (can be downloaded from https://www.dropbox.com/s/o53umyg6mn3zhxy/data.tar.gz?dl=1).
 These Data in `Numpy.ndarray` was first pre-processing into `.csv` format, which can be loaded by `pandas.Dataframe` as the input to `MultiModalPredictor`.
 All Data can be automatically downloaded from s3 (online connection is necessary) if it does not exist with the given dataset path `dataset_dir`.
 

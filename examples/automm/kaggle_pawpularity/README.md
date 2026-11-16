@@ -4,7 +4,7 @@ Take [Petfinder Pawpularity competition](https://www.kaggle.com/competitions/pet
 
 ## 1. MultiModalPredictor for Training
 
-MultiModalPredictor is a tool that can handle diverse data including images, text, numerical data and categorical data. It can automatically identify data types and fuse the pretrained DL backbones. With the tool, you can make the train easily with less code. For details, please refer to [`kaggle_Pawpularity.py`](./kaggle_Pawpularity.py).
+MultiModalPredictor is a tool that can handle diverse data including images, text, numerical data and categorical data. It can automatically identify data types and fuse the pretrained DL backbones. With the tool, you can make the train easily with less code. For details, please refer to [`kaggle_pawpularity_train.py`](./kaggle_pawpularity_train.py).
 
 ### 1.1 Build the MultiModalPredictor
 
@@ -111,7 +111,7 @@ With the `.predict()`, you can get the prediction of test datasets.
 
     test_pred = pretrained_model.predict(test_df)
  
-For detailed codes, please refer to [`Kaggle_Pawpularity_submit.py`](./kaggle_Pawpularity_submit.py).
+For detailed codes, please refer to [`kaggle_pawpularity_submit.py`](./kaggle_pawpularity_submit.py).
 
 ## 4. Result in Kaggle Competitions
 

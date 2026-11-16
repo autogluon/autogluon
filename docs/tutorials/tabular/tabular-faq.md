@@ -96,7 +96,7 @@ The positive class can also be retrieved via `predictor.class_labels[-1]`. The o
 
 See ["Interpretability (feature importance)" in the In Depth Tutorial](tabular-indepth.ipynb), which allows you to quantify how much each feature contributes to AutoGluon's predictive accuracy.
 
-Additionally, you can explain particular AutoGluon predictions using [Shapely values](https://github.com/slundberg/shap/). Notebooks demonstrating this are provided at: [https://github.com/autogluon/autogluon/tree/master/examples/tabular/interpret](https://github.com/autogluon/autogluon/tree/master/examples/tabular/interpret). We recommend starting with the notebook "SHAP with AutoGluon-Tabular" contained in this folder, which demonstrates handling of multiclass classification tasks and data with categorical features.
+Additionally, you can explain particular AutoGluon predictions using [Shapely values](https://github.com/shap/shap/). Notebooks demonstrating this are provided at: [https://github.com/autogluon/autogluon/tree/master/examples/tabular/interpret](https://github.com/autogluon/autogluon/tree/master/examples/tabular/interpret). We recommend starting with the notebook "SHAP with AutoGluon-Tabular" contained in this folder, which demonstrates handling of multiclass classification tasks and data with categorical features.
 
 
 ## How can I perform inference on a file that won't fit in memory?
