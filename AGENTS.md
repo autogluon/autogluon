@@ -40,3 +40,22 @@ rules above stays in the pull request.
 
 When reviewing a pull request, look for such a commit and run its test. Suggest keeping the test only if
 it meets the rules above.
+
+## Artifacts saved by older versions
+
+Do not add logic whose only purpose is to keep loading a predictor or model that an older version of
+AutoGluon saved. AutoGluon does not support backward compatibility of saved artifacts: by default a
+predictor refuses to load under a version other than the one that created it
+(`require_version_match=True`). A fallback for an outdated artifact never runs in supported use, and it
+stays in the code long after anyone could need it.
+
+- Read a new attribute directly. Do not write `getattr(self, "_new_attribute", default)` for an attribute
+  that `__init__` or `fit` always sets, to cover an object pickled before the attribute existed.
+- Do not re-apply a setting to a stored object on every call because an object saved earlier may lack it.
+- Do not add a test that removes a new attribute, or rebuilds an old on-disk format, to show that an old
+  artifact still loads.
+
+This rule is about saved artifacts only. It does not change how a public argument, method or default is
+deprecated, or which versions of a dependency the code supports.
+
+When reviewing a pull request, ask for such logic and its tests to be removed.
