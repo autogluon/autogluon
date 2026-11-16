@@ -1,7 +1,42 @@
+import numpy as np
+import pandas as pd
+import pytest
+
 from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
 from autogluon.core.metrics import METRICS
+from autogluon.tabular.experimental import TabularClassifier, TabularRegressor
 from autogluon.tabular.models.lgb.lgb_model import LGBModel
 from autogluon.tabular.testing import FitHelper
+
+
+@pytest.mark.parametrize("estimator_type", [TabularClassifier, TabularRegressor])
+def test_scikit_predictions_preserve_dataframe_features(estimator_type, tmp_path):
+    # One frame with everything `check_array` could not pass through as a numeric array:
+    # a missing number, a categorical feature with a missing value, and a datetime feature.
+    X = pd.DataFrame(
+        {
+            "numeric_feature": np.arange(20, dtype=float),
+            "categorical_feature": pd.Series(["a", "b"] * 10, dtype="category"),
+            "datetime_feature": pd.date_range("2020-01-01", periods=20),
+        }
+    )
+    X.loc[0, "numeric_feature"] = np.nan
+    X.loc[1, "categorical_feature"] = np.nan
+    y = np.arange(20) % 2
+    estimator = estimator_type(
+        path=str(tmp_path / "predictor"),
+        verbosity=0,
+        hyperparameters={"DUMMY": {}},
+        fit_args={"fit_weighted_ensemble": False},
+    ).fit(X, y)
+
+    np.testing.assert_array_equal(estimator.predict(X), estimator.predictor_.predict(X).to_numpy())
+    if estimator_type is TabularClassifier:
+        np.testing.assert_allclose(estimator.predict_proba(X), estimator.predictor_.predict_proba(X).to_numpy())
+    with pytest.raises(ValueError, match="Inconsistent number of features"):
+        estimator.predict(X.iloc[:, :1])
+    with pytest.raises(ValueError, match="at least one sample"):
+        estimator.predict(X.iloc[:0])
 
 
 def test_scikit_api_binary():

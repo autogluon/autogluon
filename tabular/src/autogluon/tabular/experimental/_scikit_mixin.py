@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import pandas as pd
+import sklearn
+from packaging.version import parse as parse_version
 from sklearn.utils.validation import check_array, check_is_fitted
 
 
@@ -41,13 +43,21 @@ class ScikitMixin:
 
     def _validate_input(self, X):
         check_is_fitted(self)
-        # Input validation
-        X = check_array(X)
-        if X.shape[1] != self.n_features_in_:
+        # AutoGluon handles categorical features and missing values. A DataFrame can also mix
+        # datetime and numeric dtypes, which check_array cannot combine into a single array.
+        if isinstance(X, pd.DataFrame):
+            if X.empty:
+                raise ValueError("Input must contain at least one sample and feature.")
+            validated = X
+        elif parse_version(sklearn.__version__) >= parse_version("1.6"):
+            validated = check_array(X, dtype=None, ensure_all_finite=False)
+        else:
+            validated = check_array(X, dtype=None, force_all_finite=False)
+        if validated.shape[1] != self.n_features_in_:
             raise ValueError(
-                f"Inconsistent number of features between fit and predict calls: ({self.n_features_in_}, {X.shape[1]})"
+                f"Inconsistent number of features between fit and predict calls: ({self.n_features_in_}, {validated.shape[1]})"
             )
-        return X
+        return validated
 
     def _combine_X_y(self, X, y) -> pd.DataFrame:
         label = self.predictor_.label
