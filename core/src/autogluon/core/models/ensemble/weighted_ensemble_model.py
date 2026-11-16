@@ -97,7 +97,7 @@ class WeightedEnsembleModel(StackerEnsembleModel):
 
         fi_df = fi.to_frame(name="importance")
         fi_df["stddev"] = np.nan
-        fi_df["p_score"] = np.nan
+        fi_df["p_value"] = np.nan
         fi_df["n"] = np.nan
 
         # TODO: Rewrite preprocess() in greedy_weighted_ensemble_model to enable
