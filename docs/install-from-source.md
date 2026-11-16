@@ -6,7 +6,7 @@ so the entire monorepo installs editable in **one command**.
 
 ## Prerequisites
 
-- **Python 3.10–3.13**
+- **Python 3.10–3.14**
 - **git**
 - **[uv](https://docs.astral.sh/uv/)** — install with:
   ```bash
