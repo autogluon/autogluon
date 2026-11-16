@@ -188,6 +188,26 @@ def test_log_loss_with_sklearn(gt, probs):
     np.testing.assert_allclose(ag_loss_as_sklearn, sklearn_log_loss)
 
 
+@pytest.mark.parametrize(
+    "gt,probs",
+    [
+        ([0, 2, 1, 1], [[0.1, 0.2, 0.7], [0.2, 0.1, 0.7], [0.3, 0.4, 0.3], [0.01, 0.9, 0.09]]),
+        ([0, 1, 0, 1], [0.1, 0.2, 0.3, 0.4]),
+    ],
+)
+def test_log_loss_with_sample_weight(gt, probs):
+    gt = np.array(gt, dtype=np.int64)
+    probs = np.array(probs, dtype=np.float32)
+    sample_weight = np.array([0.5, 2.0, 1.0, 3.0])
+    ag_loss = log_loss(gt, probs, sample_weight=sample_weight)
+    np.testing.assert_allclose(ag_loss, -sklearn.metrics.log_loss(gt, probs, sample_weight=sample_weight))
+    # integer weights are the same as repeating rows
+    repeated = np.repeat(np.arange(4), [1, 4, 2, 6])
+    np.testing.assert_allclose(
+        log_loss(gt, probs, sample_weight=2 * sample_weight), log_loss(gt[repeated], probs[repeated])
+    )
+
+
 def test_roc_auc_score_with_sklearn():
     """
     Ensure AutoGluon's custom fast roc_auc_score produces the same result as sklearn's roc_auc_score.
