@@ -47,6 +47,21 @@ def _get_default_device():
         return "cpu"
 
 
+def _resolve_precision(precision, device):
+    """Autocast dtype for Mitra: `precision` if given, else bfloat16, except float16 on CUDA GPUs older than
+    Ampere (compute capability < 8). Those GPUs have no bfloat16 kernel for memory-efficient attention, so
+    PyTorch falls back to the math kernel, which materializes the full attention matrix: far slower, and it runs
+    out of memory at sizes float16 handles."""
+    if precision is not None:
+        if precision not in ("bfloat16", "float16"):
+            raise ValueError(f"precision must be 'bfloat16', 'float16' or None, got {precision!r}")
+        return precision
+    device = torch.device(device)
+    if device.type == "cuda" and torch.cuda.is_available() and torch.cuda.get_device_capability(device)[0] < 8:
+        return "float16"
+    return "bfloat16"
+
+
 DEFAULT_DEVICE = _get_default_device()
 DEFAULT_ENSEMBLE = 1
 DEFAULT_DIM = 512
@@ -78,6 +93,7 @@ class MitraBase(BaseEstimator):
         random_mirror_x=RANDOM_MIRROR_X,
         seed=SEED,
         verbose=True,
+        precision=None,
     ):
         """
         Initialize the base Mitra model.
@@ -95,6 +111,9 @@ class MitraBase(BaseEstimator):
         hf_model : str, optional
             Local directory containing ``config.json`` + ``model.safetensors``
             (as written by ``Tab2D.save_pretrained``), or a HuggingFace repo id.
+        precision : {"bfloat16", "float16"}, optional
+            Autocast dtype. None (default) picks bfloat16, or float16 on CUDA GPUs older than Ampere
+            (e.g. T4), which lack bfloat16 attention kernels. float16 fine-tuning uses a gradient scaler.
         """
         self.model_type = model_type
         self.n_estimators = n_estimators
@@ -115,12 +134,14 @@ class MitraBase(BaseEstimator):
         self.train_time = 0
         self.seed = seed
         self.verbose = verbose
+        self.precision = precision
 
         # FIXME: set_seed was removed in v1.4 as quality and speed reduction was observed when setting seed.
         #  This should be investigated and fixed for v1.5
         # set_seed(self.seed)
 
     def _create_config(self, task, dim_output, time_limit=None):
+        precision = _resolve_precision(self.precision, self.device)
         cfg = ConfigRun(
             device=self.device,
             model_name=ModelName.TAB2D,
@@ -130,7 +151,8 @@ class MitraBase(BaseEstimator):
                 "early_stopping_data_split": "VALID",
                 "early_stopping_max_samples": 2048,
                 "early_stopping_patience": self.patience,
-                "grad_scaler_enabled": False,
+                # float16 gradients underflow without loss scaling
+                "grad_scaler_enabled": precision == "float16",
                 "grad_scaler_growth_interval": 1000,
                 "grad_scaler_scale_init": 65536.0,
                 "grad_scaler_scale_min": 65536.0,
@@ -144,7 +166,7 @@ class MitraBase(BaseEstimator):
                 "lr": self.lr,
                 "weight_decay": 0.1,
                 "warmup_steps": self.warmup_steps,
-                "precision": "bfloat16",
+                "precision": precision,
                 "random_mirror_regression": self.random_mirror_regression,
                 "random_mirror_x": self.random_mirror_x,
                 "shuffle_classes": self.shuffle_classes,
@@ -262,6 +284,7 @@ class MitraClassifier(MitraBase, ClassifierMixin):
         random_mirror_x=RANDOM_MIRROR_X,
         seed=SEED,
         verbose=True,
+        precision=None,
     ):
         """Initialize the classifier."""
         super().__init__(
@@ -282,6 +305,7 @@ class MitraClassifier(MitraBase, ClassifierMixin):
             random_mirror_x=random_mirror_x,
             seed=seed,
             verbose=verbose,
+            precision=precision,
         )
         self.task = "classification"
 
@@ -400,6 +424,7 @@ class MitraRegressor(MitraBase, RegressorMixin):
         random_mirror_x=RANDOM_MIRROR_X,
         seed=SEED,
         verbose=True,
+        precision=None,
     ):
         """Initialize the regressor."""
         super().__init__(
@@ -420,6 +445,7 @@ class MitraRegressor(MitraBase, RegressorMixin):
             random_mirror_x=random_mirror_x,
             seed=seed,
             verbose=verbose,
+            precision=precision,
         )
         self.task = "regression"
 

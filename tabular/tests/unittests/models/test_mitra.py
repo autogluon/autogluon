@@ -49,6 +49,36 @@ def test_mitra_resolve_hf_model(problem_type, hyperparameters, expected):
     assert MitraModel._resolve_hf_model(problem_type=problem_type, hyp=dict(hyperparameters)) == expected
 
 
+@pytest.mark.parametrize(
+    "precision, device, capability, expected",
+    [
+        # Pre-Ampere CUDA GPUs (T4, V100) have no bfloat16 memory-efficient attention kernel.
+        (None, "cuda", (7, 5), "float16"),
+        (None, "cuda:0", (7, 0), "float16"),
+        (None, "cuda", (8, 0), "bfloat16"),
+        (None, "cpu", None, "bfloat16"),
+        # An explicit value always wins.
+        ("bfloat16", "cuda", (7, 5), "bfloat16"),
+        ("float16", "cuda", (9, 0), "float16"),
+    ],
+)
+def test_mitra_resolve_precision(precision, device, capability, expected):
+    from autogluon.tabular.models.mitra.sklearn_interface import _resolve_precision
+
+    with (
+        mock.patch("torch.cuda.is_available", return_value=capability is not None),
+        mock.patch("torch.cuda.get_device_capability", return_value=capability),
+    ):
+        assert _resolve_precision(precision, device) == expected
+
+
+def test_mitra_resolve_precision_rejects_unknown_dtype():
+    from autogluon.tabular.models.mitra.sklearn_interface import _resolve_precision
+
+    with pytest.raises(ValueError, match="precision"):
+        _resolve_precision("float32", "cpu")
+
+
 def test_mitra_resolve_hf_model_pops_every_alias():
     """Every alias must be popped, else an unused one leaks into the model constructor."""
     hyp = {
