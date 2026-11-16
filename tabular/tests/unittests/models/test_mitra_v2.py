@@ -419,8 +419,8 @@ def test_version_selects_checkpoint_with_shared_trainer_and_limits(problem_type,
     assert estimator._get_trainer_cls() is TrainerFinetuneV2
     assert model._get_model_version() == expected_version
     limits = model._get_default_auxiliary_params()
-    assert limits["max_rows"] == 1_000_000
-    assert limits["max_features"] == 50_000
+    assert limits["max_rows"] == 150_000
+    assert limits["max_features"] == 1_500
     assert limits["max_classes"] is None
 
 

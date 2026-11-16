@@ -19,6 +19,9 @@ class MitraV2Model(MitraModel):
     checkpoint selected by ``model_version``. The checkpoint's ``config.json``
     defines the architecture; release metadata is not required.
 
+    Default fit limits are 150,000 training rows and 1,500 features. Override
+    these constraints with ``ag.max_rows`` and ``ag.max_features``.
+
     A fit defaults to 3,600 seconds shared across bag folds. For classification
     above ten classes, bagging with an external validation set fits a separate
     bag at each hierarchy node, with a 3,600-second budget per node. AutoGluon's
@@ -45,8 +48,8 @@ class MitraV2Model(MitraModel):
     ag_key = "MITRA"
     ag_name = "Mitra"
     _default_auxiliary_params_extra = {
-        "max_rows": 1_000_000,
-        "max_features": 50_000,
+        "max_rows": 150_000,
+        "max_features": 1_500,
         "max_classes": None,
         "max_time_limit": 3600,
     }

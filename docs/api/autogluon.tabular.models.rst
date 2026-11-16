@@ -299,6 +299,11 @@ The original v1 API keeps its class and saved-model format. Select it explicitly
 
    predictor.fit(train_data, hyperparameters={"MITRA": {}}, num_bag_folds=8)
 
+The default fit limits are 150,000 training rows and 1,500 features. Override
+them with ``ag.max_rows`` and ``ag.max_features`` in the ``MITRA``
+hyperparameters. These fit constraints are separate from ``max_features=256``,
+which controls feature reduction.
+
 Mitra uses the released HF API's default fit budget of 3,600 seconds, shared
 across the bag folds. AutoGluon's global ``time_limit`` can impose a shorter
 limit. To choose a different Mitra budget, set its model and ensemble limits;
