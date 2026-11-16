@@ -66,14 +66,11 @@ extras_require = {
     "fastai": [
         "spacy<3.9",
         "torch",  # version range defined in `core/_setup_utils.py`
-        # Held below 2.8.8: that release requires fastcore>=1.14.6, but the highest fastcore 1.x
-        # is 1.14.5, so it is unreachable under the fastcore<2 cap below. Lifting that cap needs
-        # the removed L.starmap usage replaced first.
-        "fastai>=2.3.1,<2.8.8",  # Cap for major version
-        "fastcore<2",  # Breaking change in v2: removed L.starmap, which breaks fastai models
+        # fastai>=2.8.8 supports fastcore>=2 (https://github.com/fastai/fastai/issues/4154).
+        "fastai>=2.8.8,<2.9",  # <{N+1} upper cap, where N is the latest released minor version
         # plum-dispatch 2.10.0 ships mypyc-compiled wheels whose `Function.__doc__` is read-only, so
-        # fastcore's `@docs` raises AttributeError while importing fastai. fastai 2.8.10 pins
-        # `plum-dispatch<2.10` for this, but that release requires fastcore>=2, which we cap above.
+        # fastcore's `@docs` raises AttributeError while importing fastai. Keep this cap for
+        # fastai 2.8.8/2.8.9; fastai>=2.8.10 declares the same cap itself.
         "plum-dispatch<2.10",
     ],
     "tabm": [
