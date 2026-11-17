@@ -90,14 +90,24 @@ class SpearmanFeatureSelector(AbstractFeatureGenerator):
         numeric = X.select_dtypes(include=np.number)
         if numeric.shape[1] != X.shape[1]:
             return (X.nunique(dropna=True) > 1).to_numpy()
-        values = numeric.to_numpy(dtype=float, copy=False)
-        with warnings.catch_warnings():
-            # An all-null column makes nanmin/nanmax warn and return NaN; that is the answer we
-            # want (NaN != NaN would read as non-constant, so it is excluded explicitly below).
-            warnings.simplefilter("ignore", RuntimeWarning)
-            low = np.nanmin(values, axis=0)
-            high = np.nanmax(values, axis=0)
-        return (low != high) & ~np.isnan(low)
+        non_constant = np.zeros(numeric.shape[1], dtype=bool)
+        dtypes = numeric.dtypes
+        for dtype in dtypes.unique():
+            columns = (dtypes == dtype).to_numpy()
+            block = numeric if columns.all() else numeric.loc[:, columns]
+            if not isinstance(dtype, np.dtype):
+                non_constant[columns] = (block.nunique(dropna=True) > 1).to_numpy()
+                continue
+            # Keep integer blocks in their original dtype: conversion to float64 can merge
+            # distinct values above 2**53, incorrectly discarding an informative feature.
+            values = block.to_numpy(copy=False)
+            with warnings.catch_warnings():
+                # All-null float columns produce NaN extrema and must be excluded explicitly.
+                warnings.simplefilter("ignore", RuntimeWarning)
+                low = np.nanmin(values, axis=0)
+                high = np.nanmax(values, axis=0)
+            non_constant[columns] = (low != high) & ~np.isnan(low)
+        return non_constant
 
     @staticmethod
     def _abs_spearman(X: pd.DataFrame, y: pd.Series) -> pd.Series:
@@ -109,19 +119,37 @@ class SpearmanFeatureSelector(AbstractFeatureGenerator):
         column's null mask, and generated features inherit their parents' nulls, so wide frames
         carry far fewer distinct masks than columns.
 
-        Matches ``corrwith`` to floating-point noise. Non-numeric input falls back to it.
+        Matches ``corrwith`` for ordinary numeric input, while preserving large integer ranks.
+        Non-numeric input falls back to it.
         """
         numeric = X.select_dtypes(include=np.number)
         if numeric.shape[1] != X.shape[1]:
             return X.corrwith(y, method="spearman").abs()
 
-        values = numeric.to_numpy(dtype=float, copy=False)
-        target = y.to_numpy(dtype=float, copy=False)
-        # `DataFrame.rank` ranks each column's non-null entries among themselves, which is exactly
-        # their rank within the pairwise-complete subset (the target, being the label, has no
-        # nulls). So the subset ranks come out of a single pass over the frame.
-        ranks = numeric.rank().to_numpy(dtype=float, copy=False)
-        valid = ~np.isnan(values)
+        target = y.to_numpy(copy=False)
+        valid = numeric.notna().to_numpy()
+        dtypes = numeric.dtypes
+        unique_dtypes = dtypes.unique()
+        if len(unique_dtypes) == 1 and isinstance(unique_dtypes[0], np.dtype):
+            # Avoid allocating a second full rank matrix on homogeneous numpy frames.
+            ranks = numeric.rank().to_numpy(dtype=float, copy=False)
+        else:
+            ranks = np.full(numeric.shape, np.nan)
+            for dtype in unique_dtypes:
+                columns = (dtypes == dtype).to_numpy()
+                if isinstance(dtype, np.dtype):
+                    # Ranking a mixed int/float frame converts it to float64 first, merging large
+                    # integer values. Homogeneous numpy blocks retain their native precision.
+                    block = numeric.loc[:, columns]
+                    ranks[:, columns] = block.rank().to_numpy(dtype=float, copy=False)
+                else:
+                    # Nullable arrays need their missing values removed before conversion; converting
+                    # an Int64 column with pd.NA directly to numpy can also coerce it to float64.
+                    for column in np.flatnonzero(columns):
+                        mask = valid[:, column]
+                        ranks[mask, column] = rankdata(numeric.iloc[:, column].dropna().to_numpy(copy=False))
+        # Each feature's non-null ranks are its ranks within the pairwise-complete subset, since
+        # target labels have no nulls. Rank the target below in its original dtype for the same reason.
 
         # Group columns by null pattern. Bit-packing and grouping the packed rows is ~10x faster
         # than `np.unique(valid.T, axis=0)`, which lexsorts the raw boolean matrix.
