@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import copy
 import logging
 import math
@@ -7,6 +8,7 @@ import time
 
 import numpy as np
 import pandas as pd
+from packaging.version import parse as parse_version
 from pandas import DataFrame, Series
 
 from autogluon.common.features.feature_metadata import FeatureMetadata
@@ -647,7 +649,12 @@ class DefaultLearner(AbstractTabularLearner):
             # "Downcasting behavior in `replace` is deprecated" FutureWarning whenever the label
             # arrives as a numeric-valued object column); `.infer_objects(copy=False)` then applies
             # the same downcast explicitly, so values and dtype match the pre-pandas-2.2 behavior.
-            with pd.option_context("future.no_silent_downcasting", True):
+            no_silent_downcasting = (
+                pd.option_context("future.no_silent_downcasting", True)
+                if parse_version(pd.__version__).release >= (2, 2)
+                else contextlib.nullcontext()
+            )
+            with no_silent_downcasting:
                 X[self.label] = X[self.label].replace([np.inf, -np.inf], np.nan).infer_objects(copy=False)
             invalid_labels = X[self.label].isna()
             if invalid_labels.any():
