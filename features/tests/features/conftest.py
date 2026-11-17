@@ -181,7 +181,10 @@ class DataHelper:
 
     @staticmethod
     def generate_datetime_feature() -> Series:
-        return pd.to_datetime(DataHelper.generate_datetime_as_object_feature(), errors="coerce", format="mixed")
+        series = pd.to_datetime(DataHelper.generate_datetime_as_object_feature(), errors="coerce", format="mixed")
+        # Nanosecond resolution on any pandas version: pandas>=3 parses at microseconds, where the out-of-range
+        # dates of this feature (years 1000 and 2700) are valid rather than NaT
+        return series.where((series >= pd.Timestamp.min) & (series <= pd.Timestamp.max)).dt.as_unit("ns")
 
     @staticmethod
     def generate_bool_feature_int(name="int_bool") -> DataFrame:

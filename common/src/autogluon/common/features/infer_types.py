@@ -45,7 +45,8 @@ def _get_type_family_raw(dtype) -> tuple[str, bool]:
             return "category", cacheable
         if "datetime" in dtype.name:
             return "datetime", cacheable
-        if "string" in dtype.name:
+        # "string" and "string[pyarrow]", and "str", the default string dtype of pandas>=3, which numpy cannot interpret
+        if "str" in dtype.name:
             return "object", cacheable
         elif np.issubdtype(dtype, np.integer):
             return "int", cacheable
@@ -170,7 +171,8 @@ def check_if_datetime_as_object_feature(X: Series) -> bool:
             if len(X) > 500:
                 # Sample to speed-up type inference
                 X = X.sample(n=500, random_state=0)
-            result = pd.to_datetime(X, errors="coerce", format="mixed")
+            # utc=True like DatetimeFeatureGenerator: pandas>=3 raises on mixed UTC offsets, which pandas<3 parsed
+            result = pd.to_datetime(X, errors="coerce", format="mixed", utc=True)
             if result.isnull().mean() > 0.8:  # If over 80% of the rows are NaN
                 return False
             return True
