@@ -219,15 +219,8 @@ class TabPFNMixModel(AbstractModel):
             X_val = self.preprocess(X_val)
             y_val = y_val.values
 
-        # FIXME: What if an exception occurs or timeout occurs after updating threads? Can we add logic to ensure torch num_threads are reset?
-        need_to_reset_torch_threads = False
-        torch_threads_og = None
         if num_cpus is not None and isinstance(num_cpus, (int, float)):
-            torch_threads_og = torch.get_num_threads()
-            if torch_threads_og != num_cpus:
-                # reset torch threads back to original value after fit
-                torch.set_num_threads(num_cpus)
-                need_to_reset_torch_threads = True
+            torch.set_num_threads(num_cpus)
 
         model_cls = self._get_model_type()
 
@@ -263,9 +256,6 @@ class TabPFNMixModel(AbstractModel):
 
         # reduce memory and disk usage by 3x
         self.model.trainer.minimize_for_inference()
-
-        if need_to_reset_torch_threads:
-            torch.set_num_threads(torch_threads_og)
 
         return self
 
@@ -357,6 +347,12 @@ class TabPFNMixModel(AbstractModel):
 
     def _ag_params(self) -> set:
         return {"max_classes", "max_rows", "sample_rows", "sample_rows_val"}
+
+    @classmethod
+    def _class_tags(cls):
+        return {
+            "reset_torch_threads": True,
+        }
 
     def _more_tags(self) -> dict:
         tags = {"can_refit_full": True}
