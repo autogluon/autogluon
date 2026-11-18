@@ -30,6 +30,22 @@ warnings.filterwarnings(
 warnings.filterwarnings("ignore", category=FutureWarning, message="Dask dataframe query")  # lightGBM dask-expr warning
 logger = logging.getLogger(__name__)
 
+# LightGBM's aliases of `num_iterations`, in the order LightGBM resolves them, so the one it would use comes first.
+# `num_boost_round` is also an alias; it is left out because it is the name this model stores the value under.
+# Refer to https://lightgbm.readthedocs.io/en/latest/Parameters.html#num_iterations
+_NUM_BOOST_ROUND_ALIASES = (
+    "num_iterations",
+    "n_iter",
+    "nrounds",
+    "max_iter",
+    "num_tree",
+    "num_round",
+    "num_trees",
+    "num_rounds",
+    "n_estimators",
+    "num_iteration",
+)
+
 
 # TODO: Save dataset to binary and reload for HPO. This will avoid the memory spike overhead when training each model and instead it will only occur once upon saving the dataset.
 class LGBModel(AbstractModel):
@@ -62,6 +78,39 @@ class LGBModel(AbstractModel):
         self._features_internal_map = None
         self._requires_remap = None
         self._features_internal_lgbm = None
+
+    @classmethod
+    def _init_user_params(cls, params: dict | None = None, **kwargs) -> tuple[dict, dict]:
+        params, params_aux = super()._init_user_params(params=params, **kwargs)
+        return cls._normalize_num_boost_round(params), params_aux
+
+    @classmethod
+    def _normalize_num_boost_round(cls, params: dict) -> dict:
+        """Store the number of boosting rounds under `num_boost_round` only, removing its LightGBM aliases.
+
+        LightGBM uses an alias of `num_iterations` found in `params` (such as `n_estimators`) instead of the
+        `num_boost_round` argument. Left in the hyperparameters, the alias would also override the
+        `num_boost_round` a refit_full model is given from `params_trained`, so the refit would train the alias
+        value instead of the best iteration found via early stopping.
+
+        The value LightGBM would have used is kept, so fitting behaves as before.
+        """
+        aliases = [alias for alias in _NUM_BOOST_ROUND_ALIASES if alias in params]
+        if not aliases:
+            return params
+        num_boost_round = params[aliases[0]]
+        ignored = {alias: params.pop(alias) for alias in aliases[1:]}
+        params.pop(aliases[0])
+        if "num_boost_round" in params:
+            ignored["num_boost_round"] = params["num_boost_round"]
+        ignored = {key: val for key, val in ignored.items() if val != num_boost_round}
+        if ignored:
+            logger.warning(
+                f"Warning: {cls.__name__} received the number of boosting rounds more than once. "
+                f"Using {aliases[0]}={num_boost_round} and ignoring {ignored}, as LightGBM would."
+            )
+        params["num_boost_round"] = num_boost_round
+        return params
 
     def _set_default_params(self):
         default_params = get_param_baseline(problem_type=self.problem_type)
