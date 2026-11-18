@@ -226,6 +226,16 @@ class ChronosModel(AbstractTimeSeriesModel):
 
         self._model_pipeline: Any | None = None  # of type BaseChronosPipeline
 
+    def rename(self, name: str) -> None:
+        # The fine-tuned checkpoint is written to the model directory during fit and is not part of model.pkl,
+        # so copy it along when the model directory changes (e.g., when the model is copied for refit_full).
+        old_ckpt_path = Path(self.path) / self.fine_tuned_ckpt_name if self.path is not None else None
+        super().rename(name)
+        if old_ckpt_path is not None and old_ckpt_path.exists():
+            new_ckpt_path = Path(self.path) / self.fine_tuned_ckpt_name
+            if not new_ckpt_path.exists():
+                shutil.copytree(old_ckpt_path, new_ckpt_path)
+
     def save(self, path: str | None = None, verbose: bool = True) -> str:
         pipeline = self._model_pipeline
         self._model_pipeline = None

@@ -494,6 +494,23 @@ def test_when_chronos_bolt_fine_tuned_with_custom_quantiles_then_loaded_model_ha
     assert predictions.columns.tolist() == ["mean"] + [str(q) for q in custom_quantiles]
 
 
+def test_when_fine_tuned_model_converted_to_refit_full_via_copy_then_checkpoint_is_copied(temp_model_path):
+    model = ChronosModel(
+        path=temp_model_path,
+        hyperparameters={"model_path": CHRONOS_BOLT_MODEL_PATH, "fine_tune": True, "fine_tune_steps": 1},
+    )
+    model.fit(DUMMY_TS_DATAFRAME)
+    model.save()
+    model = ChronosModel.load(model.path)
+
+    refit_model = model.convert_to_refit_full_via_copy()
+
+    assert refit_model.path != model.path
+    assert refit_model.model_path.startswith(refit_model.path)
+    predictions = refit_model.predict(DUMMY_TS_DATAFRAME)
+    assert not predictions.isna().any().any()
+
+
 def test_when_chronos_bolt_no_fine_tune_with_custom_quantiles_then_original_quantiles_preserved():
     original_quantiles = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
     model = ChronosModel(
