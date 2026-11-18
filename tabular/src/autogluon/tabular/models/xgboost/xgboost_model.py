@@ -47,6 +47,7 @@ class XGBoostModel(AbstractModel):
         self._xgb_model_type = None
         self._cat_col_names = None
         self._category_mapping = None
+        self._feature_names_internal = None
 
     def _set_default_params(self):
         default_params = get_param_baseline(problem_type=self.problem_type, num_classes=self.num_classes)
@@ -98,6 +99,20 @@ class XGBoostModel(AbstractModel):
                     # so pandas turns them into NaN
                     codes = X[col].astype(object).map(mapping).fillna(-1).astype(int)
                     X[col] = pd.Categorical(codes, categories=range(len(mapping)))
+
+            if is_train:
+                needs_remap = any(
+                    not isinstance(column, str) or any(character in column for character in "[]<")
+                    for column in X.columns
+                )
+                self._feature_names_internal = [f"f{i}" for i in range(X.shape[1])] if needs_remap else None
+            # Keep public feature names intact while satisfying XGBoost's naming restrictions.
+            names = getattr(self, "_feature_names_internal", None)
+            if names is not None:
+                if len(names) != X.shape[1]:
+                    raise ValueError("XGBoost feature count does not match the fitted feature names")
+                X = X.copy(deep=False)
+                X.columns = names
 
         return X
 
