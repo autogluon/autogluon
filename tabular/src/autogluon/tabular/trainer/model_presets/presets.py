@@ -103,6 +103,9 @@ def get_preset_models(
         default_priorities = {
             ag_model_registry.key(model_cls): priority for model_cls, priority in priority_cls_map.items()
         }
+        for model_cls, priority in priority_cls_map.items():
+            for alias in ag_model_registry.aliases(model_cls):
+                default_priorities[alias] = priority
 
     level_key = level if level in hyperparameters.keys() else "default"
     if level_key not in hyperparameters.keys() and level_key == "default":
@@ -192,6 +195,11 @@ def clean_model_cfg(
         if model_type not in model_types:
             raise AssertionError(
                 f"Unknown model type specified in hyperparameters: '{model_type}'. Valid model types: {list(model_types.keys())}"
+            )
+        if model_type in ag_model_registry.aliases_map:
+            canonical_key = ag_model_registry.aliases_map[model_type]
+            logger.info(
+                f"Model key '{model_type}' is an alias for '{canonical_key}'. Using '{canonical_key}' ({model_types[model_type].__name__})."
             )
         model_type = model_types[model_type]
     elif not issubclass(model_type, AbstractModel):
