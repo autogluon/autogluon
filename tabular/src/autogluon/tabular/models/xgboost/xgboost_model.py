@@ -5,6 +5,7 @@ import math
 import os
 import time
 
+import numpy as np
 import pandas as pd
 
 from autogluon.common.features.types import R_BOOL, R_CATEGORY, R_FLOAT, R_INT
@@ -115,7 +116,6 @@ class XGBoostModel(AbstractModel):
         verbosity=2,
         **kwargs,
     ):
-        # TODO: utilize sample_weight_val in early-stopping if provided
         start_time = time.time()
         ag_params = self._get_ag_params()
         params = self._get_model_params()
@@ -246,7 +246,16 @@ class XGBoostModel(AbstractModel):
                 #  ref: https://github.com/dmlc/xgboost/issues/9791
                 params["verbosity"] = 0
             self.model = model_type(**params)
-            self.model.fit(X=X, y=y, eval_set=eval_set, verbose=False, sample_weight=sample_weight)
+            fit_kwargs = dict(
+                X=X,
+                y=y,
+                eval_set=eval_set,
+                verbose=False,
+                sample_weight=sample_weight,
+            )
+            if eval_set is not None and sample_weight_val is not None:
+                fit_kwargs["sample_weight_eval_set"] = [np.asarray(sample_weight_val)]
+            self.model.fit(**fit_kwargs)
 
         if generate_curves:
 

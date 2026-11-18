@@ -47,28 +47,36 @@ def func_generator(metric: Scorer, problem_type: str):
     needs_pred_proba = not metric.needs_pred
     sign = -1 if metric.greater_is_better else 1
 
+    def _eval(y_true, y_hat, sample_weight=None):
+        if sample_weight is not None:
+            try:
+                return sign * metric(y_true, y_hat, sample_weight=sample_weight)
+            except TypeError:
+                pass
+        return sign * metric(y_true, y_hat)
+
     if needs_pred_proba:
 
-        def custom_metric(y_true, y_hat):
-            return sign * metric(y_true, y_hat)
+        def custom_metric(y_true, y_hat, sample_weight=None):
+            return _eval(y_true, y_hat, sample_weight=sample_weight)
 
     else:
         if problem_type in [MULTICLASS, SOFTCLASS]:
 
-            def custom_metric(y_true, y_hat):
+            def custom_metric(y_true, y_hat, sample_weight=None):
                 y_hat = y_hat.argmax(axis=1)
-                return sign * metric(y_true, y_hat)
+                return _eval(y_true, y_hat, sample_weight=sample_weight)
 
         elif problem_type == BINARY:
 
-            def custom_metric(y_true, y_hat):
+            def custom_metric(y_true, y_hat, sample_weight=None):
                 y_hat = np.round(y_hat)
-                return sign * metric(y_true, y_hat)
+                return _eval(y_true, y_hat, sample_weight=sample_weight)
 
         else:
 
-            def custom_metric(y_true, y_hat):
-                return sign * metric(y_true, y_hat)
+            def custom_metric(y_true, y_hat, sample_weight=None):
+                return _eval(y_true, y_hat, sample_weight=sample_weight)
 
     # Note: Must include "_" prefix due to xgboost internal metric naming conflicts (e.g. precision)
     custom_metric.__name__ = f"_{metric.name}"
@@ -105,8 +113,8 @@ def learning_curve_func_generator(metric: Scorer, problem_type: str, use_error: 
     sign = -1 if metric.greater_is_better else 1
     func = func_generator(metric=metric, problem_type=problem_type)
 
-    def custom_metric(y_true, y_hat):
-        result = sign * func(y_true, y_hat)
+    def custom_metric(y_true, y_hat, sample_weight=None):
+        result = sign * func(y_true, y_hat, sample_weight=sample_weight)
         if use_error:
             return metric.convert_score_to_error(result)
         return result
