@@ -14,6 +14,9 @@ from ...constants import (
     ACC,
     ACCURACY,
     AVERAGE_PRECISION,
+    AVERAGE_PRECISION_MACRO,
+    AVERAGE_PRECISION_MICRO,
+    AVERAGE_PRECISION_WEIGHTED,
     BER,
     COSINE_EMBEDDING_LOSS,
     COVERAGE,
@@ -311,8 +314,29 @@ def get_torchmetric(
         )
     elif metric_name == ROC_AUC:
         return torchmetrics.AUROC(task=problem_type, num_classes=num_classes), None
-    elif metric_name == AVERAGE_PRECISION:
-        return torchmetrics.AveragePrecision(task=problem_type, num_classes=num_classes)
+    elif metric_name in [AVERAGE_PRECISION, AVERAGE_PRECISION_MACRO]:
+        return (
+            torchmetrics.AveragePrecision(
+                task=problem_type,
+                num_classes=num_classes,
+                average="macro" if problem_type == MULTICLASS else None,
+            ),
+            None,
+        )
+    elif metric_name == AVERAGE_PRECISION_WEIGHTED:
+        return (
+            torchmetrics.AveragePrecision(
+                task=problem_type,
+                num_classes=num_classes,
+                average="weighted" if problem_type == MULTICLASS else None,
+            ),
+            None,
+        )
+    elif metric_name == AVERAGE_PRECISION_MICRO:
+        raise ValueError(
+            "Average precision with micro averaging is not supported as a validation metric in torchmetrics. "
+            "Consider using 'average_precision_macro' or 'average_precision_weighted'."
+        )
     elif metric_name in [LOG_LOSS, CROSS_ENTROPY]:
         return torchmetrics.MeanMetric(), functools.partial(F.cross_entropy, reduction="none")
     elif metric_name == COSINE_EMBEDDING_LOSS:
