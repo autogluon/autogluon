@@ -87,7 +87,7 @@ def early_stopping_custom(
             msg = "Training until validation scores don't improve for {} rounds."
             logger.debug(msg.format(stopping_rounds))
             if manual_stop_file:
-                logger.debug("Manually stop training by creating file at location: ", manual_stop_file)
+                logger.debug("Manually stop training by creating file at location: %s", manual_stop_file)
 
         if isinstance(stopping_rounds, int):
             es_template = SimpleES(patience=stopping_rounds)
