@@ -164,7 +164,10 @@ class BaggedEnsembleModel(AbstractModel):
             "stratify": "auto",
             "bin": "auto",
             "n_bins": None,
-            "vary_seed_across_folds": False,  # If True, the seed used for each fold will be varied across folds.
+            # If True, the seed used for each fold will be varied across folds. This is the default for a
+            # child model that declares nothing; AutoGluon's models declare it themselves, True for trained
+            # models and False for pretrained in-context ones (`AbstractModel._get_default_ag_args_ensemble`).
+            "vary_seed_across_folds": False,
             "model_random_seed": 0,
             "custom_splits": None,
             # If True, keep each fold model's out-of-fold predictions on its validation rows apart

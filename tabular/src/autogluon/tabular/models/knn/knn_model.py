@@ -33,7 +33,7 @@ class KNNModel(AbstractModel):
         valid_raw_types=[R_INT, R_FLOAT],  # TODO: Eventually use category features
         ignored_type_group_special=[S_BOOL],
     )
-    _default_ag_args_ensemble_extra = {"use_child_oof": True}
+    _default_ag_args_ensemble_extra = {"use_child_oof": True, "vary_seed_across_folds": True}
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)

@@ -39,6 +39,7 @@ class CatBoostModel(AbstractModel):
     ag_priority = 70
     ag_priority_by_problem_type = MappingProxyType({SOFTCLASS: 60})
     seed_name = "random_seed"
+    _default_ag_args_ensemble_extra = {"vary_seed_across_folds": True}  # trained: a seed per fold model
     _supported_problem_types = ["binary", "multiclass", "regression", "quantile", "softclass"]
 
     _default_auxiliary_params_extra = dict(

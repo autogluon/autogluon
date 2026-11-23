@@ -12,6 +12,7 @@ from autogluon.core.models import AbstractModel
 
 class _IModelsModel(AbstractModel):
     _supported_problem_types = ["binary", "multiclass", "regression"]
+    _default_ag_args_ensemble_extra = {"vary_seed_across_folds": True}  # trained: a seed per fold model
 
     _default_auxiliary_params_extra = dict(
         get_features_kwargs=dict(

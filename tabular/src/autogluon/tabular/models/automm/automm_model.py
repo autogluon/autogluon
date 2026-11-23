@@ -37,7 +37,7 @@ class MultiModalPredictorModel(AbstractModel):
         valid_raw_types=[R_INT, R_FLOAT, R_CATEGORY, R_OBJECT],
         ignored_type_group_special=[S_TEXT_NGRAM, S_TEXT_AS_CATEGORY, S_TEXT_SPECIAL],
     )
-    _default_ag_args_ensemble_extra = {"fold_fitting_strategy": "sequential_local"}
+    _default_ag_args_ensemble_extra = {"fold_fitting_strategy": "sequential_local", "vary_seed_across_folds": True}
     minimum_num_gpus = 1
     gpu_required = True
 

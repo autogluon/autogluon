@@ -189,6 +189,25 @@ EXPECTED_MODEL_PRIORITY_BY_PROBLEM_TYPE = {
     },
 }
 
+# The pretrained (foundation) models that predict in context: a bag keeps one seed across its folds,
+# so the fold models are the refit that predicts. Every other registered model is trained on the data
+# and gets a seed per fold model.
+EXPECTED_ONE_SEED_PER_BAG = {
+    TabDPTModel,
+    TabDPTTurboModel,
+    TabICLModel,
+    TabPFNMixModel,
+    TabPFNv26Model,
+    RealTabPFNv2Model,
+    RealTabPFNv25Model,
+    TabPFN3Model,
+    TabPFN35Model,
+    MitraModel,
+    NoriModel,
+    CausiloModel,
+    TabFMModel,
+}
+
 EXPECTED_REGISTERED_MODEL_CLS_LST = list(EXPECTED_MODEL_NAMES.keys())
 REGISTERED_MODEL_CLS_LST = ag_model_registry.model_cls_list
 
@@ -201,6 +220,24 @@ REGISTERED_MODEL_CLS_LST = ag_model_registry.model_cls_list
 def test_model_cls_key(model_cls: Type[AbstractModel]):
     expected_model_key = EXPECTED_MODEL_KEYS[model_cls]
     assert expected_model_key == model_cls.ag_key
+
+
+@pytest.mark.parametrize(
+    "model_cls",
+    REGISTERED_MODEL_CLS_LST,
+    ids=[c.__name__ for c in REGISTERED_MODEL_CLS_LST],
+)  # noqa
+def test_model_cls_declares_vary_seed_across_folds(model_cls: Type[AbstractModel]):
+    """
+    Every registered model chooses whether a bag gives its fold models seeds of their own, so that the
+    choice is the model's and a new model has to make it.
+    """
+    vary_seed_across_folds = model_cls._get_default_ag_args_ensemble().get("vary_seed_across_folds")
+    assert isinstance(vary_seed_across_folds, bool), (
+        f"{model_cls.__name__} must declare `vary_seed_across_folds` in `_default_ag_args_ensemble_extra`: "
+        f"True for a model trained on the data, False for a pretrained model that predicts in context."
+    )
+    assert vary_seed_across_folds is (model_cls not in EXPECTED_ONE_SEED_PER_BAG)
 
 
 def verify_registry(model_cls: Type[AbstractModel], model_registry: ModelRegistry):

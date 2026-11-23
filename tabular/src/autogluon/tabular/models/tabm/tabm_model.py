@@ -36,6 +36,7 @@ class TabMModel(AbstractTorchModel):
     ag_name = "TabM"
     ag_priority = 85
     seed_name = "random_state"
+    _default_ag_args_ensemble_extra = {"vary_seed_across_folds": True}  # trained: a seed per fold model
     _supported_problem_types = ["binary", "multiclass", "regression"]
 
     _MAX_FEATURES_FOR_MEMORY_ESTIMATE: int = 2000

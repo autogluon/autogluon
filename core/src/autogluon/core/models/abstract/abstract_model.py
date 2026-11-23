@@ -3994,6 +3994,18 @@ class AbstractModel(ModelBase, Tunable):
         Subclasses declare their overrides via the `_default_ag_args_ensemble_extra` class
         attribute (merged base-most class first, so subclasses win); overriding this
         classmethod also remains supported.
+
+        Every model AutoGluon registers declares `vary_seed_across_folds` here, so the model owns
+        the choice and callers need not pass it:
+
+        - `True` for models trained on the data. Each fold model of a bag is a training run of its
+          own, and a seed per fold lets the bag average over seed noise too.
+        - `False` for pretrained (foundation) models that predict in context. Their seed decides
+          how the data is presented to them (preprocessing, context and estimator draws), so fold
+          models with seeds of their own would not be the refit that predicts, and the validation
+          predictions would track the test predictions less well.
+
+        A bag whose child model declares nothing keeps one seed across its folds.
         """
         default_ag_args_ensemble = {}
         for klass in reversed(cls.__mro__):

@@ -16,7 +16,7 @@ class DummyModel(AbstractModel):
     # A constant predictor gains nothing from parallel fold workers and pays their full
     # startup cost (fresh processes via Ray), which dominates the runtime of the tests this
     # model exists to serve.
-    _default_ag_args_ensemble_extra = {"fold_fitting_strategy": "sequential_local"}
+    _default_ag_args_ensemble_extra = {"fold_fitting_strategy": "sequential_local", "vary_seed_across_folds": True}
 
     ag_key = "DUMMY"
     ag_name = "Dummy"

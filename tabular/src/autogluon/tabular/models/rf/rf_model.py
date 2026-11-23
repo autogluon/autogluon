@@ -33,6 +33,7 @@ class RFModel(AbstractModel):
     ag_name = "RandomForest"
     ag_priority = 80
     seed_name = "random_state"
+    _default_ag_args_ensemble_extra = {"vary_seed_across_folds": True}  # trained: a seed per fold model
     _supported_problem_types = ["binary", "multiclass", "regression", "quantile", "softclass"]
 
     _default_auxiliary_params_extra = dict(

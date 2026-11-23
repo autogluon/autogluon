@@ -86,6 +86,7 @@ class NoriModel(AbstractTorchModel):
     _default_ag_args_ensemble_extra = {
         "fold_fitting_strategy": "sequential_local",
         "refit_folds": True,  # Better to refit the model for faster inference and similar quality as the bag.
+        "vary_seed_across_folds": False,  # pretrained: the fold models are the refit that predicts
     }
     """Set fold_fitting_strategy to sequential_local, as parallel folding crashes if model weights aren't pre-downloaded."""
     default_resources_physical_cores_only = True

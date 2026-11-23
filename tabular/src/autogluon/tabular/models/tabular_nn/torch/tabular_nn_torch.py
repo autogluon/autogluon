@@ -53,6 +53,7 @@ class TabularNeuralNetTorchModel(AbstractNeuralNetworkModel):
     ag_name = "NeuralNetTorch"
     ag_priority = 25
     seed_name = "seed_value"
+    _default_ag_args_ensemble_extra = {"vary_seed_across_folds": True}  # trained: a seed per fold model
     _supported_problem_types = ["binary", "multiclass", "regression", "quantile", "softclass"]
 
     # Constants used throughout this class:

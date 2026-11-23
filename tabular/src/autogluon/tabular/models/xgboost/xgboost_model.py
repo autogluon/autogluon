@@ -32,6 +32,7 @@ class XGBoostModel(AbstractModel):
     ag_name = "XGBoost"
     ag_priority = 40
     seed_name = "seed"
+    _default_ag_args_ensemble_extra = {"vary_seed_across_folds": True}  # trained: a seed per fold model
     _supported_problem_types = ["binary", "multiclass", "regression", "softclass"]
 
     _default_auxiliary_params_extra = dict(
