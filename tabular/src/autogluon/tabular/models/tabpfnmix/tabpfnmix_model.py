@@ -43,7 +43,8 @@ class TabPFNMixModel(AbstractModel):
     ag_name = "TabPFNMix"
     ag_priority = 45
     seed_name = "random_state"
-    _default_ag_args_ensemble_extra = {"vary_seed_across_folds": False}  # pretrained: the fold models are the refit
+    # fine-tuned per fold and not refit: the bag itself predicts, so each fold model gets its own seed
+    _default_ag_args_ensemble_extra = {"vary_seed_across_folds": True}
     _supported_problem_types = ["binary", "multiclass", "regression"]
 
     weights_file_name = "model.pt"

@@ -190,22 +190,29 @@ EXPECTED_MODEL_PRIORITY_BY_PROBLEM_TYPE = {
 }
 
 # The pretrained (foundation) models that predict in context: a bag keeps one seed across its folds,
-# so the fold models are the refit that predicts. Every other registered model is trained on the data
-# and gets a seed per fold model.
+# so the fold models are the refit that predicts. Every other model that declares the value is trained
+# on the data and gets a seed per fold model. That includes Mitra and TabPFNMix, which are fine-tuned
+# per fold and not refit, so their bag itself predicts.
 EXPECTED_ONE_SEED_PER_BAG = {
     TabDPTModel,
     TabDPTTurboModel,
     TabICLModel,
-    TabPFNMixModel,
     TabPFNv26Model,
     RealTabPFNv2Model,
     RealTabPFNv25Model,
     TabPFN3Model,
     TabPFN35Model,
-    MitraModel,
     NoriModel,
     CausiloModel,
     TabFMModel,
+}
+
+# The models that declare nothing and keep the bag's default: a constant predictor and the weighted
+# ensembles, which have no fold models to give seeds to.
+EXPECTED_NO_VARY_SEED_DECLARATION = {
+    DummyModel,
+    GreedyWeightedEnsembleModel,
+    SimpleWeightedEnsembleModel,
 }
 
 EXPECTED_REGISTERED_MODEL_CLS_LST = list(EXPECTED_MODEL_NAMES.keys())
@@ -229,13 +236,17 @@ def test_model_cls_key(model_cls: Type[AbstractModel]):
 )  # noqa
 def test_model_cls_declares_vary_seed_across_folds(model_cls: Type[AbstractModel]):
     """
-    Every registered model chooses whether a bag gives its fold models seeds of their own, so that the
-    choice is the model's and a new model has to make it.
+    Every registered model with fold models to seed chooses whether a bag gives them seeds of their own, so
+    that the choice is the model's and a new model has to make it.
     """
     vary_seed_across_folds = model_cls._get_default_ag_args_ensemble().get("vary_seed_across_folds")
+    if model_cls in EXPECTED_NO_VARY_SEED_DECLARATION:
+        assert vary_seed_across_folds is None
+        return
     assert isinstance(vary_seed_across_folds, bool), (
         f"{model_cls.__name__} must declare `vary_seed_across_folds` in `_default_ag_args_ensemble_extra`: "
-        f"True for a model trained on the data, False for a pretrained model that predicts in context."
+        f"True for a model trained (or fine-tuned without a refit) on the data, False for a pretrained model that "
+        f"predicts in context."
     )
     assert vary_seed_across_folds is (model_cls not in EXPECTED_ONE_SEED_PER_BAG)
 

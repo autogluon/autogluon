@@ -425,7 +425,11 @@ def test_advanced_functionality_bagging():
         assert set(model_info.keys()) == set(model_info_2.keys())
         model_hyperparameters = predictor.model_hyperparameters(model=model)
         assert isinstance(model_hyperparameters, dict)
-    assert predictor.model_hyperparameters(model="LightGBM_BAG_L1") == gbm_hyperparameters
+    # the bag's hyperparameters carry the model's own `vary_seed_across_folds` (LightGBM declares True)
+    assert predictor.model_hyperparameters(model="LightGBM_BAG_L1") == {
+        **gbm_hyperparameters,
+        "ag_args_ensemble": {"vary_seed_across_folds": True},
+    }
     lightgbm_full_params = predictor.model_hyperparameters(
         model="LightGBM_BAG_L1_FULL", include_ag_args_ensemble=False
     )

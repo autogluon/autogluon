@@ -166,7 +166,8 @@ class BaggedEnsembleModel(AbstractModel):
             "n_bins": None,
             # If True, the seed used for each fold will be varied across folds. This is the default for a
             # child model that declares nothing; AutoGluon's models declare it themselves, True for trained
-            # models and False for pretrained in-context ones (`AbstractModel._get_default_ag_args_ensemble`).
+            # (or fine-tuned) models and False for pretrained in-context ones
+            # (`AbstractModel._get_default_ag_args_ensemble`).
             "vary_seed_across_folds": False,
             "model_random_seed": 0,
             "custom_splits": None,

@@ -45,7 +45,8 @@ class MitraModel(AbstractTorchModel):
     }
     _default_ag_args_ensemble_extra = {
         "fold_fitting_strategy": "sequential_local",  # FIXME: Comment out after debugging for large speedup
-        "vary_seed_across_folds": False,  # pretrained: the fold models are the refit that predicts
+        # fine-tuned per fold and not refit: the bag itself predicts, so each fold model gets its own seed
+        "vary_seed_across_folds": True,
     }
     default_resources_physical_cores_only = True
     default_num_gpus = 1

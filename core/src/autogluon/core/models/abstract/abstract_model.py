@@ -3995,11 +3995,13 @@ class AbstractModel(ModelBase, Tunable):
         attribute (merged base-most class first, so subclasses win); overriding this
         classmethod also remains supported.
 
-        Every model AutoGluon registers declares `vary_seed_across_folds` here, so the model owns
-        the choice and callers need not pass it:
+        The models AutoGluon registers declare `vary_seed_across_folds` here (all but the dummy
+        model and the weighted ensemble), so the model owns the choice and callers need not pass it:
 
         - `True` for models trained on the data. Each fold model of a bag is a training run of its
-          own, and a seed per fold lets the bag average over seed noise too.
+          own, and a seed per fold lets the bag average over seed noise too. This includes
+          pretrained models that are fine-tuned per fold and not refit (Mitra, TabPFNMix): their bag
+          itself predicts.
         - `False` for pretrained (foundation) models that predict in context. Their seed decides
           how the data is presented to them (preprocessing, context and estimator draws), so fold
           models with seeds of their own would not be the refit that predicts, and the validation

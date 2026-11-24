@@ -14,7 +14,6 @@ logger = logging.getLogger(__name__)
 class GreedyWeightedEnsembleModel(AbstractModel):
     ag_key = "ENS_WEIGHTED"
     ag_name = "WeightedEnsemble"
-    _default_ag_args_ensemble_extra = {"vary_seed_across_folds": True}  # trained: a seed per fold model
     _supported_problem_types = ["binary", "multiclass", "regression", "quantile", "softclass"]
 
     _default_auxiliary_params_extra = dict(
