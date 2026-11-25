@@ -87,6 +87,7 @@ class TabDPTModel(AbstractTorchModel):
         # 8-fold bag: sequential is 2-4x faster than any parallel fold split
         # (0.125/0.25/0.5 GPU per fold) at both 600 and 30k train rows.
         "fold_fitting_strategy": "sequential_local",
+        "vary_seed_across_folds": False,  # pretrained: the fold models are the refit that predicts
     }
     default_resources_physical_cores_only = True
     default_num_gpus = 1

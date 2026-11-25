@@ -48,6 +48,7 @@ class LGBModel(AbstractModel):
     ag_priority_by_problem_type = MappingProxyType({SOFTCLASS: 100})
     seed_name = "seed"
     seed_name_alt = ["seed_value", "random_seed", "random_state"]
+    _default_ag_args_ensemble_extra = {"vary_seed_across_folds": True}  # trained: a seed per fold model
     _supported_problem_types = ["binary", "multiclass", "regression", "quantile", "softclass"]
 
     _default_auxiliary_params_extra = dict(

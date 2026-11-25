@@ -58,6 +58,7 @@ class EBMModel(AbstractModel):
     ag_name = "EBM"
     ag_priority = 35
     seed_name = "random_state"
+    _default_ag_args_ensemble_extra = {"vary_seed_across_folds": True}  # trained: a seed per fold model
     _supported_problem_types = ["binary", "multiclass", "regression"]
 
     _default_auxiliary_params_extra = {

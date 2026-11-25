@@ -36,6 +36,8 @@ for model_key, model_hps in [
     # ("KNN", {"n_neighbors": 2, "ag_args_ensemble": {"use_child_oof": False}}),  # not enough samples?
     # ("RF", {"n_estimators": 10, "ag_args_ensemble": {"use_child_oof": False}}),  # counts for RF and XT
 ]:
+    # The model's own default: these models are trained on the data, so the seed varies across folds
+    TEST_CASES.append(({model_key: model_hps}, {}, list(range(3))))
     # Different fixed seed
     TEST_CASES.append(({model_key: model_hps}, {"vary_seed_across_folds": False, "model_random_seed": 42}, [42] * 3))
     # Vary default

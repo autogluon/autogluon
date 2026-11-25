@@ -56,6 +56,7 @@ class RealMLPModel(AbstractTorchModel):
     ag_name = "RealMLP"
     ag_priority = 75
     seed_name = "random_state"
+    _default_ag_args_ensemble_extra = {"vary_seed_across_folds": True}  # trained: a seed per fold model
     _supported_problem_types = ["binary", "multiclass", "regression", "quantile"]
     default_resources_physical_cores_only = True
     default_num_gpus = 1

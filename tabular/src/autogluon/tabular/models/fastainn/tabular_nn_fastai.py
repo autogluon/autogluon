@@ -108,6 +108,7 @@ class NNFastAiTabularModel(AbstractModel):
         }
     )
     seed_name = "random_seed"
+    _default_ag_args_ensemble_extra = {"vary_seed_across_folds": True}  # trained: a seed per fold model
     _supported_problem_types = ["binary", "multiclass", "regression", "quantile"]
 
     model_internals_file_name = "model-internals.pkl"
