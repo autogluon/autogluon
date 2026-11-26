@@ -17,7 +17,7 @@ from gluonts.ev.metrics import Metric as GluonTSMetric
 from gluonts.model.evaluation import evaluate_forecasts
 from gluonts.model.forecast import QuantileForecast
 
-from autogluon.timeseries import TimeSeriesPredictor
+from autogluon.timeseries import TimeSeriesDataFrame, TimeSeriesPredictor
 from autogluon.timeseries.metrics import (
     AVAILABLE_METRICS,
     DEFAULT_METRIC_NAME,
@@ -321,6 +321,38 @@ def test_when_eval_metric_seasonal_period_is_longer_than_ts_then_squared_seasona
         y_past=DUMMY_TS_DATAFRAME["target"], seasonal_period=seasonal_period
     )
     assert (naive_error_per_item == 1.0).all()
+
+
+@pytest.mark.parametrize(
+    "metric_name, expected_value", [("MASE", 2.5 / 3), ("RMSSE", np.sqrt(2.25 / 3)), ("SQL", 2.5 / 3)]
+)
+@pytest.mark.parametrize("short_item_position", [0, 1, 2])
+def test_when_item_has_no_past_values_then_scaled_metric_uses_seasonal_error_of_1(
+    metric_name, expected_value, short_item_position
+):
+    prediction_length = 3
+    # Seasonal errors of the long items are 1.0 and 2.0. The short item has no past values, so its seasonal error
+    # defaults to 1.0.
+    series = {"A": np.arange(10.0), "C": 2 * np.arange(10.0)}
+    item_order = ["A", "C"]
+    item_order.insert(short_item_position, "B")
+    series["B"] = np.arange(prediction_length, dtype=float)
+    data = TimeSeriesDataFrame.from_data_frame(
+        pd.DataFrame(
+            [
+                {"item_id": item_id, "timestamp": timestamp, "target": value}
+                for item_id in item_order
+                for timestamp, value in zip(pd.date_range("2020-01-01", periods=len(series[item_id])), series[item_id])
+            ]
+        )
+    )
+    data_future = data.slice_by_timestep(-prediction_length, None)
+    # All forecasts are off by 1, so the metric only depends on the seasonal error of each item
+    predictions = TimeSeriesDataFrame(
+        pd.DataFrame({"mean": data_future["target"] + 1, "0.5": data_future["target"] + 1}, index=data_future.index)
+    )
+    metric = check_get_evaluation_metric(metric_name, prediction_length=prediction_length, seasonal_period=1)
+    assert np.isclose(metric.error(data, predictions), expected_value)
 
 
 @pytest.mark.parametrize("prediction_length, seasonal_period, expected_result", [(3, 1, 3), (6, 3, 2)])
