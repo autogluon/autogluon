@@ -24,6 +24,8 @@ AutoGluon is modularized into [sub-modules](https://packaging.python.org/guides/
 - `autogluon.multimodal` - functionality for image, text, and multimodal problems. Focus on deep learning models.
     - To try object detection functionality using `MultiModalPredictor`, please install additional dependencies via `mim install "mmcv==2.1.0"`, `pip install "mmdet==3.2.0"` and `pip install pycocotools`. Note that Windows users should also install `pycocotools` by: `pip install pycocotools-windows`, but it only supports python 3.6/3.7/3.8.
 - `autogluon.timeseries` - only functionality for time series data (TimeSeriesPredictor).
+    - CatBoost is optional. Install it with `pip install "autogluon.timeseries[catboost]"` to use tabular models, covariate regressors, or ensembles configured with `model_name="CAT"`.
+    - `autogluon.timeseries[all]` includes both CatBoost and Ray. Installing `autogluon` also includes CatBoost.
 - `autogluon.common` - helper functionality. Not useful standalone.
 - `autogluon.core` - only core functionality (Searcher/Scheduler) useful for hyperparameter tuning of arbitrary code/models.
 - `autogluon.features` - only functionality for feature generation / feature preprocessing pipelines (primarily related to Tabular data).
