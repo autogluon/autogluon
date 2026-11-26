@@ -30,6 +30,7 @@ from autogluon.tabular.trainer.group_views import (
 )
 
 HYPERPARAMETERS = {"GBM": {"num_boost_round": 20}, "LR": {}}
+QUANTILE_LEVELS = [0.1, 0.5, 0.9]
 
 
 def _label_per_group_frame(problem_type: str, n_groups: int, rows: int, seed: int) -> pd.DataFrame:
@@ -38,7 +39,7 @@ def _label_per_group_frame(problem_type: str, n_groups: int, rows: int, seed: in
     group = np.repeat(np.arange(n_groups), rows)
     latent = rng.normal(size=(n_groups, 3))
     signal = latent[:, 0] + 0.5 * latent[:, 1]
-    if problem_type == "regression":
+    if problem_type in ("regression", "quantile"):
         y = signal
     elif problem_type == "binary":
         y = (signal > 0).astype(int)
@@ -51,10 +52,11 @@ def _label_per_group_frame(problem_type: str, n_groups: int, rows: int, seed: in
     return df
 
 
-def _fit(train: pd.DataFrame, tmp_path, **kwargs) -> TabularPredictor:
+def _fit(train: pd.DataFrame, tmp_path, quantile: bool = False, **kwargs) -> TabularPredictor:
     kwargs.setdefault("num_bag_folds", 3)
     kwargs.setdefault("hyperparameters", HYPERPARAMETERS)
-    return TabularPredictor(label="label", path=str(tmp_path / "predictor"), verbosity=0).fit(
+    init = {"problem_type": "quantile", "quantile_levels": QUANTILE_LEVELS} if quantile else {}
+    return TabularPredictor(label="label", path=str(tmp_path / "predictor"), verbosity=0, **init).fit(
         train, num_gpus=0, dynamic_stacking=False, **kwargs
     )
 
@@ -62,6 +64,8 @@ def _fit(train: pd.DataFrame, tmp_path, **kwargs) -> TabularPredictor:
 def _predict(predictor: TabularPredictor, data: pd.DataFrame) -> pd.DataFrame:
     if predictor.problem_type == "regression":
         return predictor.predict(data).to_frame()
+    if predictor.problem_type == "quantile":
+        return predictor.predict(data)
     return predictor.predict_proba(data)
 
 
@@ -103,8 +107,17 @@ def test_pool_within_groups_by_mean_median_or_a_custom_strategy():
     np.testing.assert_allclose(pool_within_groups(y, codes, "regression", "median"), [2, 2, 2, 6, 6])
     np.testing.assert_allclose(pool_within_groups(y, codes, "regression", _max_pool), [6, 6, 6, 8, 8])
 
+    # quantile predictions, a column per level, are pooled one level at a time and not renormalized
+    quantiles = np.array([[1.0, 2.0, 4.0], [3.0, 4.0, 6.0], [2.0, 9.0, 11.0], [0.0, 1.0, 2.0], [4.0, 5.0, 6.0]])
+    mean = np.repeat([[2.0, 5.0, 7.0], [2.0, 3.0, 4.0]], [3, 2], axis=0)
+    np.testing.assert_allclose(pool_within_groups(quantiles, codes, "quantile"), mean)
+    median = np.repeat([[2.0, 4.0, 6.0], [2.0, 3.0, 4.0]], [3, 2], axis=0)
+    np.testing.assert_allclose(pool_within_groups(quantiles, codes, "quantile", "median"), median)
+
     with pytest.raises(ValueError, match="does not apply to regression"):
         pool_within_groups(y, codes, "regression", "geometric_mean")
+    with pytest.raises(ValueError, match="does not apply to quantile regression"):
+        pool_within_groups(quantiles, codes, "quantile", "geometric_mean")
     with pytest.raises(ValueError, match="must be one of"):
         pool_within_groups(y, codes, "regression", "mode")
     with pytest.raises(ValueError, match="shape of its input"):
@@ -277,18 +290,27 @@ def test_group_mode_is_order_invariant_and_breaks_ties_by_the_smallest_value():
 
 
 # Ids without "regression": the test suite reserves that keyword for its opt-in regression-test marker.
-@pytest.mark.parametrize("problem_type", ["binary", "multiclass", "regression"], ids=["binary", "multiclass", "rmse"])
+@pytest.mark.parametrize(
+    "problem_type",
+    ["binary", "multiclass", "regression", "quantile"],
+    ids=["binary", "multiclass", "rmse", "quantile"],
+)
 def test_group_views_fit_two_views_and_predict_per_group(problem_type, tmp_path):
+    quantile = problem_type == "quantile"
     train = _label_per_group_frame(problem_type, n_groups=40, rows=5, seed=0)
     test = _label_per_group_frame(problem_type, n_groups=15, rows=5, seed=1)
-    predictor = _fit(train, tmp_path, validation_structure={"group_on": "patient"}, group_views=True)
+    predictor = _fit(
+        train, tmp_path, quantile=quantile, validation_structure={"group_on": "patient"}, group_views=True
+    )
 
     names = predictor.model_names()
-    for base in ("LightGBM", "LinearModel"):
+    # the linear model fits no quantiles
+    for base in ("LightGBM",) if quantile else ("LightGBM", "LinearModel"):
         assert f"{base}_BAG_L1" in names and f"{base}{GROUP_COLLAPSED_SUFFIX}_BAG_L1" in names
 
     ensemble = predictor._trainer.load_model(predictor.model_best)
-    assert ensemble.params["group_pooling"] == ("mean" if problem_type == "regression" else "geometric_mean")
+    numeric_target = problem_type in ("regression", "quantile")
+    assert ensemble.params["group_pooling"] == ("mean" if numeric_target else "geometric_mean")
 
     pred = _predict(predictor, test)
     # Every view is constant within a group, so the ensemble is too.

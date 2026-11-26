@@ -1061,8 +1061,8 @@ class TabularPredictor:
                 therefore needs the `group_on` column(s); rows of different groups never interact.
 
                 "auto": on when `group_on` is set, models are bagged (`num_bag_folds >= 2`), the
-                problem is binary, multiclass or regression, and every group of `train_data` with a
-                label has a single label value (with at least one group of two or more rows).
+                problem is binary, multiclass, regression or quantile, and every group of `train_data`
+                with a label has a single label value (with at least one group of two or more rows).
                 True: on, raising if `group_on`, bagging or the problem type do not allow it.
                 False or None (default): off, unless `validation_size_curves` sets `group_views`.
 
@@ -1077,17 +1077,19 @@ class TabularPredictor:
                   is that product brought back to the confidence of a single row, so correlated rows
                   do not add up to overconfidence. A row that confidently rules a class out pulls the
                   group's probability of that class down strongly.
-                - "mean" (default for regression): the arithmetic mean. A single confidently wrong row
-                  moves the group's prediction less than under the geometric mean.
-                - "median": the median of each class's probability (renormalized) or of the
-                  regression predictions, robust to a minority of outlying rows.
+                - "mean" (default for regression and quantile regression): the arithmetic mean. A
+                  single confidently wrong row moves the group's prediction less than under the
+                  geometric mean. Quantile predictions are pooled one quantile level at a time.
+                - "median": the median of each class's probability (renormalized), of the regression
+                  predictions or of each quantile level, robust to a minority of outlying rows.
                 - a callable `pooling(pred, groups)`, which takes one model's predictions as a 2-d
-                  float array (a column per class, or one column for regression) and each row's group
-                  as an integer array, and returns an array of `pred`'s shape in which every row holds
-                  its group's pooled prediction. Pooled class probabilities are then floored at 1e-15
-                  and renormalized. The collapsed views' predictions, constant within a group, are
-                  pooled too, so it should map a group of identical rows to that row. It is saved with
-                  the predictor, so it must be picklable (e.g. a function defined at module level).
+                  float array (a column per class or per quantile level, or one column for regression)
+                  and each row's group as an integer array, and returns an array of `pred`'s shape in
+                  which every row holds its group's pooled prediction. Pooled class probabilities are
+                  then floored at 1e-15 and renormalized. The collapsed views' predictions, constant
+                  within a group, are pooled too, so it should map a group of identical rows to that
+                  row. It is saved with the predictor, so it must be picklable (e.g. a function defined
+                  at module level).
                 - a list of these, e.g. `["geometric_mean", "median"]`: every model gets one pooled
                   view per strategy, each a separate input of the weighted ensemble named
                   `<model>@<strategy>` (a callable's `__name__`), so the ensemble weighs the
