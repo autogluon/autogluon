@@ -117,6 +117,19 @@ class _FunctionEstimator:
         return np.full((len(X), 2), 0.5)
 
 
+class _Runner:
+    """Holds a child of the network apart from the network, like causilo's runner holds the network's blocks."""
+
+    def __init__(self, layer):
+        self.layer = layer
+
+
+class _RunnerEstimator(_FunctionEstimator):
+    def fit(self, X, y):
+        self.runner_ = _Runner(self.network.linear)
+        return super().fit(X, y)
+
+
 class Trainer:
     """A fine-tuning library: ``from_pretrained`` returns the base network every fit then trains."""
 
@@ -184,6 +197,15 @@ class FunctionModel(_Base):
             hps.get("checkpoint", "default.ckpt"), device="cpu", precision=hps.get("precision", "float32")
         )
         self.model = _FunctionEstimator(network, n_estimators=hps.get("n_estimators", 4)).fit(X, y)
+
+
+class RunnerModel(FunctionModel):
+    """The fitted estimator also references a submodule of the shared network."""
+
+    ag_key = "FAKE-RUNNER"
+
+    def _fit(self, X, y, num_cpus=1, num_gpus=0, **kwargs):
+        self.model = _RunnerEstimator(build_network("default.ckpt", device="cpu")).fit(X, y)
 
 
 class DtypeFunctionModel(_Base):
@@ -377,6 +399,25 @@ def test_function_loader_rebuilds_with_its_recorded_dtype(tmp_path, data):
     fresh.prepare_for_inference()
     assert BUILDS[-1] == ("dtype", "default.ckpt", torch.bfloat16), "the rebuild passes the dtype, not its repr"
     assert next(fresh.model.network.parameters()).dtype == torch.bfloat16
+
+
+def test_pickle_leaves_out_a_submodule_held_apart_from_the_network(tmp_path, data):
+    model = _fit(RunnerModel, tmp_path, data)
+    network = model.model.network
+    blob = pickle.dumps(model)
+    assert network.linear.weight.detach().numpy().tobytes() not in blob, "the submodule's weights are in the pickle"
+    assert model.model.runner_.layer is network.linear, "the live model keeps its runner"
+
+    loaded = pickle.loads(blob)
+    assert loaded.model.network is None and loaded.model.runner_.layer is None
+    loaded.prepare_for_inference()
+    assert loaded.model.network is network and loaded.model.runner_.layer is network.linear
+
+    registry.release()
+    fresh = pickle.loads(blob)
+    fresh.prepare_for_inference()
+    assert fresh.model.network is not network and len(BUILDS) == 2
+    assert fresh.model.runner_.layer is fresh.model.network.linear, "the rebuilt network's child, not a copy"
 
 
 def test_copy_per_fit_gives_every_fit_its_own_network(tmp_path, data):

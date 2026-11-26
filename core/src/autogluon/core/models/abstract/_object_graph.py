@@ -22,7 +22,7 @@ from typing import TYPE_CHECKING, Any
 from ._shared_weights_registry import normalize_device, shallow_copy
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Iterator, Sequence
+    from collections.abc import Callable, Iterable, Iterator, Sequence
 
     import torch
 
@@ -182,17 +182,31 @@ def payload_modules(payload: Any) -> list[torch.nn.Module]:
     return list(iter_modules(payload))
 
 
+def with_submodules(modules: Iterable[torch.nn.Module]) -> list[torch.nn.Module]:
+    """``modules``, then every submodule of theirs not listed yet, each once.
+
+    A library can keep a child of the network apart from the network, such as a runner that holds the
+    network's blocks; a detach that looked only for the top-level module would pickle that child with
+    its weights. The top-level modules keep the first indices, and the submodules follow in
+    ``Module.modules()`` order, a function of the network's structure.
+    """
+    listed = list(modules)
+    seen = {id(module) for module in listed}
+    for module in list(listed):
+        for submodule in module.modules():
+            if id(submodule) not in seen:
+                seen.add(id(submodule))
+                listed.append(submodule)
+    return listed
+
+
 def shared_components(payload: Any) -> list[Any]:
-    """The objects a detach looks for by identity: the payload itself first, then its modules.
+    """The objects a detach looks for by identity: the payload itself first, then its modules and their submodules.
 
     The order is a function of the payload's structure, so the registry entry of another device
     yields the same indices and a recorded ``(path, index)`` pair points at the matching object.
     """
-    components: list[Any] = [payload]
-    for module in iter_modules(payload):
-        if module is not payload:
-            components.append(module)
-    return components
+    return [payload, *with_submodules(module for module in iter_modules(payload) if module is not payload)]
 
 
 def payload_device(payload: Any) -> str:
@@ -549,4 +563,5 @@ __all__ = [
     "rewrite_path_devices",
     "shared_components",
     "tensors_off_device",
+    "with_submodules",
 ]
