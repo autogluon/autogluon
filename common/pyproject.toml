@@ -10,7 +10,7 @@ name = "autogluon.common"
 dynamic = ["version", "dependencies", "optional-dependencies", "classifiers", "readme"]
 description = "Fast and Accurate ML in 3 Lines of Code"
 license = "Apache-2.0"
-requires-python = ">=3.10,<3.14"
+requires-python = ">=3.10,<3.15"
 authors = [{ name = "AutoGluon Community" }]
 
 [project.urls]
