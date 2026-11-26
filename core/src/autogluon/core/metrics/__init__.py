@@ -236,6 +236,27 @@ class Scorer(object, metaclass=ABCMeta):
     score = __call__
 
 
+def _flatten_single_column(y_pred):
+    """Return a single column of predictions, shape (n, 1), as a 1-D array.
+
+    Compared with a 1-D `y_true`, an (n, 1) column broadcasts to an (n, n) matrix, which some metrics silently reduce
+    to a wrong score (`root_mean_squared_error` and `quadratic_kappa`, for example).
+    """
+    if len(y_pred.shape) == 2 and y_pred.shape[1] == 1:
+        return np.asarray(y_pred)[:, 0]
+    return y_pred
+
+
+def _is_binary_positive_class_proba(y_true, y_pred) -> bool:
+    """Whether a 1-D `y_pred` holds the positive-class probabilities of binary classification rather than classes."""
+    y_pred = np.asarray(y_pred)
+    if y_pred.dtype.kind != "f" or not np.isfinite(y_pred).all():
+        return False
+    if np.array_equal(y_pred, np.round(y_pred)):
+        return False  # integer-valued, so classes
+    return bool(((y_pred >= 0) & (y_pred <= 1)).all()) and type_of_target(y_true) == "binary"
+
+
 class _PredictScorer(Scorer):
     def _preprocess(self, y_true, y_pred, **kwargs):
         if isinstance(y_true, list):
@@ -243,7 +264,8 @@ class _PredictScorer(Scorer):
         if isinstance(y_pred, list):
             y_pred = np.array(y_pred)
 
-        if len(y_pred.shape) == 1 or y_pred.shape[1] == 1:
+        y_pred = _flatten_single_column(y_pred)
+        if len(y_pred.shape) == 1:
             pass  # must be regression, all other task types would return at least two probabilities
         else:
             type_true = type_of_target(y_true)
@@ -286,8 +308,12 @@ class _ClassScorer(Scorer):
         if isinstance(y_pred, list):
             y_pred = np.array(y_pred)
 
-        if len(y_pred.shape) == 1 or y_pred.shape[1] == 1:
-            pass  # FIXME
+        y_pred = _flatten_single_column(y_pred)
+        if len(y_pred.shape) == 1:
+            if _is_binary_positive_class_proba(y_true, y_pred):
+                # AutoGluon's 1-D binary `predict_proba` form: convert to classes as the 2-column form is converted
+                # below (`argmax` picks class 1 exactly when its probability is above 0.5). Otherwise these are classes.
+                y_pred = (np.asarray(y_pred) > 0.5).astype(int)
         else:
             type_true = type_of_target(y_true)
             if type_true in ["binary", "multiclass"]:
