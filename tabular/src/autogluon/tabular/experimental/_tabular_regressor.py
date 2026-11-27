@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import pandas as pd
 from sklearn.base import BaseEstimator, RegressorMixin
-from sklearn.utils.validation import check_array, check_is_fitted, check_X_y
 
 from autogluon.core.metrics import Scorer
 
@@ -50,15 +49,7 @@ class TabularRegressor(BaseEstimator, RegressorMixin, ScikitMixin):
         return self
 
     def predict(self, X):
-        # Check if fit has been called
-        check_is_fitted(self)
-        # Input validation
-        X = check_array(X)
-        if X.shape[1] != self.n_features_in_:
-            raise ValueError(
-                f"Inconsistent number of features between fit and predict calls: ({self.n_features_in_}, {X.shape[1]})"
-            )
-
+        X = self._validate_input(X=X)
         data = pd.DataFrame(X)
         y_pred = self.predictor_.predict(data=data).to_numpy()
         return y_pred
