@@ -264,6 +264,30 @@ class TestChronos2FineTuning:
         assert len(predictions) == DUMMY_TS_DATAFRAME.num_items * loaded_model.prediction_length
         assert "mean" in predictions.columns
 
+    def test_when_fine_tuned_model_converted_to_refit_full_via_copy_then_checkpoint_is_copied(
+        self, fine_tuned_chronos2_model
+    ):
+        refit_model = fine_tuned_chronos2_model.convert_to_refit_full_via_copy()
+
+        assert refit_model.path != fine_tuned_chronos2_model.path
+        assert refit_model._is_fine_tuned
+        assert refit_model.model_path.startswith(refit_model.path)
+
+        predictions = refit_model.predict(DUMMY_TS_DATAFRAME)
+        assert len(predictions) == DUMMY_TS_DATAFRAME.num_items * refit_model.prediction_length
+        assert not predictions.isna().any().any()
+
+    def test_when_fine_tuned_model_renamed_and_saved_then_loaded_model_can_predict(self, fine_tuned_chronos2_model):
+        # MultiWindowBacktestingModel renames the refit model and saves it to a new directory
+        refit_model = fine_tuned_chronos2_model.convert_to_refit_full_via_copy()
+        refit_model.rename("Chronos2_renamed")
+        refit_model.save()
+
+        loaded_model = Chronos2Model.load(path=refit_model.path)
+        assert loaded_model.model_path.startswith(loaded_model.path)
+        predictions = loaded_model.predict(DUMMY_TS_DATAFRAME)
+        assert not predictions.isna().any().any()
+
     def test_when_covariates_provided_then_chronos2_is_fine_tuned_with_them(self, tmp_path, df_with_covariates):
         data, covariate_metadata = df_with_covariates
         past_data = data.slice_by_timestep(None, -5)
