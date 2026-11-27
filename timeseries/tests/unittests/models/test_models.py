@@ -31,6 +31,7 @@ TESTABLE_PREDICTION_LENGTHS = [1, 5]
 class TestAllModelsInitialization:
     EXPECTED_MODEL_TAGS = [
         "allow_nan",
+        "allow_nan_covariates",
         "can_refit_full",
         "can_use_train_data",
         "can_use_val_data",
