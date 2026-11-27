@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import multiprocessing
+from io import BytesIO
 from os import listdir
 from os.path import isfile, join
 from pathlib import Path
@@ -63,6 +64,8 @@ def load(
         format = "multipart_local"
     elif ".parquet" in path or ".pq" in path or path[-1] == "/":
         format = "parquet"
+    elif path.endswith((".xlsx", ".xls", ".xlsm", ".xlsb")):
+        format = "excel"
     else:
         format = "csv"
         if delimiter is None:
@@ -119,6 +122,34 @@ def load(
             names=names,
             dtype=dtype,
             low_memory=low_memory,
+            nrows=nrows,
+            skiprows=skiprows,
+            usecols=usecols,
+        )
+        column_count_full = len(list(df.columns.values))
+        if columns_to_keep is not None:
+            df = df[columns_to_keep]
+    elif format == "excel":
+        # `pd.read_excel` cannot natively read from S3 paths without fsspec/s3fs installed,
+        # so instead fetch the file contents via boto3 into an in-memory buffer.
+        if s3_utils.is_s3_url(path):
+            import boto3
+
+            bucket, prefix = s3_utils.s3_path_to_bucket_prefix(path)
+            buffer = BytesIO()
+            s3_resource = boto3.resource("s3")
+            s3_resource.Object(bucket, prefix).download_fileobj(buffer)
+            buffer.seek(0)
+            source = buffer
+        else:
+            source = path
+        # Only the first sheet is loaded (sheet_name=0)
+        df = pd.read_excel(
+            source,
+            sheet_name=0,
+            header=header,
+            names=names,
+            dtype=dtype,
             nrows=nrows,
             skiprows=skiprows,
             usecols=usecols,

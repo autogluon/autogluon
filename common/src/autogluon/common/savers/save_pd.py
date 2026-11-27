@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import multiprocessing
 import os
-from io import StringIO
+from io import BytesIO, StringIO
 from pathlib import Path
 
 import numpy as np
@@ -40,6 +40,7 @@ def save(
     By default will save the header and index.
     If saving to CSV, column dtypes may not be maintained upon loading the file.
     To ensure identical column dtypes when loading, save in Parquet format.
+    If saving to Excel (.xlsx), the `openpyxl` package must be installed.
 
     For large DataFrames (>1 GB), it is highly recommended to save in Parquet format.
     For massive DataFrames (>10 GB), it is highly recommended to save in multipart Parquet format.
@@ -58,6 +59,8 @@ def save(
         CSV (S3)                    : "s3://bucket/pre/fix/out.csv"
         Parquet (S3)                : "s3://bucket/pre/fix/out.parquet"
         Multipart Parquet (S3)      : "s3://bucket/pre/fix/"
+        Excel (local)               : "local/path/out.xlsx"
+        Excel (S3)                  : "s3://bucket/pre/fix/out.xlsx"
 
     Note: Once saved via this function, the same path can be used to
     load the file via `autogluon.common.loaders.load_pd.load(path=path)`.
@@ -74,6 +77,8 @@ def save(
             type = "csv"
         elif ".parquet" in path:
             type = "parquet"
+        elif ".xlsx" in path:
+            type = "excel"
         else:
             type = "csv"
     if "s3" not in path[:2]:
@@ -102,6 +107,19 @@ def save(
             logger.log(15, "Saved " + str(path) + " | Columns = " + str(column_count) + " | Rows = " + str(row_count))
     elif type == "parquet":
         df.to_parquet(path, compression=compression)
+        if verbose:
+            logger.log(15, "Saved " + str(path) + " | Columns = " + str(column_count) + " | Rows = " + str(row_count))
+    elif type == "excel":
+        if is_local:
+            df.to_excel(path, index=index, header=header)
+        else:
+            import boto3
+
+            buffer = BytesIO()
+            df.to_excel(buffer, index=index, header=header)
+            bucket, prefix = s3_utils.s3_path_to_bucket_prefix(s3_path=path)
+            s3_resource = boto3.resource("s3")
+            s3_resource.Object(bucket, prefix).put(Body=buffer.getvalue(), ACL="bucket-owner-full-control")
         if verbose:
             logger.log(15, "Saved " + str(path) + " | Columns = " + str(column_count) + " | Rows = " + str(row_count))
     elif type == "multipart_s3":

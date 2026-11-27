@@ -38,6 +38,7 @@ DEPENDENT_PACKAGES = {
     "joblib": ">=1.2,<1.7",  # <{N+1} upper cap
     "pyyaml": ">=5.4",  # Uncapped to maximize compatibility
     "packaging": ">=20",  # Uncapped to maximize compatibility (stable API)
+    "openpyxl": ">=3.1,<4",  # Major version cap; Excel (.xlsx) loading/saving in autogluon.common
 }
 
 # A list value expands to multiple marker-guarded requirements.
