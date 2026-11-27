@@ -223,3 +223,24 @@ def test_astype_bool_realtime_handles_nullable_missing_values():
     ]
     for output in transformed[1:]:
         pd.testing.assert_frame_equal(transformed[0], output)
+
+
+def test_astype_feature_generator_timedelta_as_seconds():
+    """Timedelta features become float seconds, with NaT as NaN, in both `fit_transform` and `transform`.
+
+    timedelta64 is a numpy integer subtype, so they used to be inferred as int features and passed through as
+    timedelta64, which models such as LightGBM and the linear model cannot use.
+    """
+    import numpy as np
+    import pandas as pd
+
+    input_data = pd.DataFrame({"duration": pd.to_timedelta([90, None, 3600], unit="s"), "n": [1, 2, 3]})
+    expected = pd.Series([90.0, np.nan, 3600.0], name="duration")
+    generator = AsTypeFeatureGenerator()
+
+    output_data = generator.fit_transform(input_data)
+
+    pd.testing.assert_series_equal(output_data["duration"], expected)
+    assert generator.feature_metadata.get_feature_type_raw("duration") == "float"
+    pd.testing.assert_series_equal(generator.transform(input_data)["duration"], expected)
+    assert input_data["duration"].dtype.kind == "m"  # the input is left untouched
