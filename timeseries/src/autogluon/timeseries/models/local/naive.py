@@ -27,15 +27,19 @@ class NaiveModel(AbstractLocalModel):
     ag_priority = 100
     allowed_local_model_args = ["seasonal_period"]
 
+    @classmethod
     def _predict_with_local_model(
-        self,
+        cls,
         time_series: pd.Series,
         local_model_args: dict,
+        prediction_length: int,
+        quantile_levels: list[float],
+        **kwargs,
     ) -> pd.DataFrame:
         return seasonal_naive_forecast(
             target=time_series.values.ravel(),
-            prediction_length=self.prediction_length,
-            quantile_levels=self.quantile_levels,
+            prediction_length=prediction_length,
+            quantile_levels=quantile_levels,
             seasonal_period=1,
         )
 
@@ -70,15 +74,19 @@ class SeasonalNaiveModel(AbstractLocalModel):
     ag_priority = 100
     allowed_local_model_args = ["seasonal_period"]
 
+    @classmethod
     def _predict_with_local_model(
-        self,
+        cls,
         time_series: pd.Series,
         local_model_args: dict,
+        prediction_length: int,
+        quantile_levels: list[float],
+        **kwargs,
     ) -> pd.DataFrame:
         return seasonal_naive_forecast(
             target=time_series.values.ravel(),
-            prediction_length=self.prediction_length,
-            quantile_levels=self.quantile_levels,
+            prediction_length=prediction_length,
+            quantile_levels=quantile_levels,
             seasonal_period=local_model_args["seasonal_period"],
         )
 
@@ -105,14 +113,18 @@ class AverageModel(AbstractLocalModel):
     allowed_local_model_args = ["seasonal_period"]
     default_max_ts_length = None
 
+    @classmethod
     def _predict_with_local_model(
-        self,
+        cls,
         time_series: pd.Series,
         local_model_args: dict,
+        prediction_length: int,
+        quantile_levels: list[float],
+        **kwargs,
     ) -> pd.DataFrame:
-        agg_functions = ["mean"] + [get_quantile_function(q) for q in self.quantile_levels]
+        agg_functions = ["mean"] + [get_quantile_function(q) for q in quantile_levels]
         stats_marginal = time_series.agg(agg_functions)
-        stats_repeated = np.tile(stats_marginal.values, [self.prediction_length, 1])
+        stats_repeated = np.tile(stats_marginal.values, [prediction_length, 1])
         return pd.DataFrame(stats_repeated, columns=stats_marginal.index)
 
     def _more_tags(self) -> dict:
@@ -145,21 +157,27 @@ class SeasonalAverageModel(AbstractLocalModel):
     allowed_local_model_args = ["seasonal_period"]
     default_max_ts_length = None
 
+    @classmethod
     def _predict_with_local_model(
-        self,
+        cls,
         time_series: pd.Series,
         local_model_args: dict,
+        prediction_length: int,
+        quantile_levels: list[float],
+        target: str | None = None,
+        **kwargs,
     ) -> pd.DataFrame:
         seasonal_period = local_model_args["seasonal_period"]
-        agg_functions = ["mean"] + [get_quantile_function(q) for q in self.quantile_levels]
+        agg_functions = ["mean"] + [get_quantile_function(q) for q in quantile_levels]
 
         # Compute mean & quantiles for each season
-        ts_df = time_series.reset_index(drop=True).to_frame()
+        target_col = target if target is not None else time_series.name
+        ts_df = time_series.reset_index(drop=True).to_frame(name=target_col)
         ts_df["season"] = ts_df.index % seasonal_period
-        stats_per_season = ts_df.groupby("season")[self.target].agg(agg_functions)
+        stats_per_season = ts_df.groupby("season")[target_col].agg(agg_functions)
 
         next_season = ts_df["season"].iloc[-1] + 1
-        season_in_forecast_horizon = np.arange(next_season, next_season + self.prediction_length) % seasonal_period
+        season_in_forecast_horizon = np.arange(next_season, next_season + prediction_length) % seasonal_period
         result = stats_per_season.reindex(season_in_forecast_horizon)
 
         if np.any(result.isna().values):

@@ -666,12 +666,7 @@ class AbstractTimeSeriesModel(TimeSeriesModelBase, TimeSeriesTunable, metaclass=
 
         data, known_covariates = self.preprocess(data, known_covariates, is_train=False)
 
-        # FIXME: Set self.covariate_regressor=None so to avoid copying it across processes during _predict
-        # FIXME: The clean solution is to convert all methods executed in parallel to @classmethod
-        covariate_regressor = self.covariate_regressor
-        self.covariate_regressor = None
         predictions = self._predict(data=data, known_covariates=known_covariates, **kwargs)
-        self.covariate_regressor = covariate_regressor
 
         # Ensure that 'mean' is the leading column. Trailing columns might not match quantile_levels if self is
         # a MultiWindowBacktestingModel and base_model.must_drop_median=True
