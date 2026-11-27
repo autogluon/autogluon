@@ -89,6 +89,7 @@ class CategoricalInteractionFeatureGenerator(AbstractFeatureGenerator):
 
         self.make_categoricals = make_categoricals
         self.fitted_ = False
+        self.cat_freq = None  # FrequencyFeatureGenerator of the new features, if `add_freq` or `only_freq`
         self.cat_sizes_ = {}  # base categorical cardinalities
         self.reverse_mapping_ = {}  # interaction_col → sorted unique int combos
 
@@ -330,23 +331,25 @@ class CategoricalInteractionFeatureGenerator(AbstractFeatureGenerator):
         mapped[valid_mask] = out
         return mapped.astype(np.int32)
 
-    def frequency_encode_new_features(self, X: pd.DataFrame, y: pd.Series = None):
-        if self.add_freq or self.only_freq:
-            if not self.fitted_:
-                # TODO: Unclear whether there is a more efficient way to do this
-                candidate_cols = FrequencyFeatureGenerator.filter_candidates_by_distinctiveness(X[self.new_col_set])
-                if len(candidate_cols) > 0:
-                    keep_original = not self.only_freq
-                    self.cat_freq = FrequencyFeatureGenerator(
-                        candidate_cols=candidate_cols, fillna=self.fillna, log=self.log, keep_original=keep_original
-                    )
-                    return self.cat_freq.fit_transform(X[candidate_cols], y)
-                else:
-                    return X
-            else:
-                return self.cat_freq.transform(X)
-        else:
+    def frequency_encode_new_features(self, X: pd.DataFrame, y: pd.Series = None, fit_mode: bool = False):
+        if not (self.add_freq or self.only_freq):
             return X
+        # `fit_mode`, not `self.fitted_`: `_fit` sets the latter before `_fit_transform` gets here
+        if fit_mode:
+            # TODO: Unclear whether there is a more efficient way to do this
+            candidate_cols = FrequencyFeatureGenerator.filter_candidates_by_distinctiveness(X[self.new_col_set])
+            if len(candidate_cols) == 0:
+                self.cat_freq = None
+                return X
+            keep_original = not self.only_freq
+            self.cat_freq = FrequencyFeatureGenerator(
+                candidate_cols=candidate_cols, fillna=self.fillna, log=self.log, keep_original=keep_original
+            )
+            # All the new features go in, so the ones that are not candidates are passed through rather than dropped
+            return self.cat_freq.fit_transform(X, y)
+        if self.cat_freq is None:
+            return X
+        return self.cat_freq.transform(X)
 
     def _fit(self, X: pd.DataFrame, y: pd.Series, **kwargs):
         if self.candidate_cols is None:
@@ -408,6 +411,6 @@ class CategoricalInteractionFeatureGenerator(AbstractFeatureGenerator):
                     X[col] = X[col].astype("category")
             X_out = self._build_interactions(X[self.used_cols], fit_mode=fit_mode)
 
-        X_out = self.frequency_encode_new_features(X_out)
+        X_out = self.frequency_encode_new_features(X_out, fit_mode=fit_mode)
 
         return X_out
