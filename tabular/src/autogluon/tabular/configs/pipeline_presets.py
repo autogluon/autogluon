@@ -474,7 +474,7 @@ def validate_ensemble_hyperparameters(ensemble_hyperparameters: dict) -> None:
         )
     ((model, hyperparameters),) = ensemble_hyperparameters.items()
     if isinstance(model, str):
-        if model not in ag_model_registry.keys:
+        if model not in ag_model_registry.all_keys:
             raise ValueError(
                 f"`ensemble_hyperparameters` names {model!r}, which is not a registered model key. "
                 "Pass the model class, or register it with `ag_model_registry.add`."
