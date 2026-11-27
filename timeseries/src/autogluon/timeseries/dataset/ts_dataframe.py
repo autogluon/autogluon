@@ -1093,6 +1093,9 @@ class TimeSeriesDataFrame(pd.DataFrame):
             else:
                 aggregation[col] = agg_categorical
 
+        # pandas returns 0 for the sum over a period without any values, these periods should be missing instead
+        sum_columns = [col for col, agg in aggregation.items() if agg == "sum"]
+
         def split_into_chunks(iterable: Iterable, size: int) -> Iterable[Iterable]:
             # Based on https://stackoverflow.com/a/22045226/5497447
             iterable = iter(iterable)
@@ -1101,7 +1104,11 @@ class TimeSeriesDataFrame(pd.DataFrame):
         def resample_chunk(chunk: Iterable[tuple[str, pd.DataFrame]]) -> pd.DataFrame:
             resampled_dfs = []
             for item_id, df in chunk:
-                resampled_df = df.resample(offset, level=self.TIMESTAMP, **kwargs).agg(aggregation)
+                resampler = df.resample(offset, level=self.TIMESTAMP, **kwargs)
+                resampled_df = resampler.agg(aggregation)
+                if sum_columns:
+                    no_values = resampler[sum_columns].count() == 0
+                    resampled_df[sum_columns] = resampled_df[sum_columns].mask(no_values)
                 resampled_dfs.append(pd.concat({item_id: resampled_df}, names=[self.ITEMID]))
             return pd.concat(resampled_dfs)
 
