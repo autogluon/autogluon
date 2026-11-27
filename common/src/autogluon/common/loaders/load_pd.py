@@ -88,7 +88,7 @@ def load(
             multiprocessing_method=multiprocessing_method,
         )  # TODO: Add arguments!
     elif format == "multipart_local":
-        paths = [join(path, f) for f in listdir(path) if (isfile(join(path, f))) & (f.startswith("part-"))]
+        paths = sorted(join(path, f) for f in listdir(path) if isfile(join(path, f)) and f.startswith("part-"))
         return _load_multipart(
             paths=paths,
             delimiter=delimiter,
@@ -200,13 +200,13 @@ def _load_multipart(
     worker_count=None,
     multiprocessing_method="forkserver",
 ):
+    if not paths:
+        raise ValueError("No data files were provided for multipart loading.")
     cpu_count = multiprocessing.cpu_count()
     workers = int(round(cpu_count))
     if worker_count is not None:
         if worker_count <= workers:
             workers = worker_count
-
-    logger.log(15, "Load multipart running pool with " + str(workers) + " workers...")
 
     full_chunks = [
         [
@@ -227,12 +227,17 @@ def _load_multipart(
         for path in paths
     ]
 
-    df_list = multiprocessing_utils.execute_multiprocessing(
-        workers_count=workers,
-        transformer=_load_multipart_child,
-        chunks=full_chunks,
-        multiprocessing_method=multiprocessing_method,
-    )
+    workers = min(workers, len(full_chunks))
+    logger.log(15, "Loading multipart data with %s worker(s)...", workers)
+    if workers == 1:
+        df_list = [_load_multipart_child(chunk) for chunk in full_chunks]
+    else:
+        df_list = multiprocessing_utils.execute_multiprocessing(
+            workers_count=workers,
+            transformer=_load_multipart_child,
+            chunks=full_chunks,
+            multiprocessing_method=multiprocessing_method,
+        )
 
     df_combined = pd.concat(df_list, axis=0, ignore_index=True)
 
