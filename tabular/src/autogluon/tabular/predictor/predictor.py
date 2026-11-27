@@ -3348,7 +3348,7 @@ class TabularPredictor:
         was_fit = self.is_fit
         if not was_fit:
             if "train_data" not in kwargs.keys():
-                Exception(
+                raise Exception(
                     "Autogluon is required to be fit or given 'train_data' in order to run 'fit_pseudolabel'."
                     " Autogluon is not fit and 'train_data' was not given"
                 )
