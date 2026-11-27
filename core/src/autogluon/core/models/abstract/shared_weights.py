@@ -194,8 +194,13 @@ class MethodPayload:
     result: Any
     attributes: dict[str, Any]
 
+    def modules(self) -> list[torch.nn.Module]:
+        """The modules the loader set on the estimator."""
+        return list(graph.iter_modules(self.attributes))
+
     def components(self) -> list[Any]:
-        return [self, *graph.iter_modules(self.attributes)]
+        """The objects a detach looks for by identity: this record, the modules, then their submodules."""
+        return [self, *graph.with_submodules(self.modules())]
 
 
 @dataclass
@@ -205,8 +210,13 @@ class FunctionPayload:
     result: Any
     arguments: dict[str, Any]
 
+    def modules(self) -> list[torch.nn.Module]:
+        """The modules of the loader's return value."""
+        return list(graph.iter_modules(self.result))
+
     def components(self) -> list[Any]:
-        return [self, *graph.iter_modules(self.result)]
+        """The objects a detach looks for by identity: this record, the modules, then their submodules."""
+        return [self, *graph.with_submodules(self.modules())]
 
 
 Payload = MethodPayload | FunctionPayload
@@ -400,7 +410,7 @@ def _take(
 
 def _place(payload: Payload, device_type: str) -> None:
     """Move the modules of a freshly built payload to ``device_type`` when the loader left them elsewhere."""
-    for module in payload.components()[1:]:
+    for module in payload.modules():
         if graph.payload_device(module) != device_type:
             module.to(device_type)
 
@@ -549,7 +559,7 @@ class SharedState:
     arguments: dict[str, Any] | None = None  # a function loader's call, to rebuild in another process
     present_before_fit: bool | None = None
     device: str | None = None
-    component_ids: list[int] = field(default_factory=list)  # identities of the payload and its modules while attached
+    component_ids: list[int] = field(default_factory=list)  # identities of the payload, its modules and submodules
     attributes: tuple[str, ...] = ()  # what a method loader set on the fresh estimator at fit time
 
 
@@ -776,10 +786,11 @@ def set_device(model: Any, device: str) -> bool:
 
 
 def shared_modules(model: Any) -> list[torch.nn.Module]:
-    """The shared modules of an attached model (``components()`` minus the payload record itself)."""
+    """The shared modules of an attached model, without their submodules (which come with them)."""
     if owns_network(model) or not attached(model):
         return []
-    return components(model)[1:]
+    entry = peek(model._shared_state.key)
+    return entry.value.modules() if entry is not None else []
 
 
 def prepare_for_inference(model: Any) -> None:

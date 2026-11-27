@@ -69,7 +69,7 @@ def test_components_and_identity_under_deepcopy(payload):
     assert copy.deepcopy(payload) is payload
     components = g.shared_components(payload)
     assert components[0] is payload and components[1] is payload.model and components[2] is payload.criterion
-    assert len(components) == 3
+    assert components[3:] == [payload.model.lin, payload.criterion.lin], "submodules follow the top-level modules"
     net = _Net()
     g.mark_identity_under_deepcopy(net)
     assert copy.deepcopy(net) is not net, "a bare module keeps deep-copying (libraries make private copies on purpose)"
