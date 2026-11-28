@@ -1,5 +1,6 @@
 from unittest import mock
 
+import numpy as np
 import pytest
 
 from autogluon.common.utils.resource_utils import ResourceManager
@@ -65,6 +66,89 @@ def test_mitra_resolve_hf_model_pops_every_alias():
 def test_mitra_resolve_hf_model_rejects_unsupported_problem_type():
     with pytest.raises(AssertionError, match="Unsupported problem_type"):
         MitraModel._resolve_hf_model(problem_type="quantile", hyp={})
+
+
+@pytest.mark.parametrize(
+    "cuda_count, accelerator_count, expected",
+    [
+        (1, 1, "cuda"),
+        (0, 1, "mps"),
+        (0, 0, "cpu"),
+    ],
+)
+def test_mitra_get_default_device(cuda_count, accelerator_count, expected):
+    def get_gpu_count(cuda_only=False):
+        return cuda_count if cuda_only else accelerator_count
+
+    with mock.patch.object(ResourceManager, "get_gpu_count_torch", side_effect=get_gpu_count):
+        assert MitraModel._get_default_device() == expected
+
+
+@pytest.mark.parametrize(
+    "device, expected_non_blocking",
+    [
+        ("mps", False),
+        ("mps:0", False),
+        ("cuda", True),
+        ("cpu", True),
+    ],
+)
+def test_mitra_model_device_transfer_is_blocking_only_on_mps(device, expected_non_blocking):
+    pytest.importorskip("torch")
+    from autogluon.tabular.models.mitra._internal.core.trainer_finetune import TrainerFinetune
+
+    model = mock.Mock()
+    moved_model = mock.Mock()
+    model.to.return_value = moved_model
+
+    assert TrainerFinetune._move_model_to_device(model=model, device=device) is moved_model
+    model.to.assert_called_once_with(device=device, non_blocking=expected_non_blocking)
+
+
+def test_mitra_regression_query_targets_are_float32():
+    torch = pytest.importorskip("torch")
+    from autogluon.tabular.models.mitra._internal.config.enums import Task
+    from autogluon.tabular.models.mitra._internal.data.dataset_finetune import DatasetFinetune
+
+    cfg = mock.Mock(task=Task.REGRESSION)
+    dataset = DatasetFinetune(
+        cfg=cfg,
+        x_support=np.zeros((2, 1), dtype=np.float32),
+        y_support=np.zeros(2, dtype=np.float32),
+        x_query=np.zeros((2, 1), dtype=np.float32),
+        y_query=np.ones(2, dtype=np.float64),
+        max_samples_support=2,
+        max_samples_query=2,
+        rng=np.random.RandomState(0),
+    )
+
+    assert dataset[0]["y_query"].dtype == torch.float32
+
+
+@pytest.mark.parametrize(
+    "task, expected_dtype",
+    [
+        ("REGRESSION", "float32"),
+        ("CLASSIFICATION", "int64"),
+    ],
+)
+def test_mitra_dummy_query_target_dtype(task, expected_dtype):
+    torch = pytest.importorskip("torch")
+    from autogluon.tabular.models.mitra._internal.config.enums import Task
+    from autogluon.tabular.models.mitra._internal.data.dataset_finetune import DatasetFinetune
+
+    dataset = DatasetFinetune(
+        cfg=mock.Mock(task=Task[task]),
+        x_support=np.zeros((2, 1), dtype=np.float32),
+        y_support=np.zeros(2, dtype=np.float32),
+        x_query=np.zeros((2, 1), dtype=np.float32),
+        y_query=None,
+        max_samples_support=2,
+        max_samples_query=2,
+        rng=np.random.RandomState(0),
+    )
+
+    assert dataset[0]["y_query"].dtype == getattr(torch, expected_dtype)
 
 
 def test_mitra_loads_local_checkpoint_dir(tmp_path):
