@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import contextlib
+import gc
 import time
 
 import numpy as np
@@ -190,10 +191,8 @@ class MitraBase(BaseEstimator):
         cfg, Tab2D = self._create_config(task, dim_output, time_limit)
         rng = np.random.RandomState(get_numpy_seed(cfg.seed))
 
-        success = False
-        while not (
-            success and cfg.hyperparams["max_samples_support"] > 0 and cfg.hyperparams["max_samples_query"] > 0
-        ):
+        trainer_cls = self._get_trainer_cls()
+        while cfg.hyperparams["max_samples_support"] > 0 and cfg.hyperparams["max_samples_query"] > 0:
             try:
                 self.trainers.clear()
 
@@ -201,8 +200,9 @@ class MitraBase(BaseEstimator):
                 for _ in range(self.n_estimators):
                     # `hf_model` is either a local directory holding `config.json` +
                     # `model.safetensors`, or a HuggingFace repo id.
-                    model = Tab2D.from_pretrained(self.hf_model, device=self.device)
-                    trainer = TrainerFinetune(
+                    model = self._load_pretrained_model(Tab2D)
+                    self._configure_pretrained_model(cfg, model)
+                    trainer = trainer_cls(
                         cfg, model, n_classes=n_classes, device=self.device, rng=rng, verbose=self.verbose
                     )
 
@@ -213,31 +213,34 @@ class MitraBase(BaseEstimator):
                     self.trainers.append(trainer)
                     self.train_time += end_time - start_time
 
-                    success = True
+                return self
 
             except torch.cuda.OutOfMemoryError:
-                if cfg.hyperparams["max_samples_support"] >= 2048:
-                    cfg.hyperparams["max_samples_support"] = int(cfg.hyperparams["max_samples_support"] // 2)
-                    print(
-                        f"Reducing max_samples_support from {cfg.hyperparams['max_samples_support'] * 2}"
-                        f"to {cfg.hyperparams['max_samples_support']} due to OOM error."
-                    )
-                else:
-                    cfg.hyperparams["max_samples_support"] = int(cfg.hyperparams["max_samples_support"] // 2)
-                    print(
-                        f"Reducing max_samples_support from {cfg.hyperparams['max_samples_support'] * 2}"
-                        f"to {cfg.hyperparams['max_samples_support']} due to OOM error."
-                    )
-                    cfg.hyperparams["max_samples_query"] = int(cfg.hyperparams["max_samples_query"] // 2)
-                    print(
-                        f"Reducing max_samples_query from {cfg.hyperparams['max_samples_query'] * 2}"
-                        f"to {cfg.hyperparams['max_samples_query']} due to OOM error."
-                    )
+                limits = ["max_samples_support"]
+                if cfg.hyperparams["max_samples_support"] < 2048:
+                    limits.append("max_samples_query")
+                for name in limits:
+                    previous = cfg.hyperparams[name]
+                    cfg.hyperparams[name] = previous // 2
+                    print(f"Reducing {name} from {previous} to {cfg.hyperparams[name]} due to OOM error.")
 
-        if not success:
-            raise RuntimeError("Failed to train Mitra model after multiple attempts due to out of memory error.")
+            self.trainers.clear()
+            model = trainer = None
+            gc.collect()
+            torch.cuda.empty_cache()
 
-        return self
+        raise RuntimeError("Failed to train Mitra model after multiple attempts due to out of memory error.")
+
+    def _get_trainer_cls(self):
+        return TrainerFinetune
+
+    def _load_pretrained_model(self, model_cls):
+        # Legacy custom checkpoints predate release metadata.
+        return model_cls.from_pretrained(self.hf_model, device=self.device)
+
+    def _configure_pretrained_model(self, cfg, model):
+        if str(model.task) != str(cfg.task):
+            raise ValueError(f"Checkpoint task {model.task!r} does not match the requested task {cfg.task!r}.")
 
 
 class MitraClassifier(MitraBase, ClassifierMixin):
