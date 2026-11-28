@@ -148,6 +148,21 @@ class TimeSeriesTrainer(AbstractTrainer[TimeSeriesModelBase]):
 
         self.models = models
 
+    def save_space(self) -> None:
+        """Delete cached data and predictions that are not needed for inference on new data.
+
+        Removes the cached training/validation data (``train.pkl``, ``val.pkl``, ``val_data_per_window.pkl``)
+        and the cached predictions. This has no impact on inference accuracy, but disables functionality that
+        relies on the cached data such as :meth:`refit_full`.
+        """
+        for file_name in ["train.pkl", "val.pkl", "val_data_per_window.pkl"]:
+            file_path = os.path.join(self.path_data, file_name)
+            if os.path.exists(file_path):
+                os.remove(file_path)
+        self.is_data_saved = False
+        self.prediction_cache.clear()
+        self.save()
+
     def _get_model_oof_predictions(self, model_name: str) -> list[TimeSeriesDataFrame]:
         model_path = os.path.join(self.path, self.get_model_attribute(model=model_name, attribute="path"))
         model_type = self.get_model_attribute(model=model_name, attribute="type")
