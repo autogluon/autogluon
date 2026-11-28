@@ -9,6 +9,7 @@ from numbers import Integral
 
 import numpy as np
 from packaging.version import parse as parse_version
+from pandas.api.types import is_object_dtype, is_string_dtype
 from scipy import sparse
 from sklearn import __version__ as _sklearn_version
 from sklearn.base import BaseEstimator, TransformerMixin
@@ -88,7 +89,7 @@ def _encode(values, uniques=None, encode=False, check_unknown=True):
     (uniques, encoded)
         If ``encode=True``.
     """
-    if values.dtype == object:
+    if is_object_dtype(values) or is_string_dtype(values):
         try:
             res = _encode_python(values, uniques, encode)
         except TypeError:
@@ -120,7 +121,7 @@ def _encode_check_unknown(values, uniques, return_mask=False):
     valid_mask : boolean array
         Additionally returned if ``return_mask=True``.
     """
-    if values.dtype == object:
+    if is_object_dtype(values) or is_string_dtype(values):
         uniques_set = set(uniques)
         diff = list(set(values) - uniques_set)
         if return_mask:

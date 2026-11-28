@@ -12,12 +12,19 @@ from typing import TYPE_CHECKING, Any, Final, Type, overload
 import numpy as np
 import pandas as pd
 from joblib.parallel import Parallel, delayed
-from pandas.core.internals import ArrayManager, BlockManager  # type: ignore
+from pandas.core.internals import BlockManager  # type: ignore
 from typing_extensions import Self
 
 from autogluon.common.loaders import load_pd
 
 logger = logging.getLogger(__name__)
+
+try:
+    from pandas.core.internals import ArrayManager  # type: ignore
+
+    _DATA_MANAGERS: tuple[type, ...] = (BlockManager, ArrayManager)
+except ImportError:  # removed in pandas 3.0
+    _DATA_MANAGERS = (BlockManager,)
 
 
 class TimeSeriesDataFrame(pd.DataFrame):
@@ -130,7 +137,7 @@ class TimeSeriesDataFrame(pd.DataFrame):
         *args,
         **kwargs,
     ):
-        if isinstance(data, (BlockManager, ArrayManager)):
+        if isinstance(data, _DATA_MANAGERS):
             # necessary for copy constructor to work in pandas <= 2.0.x. In >= 2.1.x this is replaced by _constructor_from_mgr
             pass
         elif isinstance(data, pd.DataFrame):

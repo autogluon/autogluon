@@ -6,6 +6,7 @@ import pandas as pd
 from pandas import DataFrame, Series
 
 from autogluon.common.features.types import S_IMAGE_BYTEARRAY, S_IMAGE_PATH, S_TEXT, S_TEXT_SPECIAL
+from autogluon.common.utils.pandas_utils import astype_str
 
 from .abstract import AbstractFeatureGenerator
 from .binned import BinnedFeatureGenerator
@@ -103,7 +104,7 @@ class TextSpecialFeatureGenerator(AbstractFeatureGenerator):
             )
             for text_feature_name in self.features_in:
                 above_threshold_symbols = []
-                text_feature = X[text_feature_name].astype(str)
+                text_feature = astype_str(X[text_feature_name])
                 for symbol in symbols:
                     symbol_occur_count = text_feature.str.contains(symbol, regex=False).sum()
                     if symbol_occur_count >= symbol_occur_threshold:
@@ -128,7 +129,7 @@ class TextSpecialFeatureGenerator(AbstractFeatureGenerator):
 
     def _generate_text_special(self, X: Series, feature: str, symbols: list, X_dict: dict) -> dict:
         fn = self._feature_names_dict[feature]
-        X_str = X.astype(str)
+        X_str = astype_str(X)
 
         X_no_ws = X_str.str.replace(" ", "")
         X_no_ws_text_len = X_no_ws.str.len()
