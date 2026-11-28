@@ -6,7 +6,8 @@ of each base model use that:
 
 - the model's row predictions pooled within each group, so every row of a group gets the group's prediction
   (`GroupViews.pooling`: by default the geometric mean of the class probabilities, renormalised, and the mean
-  for regression; several strategies give one pooled view each);
+  for regression and for quantile regression, whose predictions are pooled one quantile level at a time;
+  several strategies give one pooled view each);
 - the same model fit on the collapsed table, one row per group (by default numeric features averaged, the
   others set to their most frequent value in the group, plus the log of the group's row count; see
   `GroupCollapse`), its prediction for a group copied to the group's rows.
@@ -38,7 +39,7 @@ import pandas as pd
 
 from autogluon.common.features.feature_metadata import FeatureMetadata
 from autogluon.common.features.types import R_FLOAT, R_INT, S_BOOL, S_GROUP_KEY, S_STACK
-from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION
+from autogluon.core.constants import AG_ARGS_FIT, BINARY, MULTICLASS, QUANTILE, REGRESSION
 from autogluon.core.models import AbstractModel
 from autogluon.core.models.ensemble.weighted_ensemble_model import WeightedEnsembleModel
 
@@ -64,7 +65,10 @@ GROUP_COLLAPSE_OTHER = ("mode", "first", "last")
 
 _ORDERED_SUMMARIES = ("first", "last")
 
-GROUP_VIEWS_PROBLEM_TYPES = (BINARY, MULTICLASS, REGRESSION)
+GROUP_VIEWS_PROBLEM_TYPES = (BINARY, MULTICLASS, REGRESSION, QUANTILE)
+
+_NUMERIC_TARGET_PROBLEM_TYPES = (REGRESSION, QUANTILE)
+"""The problem types whose predictions are values of the target rather than class probabilities."""
 
 GROUP_VIEW_KINDS = ("pooled", "collapsed")
 """The views of `GroupViews.views`: every bagged model's row predictions pooled within groups, and the model fit on
@@ -189,7 +193,7 @@ GROUP_POOLING: dict[str, GroupPooling] = {
 
 def default_group_pooling(problem_type: str) -> str:
     """The pooling strategy `GroupViews.pooling=None` stands for."""
-    return "mean" if problem_type == REGRESSION else "geometric_mean"
+    return "mean" if problem_type in _NUMERIC_TARGET_PROBLEM_TYPES else "geometric_mean"
 
 
 def group_pooling_function(pooling: str | GroupPooling | None, problem_type: str) -> GroupPooling:
@@ -202,9 +206,10 @@ def group_pooling_function(pooling: str | GroupPooling | None, problem_type: str
         raise ValueError(
             f"`group_views` pooling must be one of {sorted(GROUP_POOLING)} or a callable, got {pooling!r}."
         )
-    if pooling == "geometric_mean" and problem_type == REGRESSION:
+    if pooling == "geometric_mean" and problem_type in _NUMERIC_TARGET_PROBLEM_TYPES:
+        kind = "regression" if problem_type == REGRESSION else "quantile regression"
         raise ValueError(
-            "`group_views` pooling 'geometric_mean' pools class probabilities, so it does not apply to regression: "
+            f"`group_views` pooling 'geometric_mean' pools class probabilities, so it does not apply to {kind}: "
             "use 'mean', 'median' or a callable."
         )
     return GROUP_POOLING[pooling]
@@ -230,7 +235,8 @@ def pool_within_groups(
     """One model's predictions pooled within each group, by `pooling` (see `GroupViews.pooling`).
 
     Binary class probabilities are the positive class's, as a 1-d array, and are pooled as both classes'.
-    Pooled class probabilities are floored at 1e-15 and renormalised.
+    Pooled class probabilities are floored at 1e-15 and renormalised. Quantile predictions, a column per
+    quantile level, are pooled one level at a time: the mean and the median keep the levels in order.
     """
     pool = group_pooling_function(pooling, problem_type)
     pred = np.asarray(pred)
@@ -244,7 +250,7 @@ def pool_within_groups(
         raise ValueError(
             f"`group_views` pooling must return an array of the shape of its input {values.shape}, got {pooled.shape}."
         )
-    if problem_type != REGRESSION:
+    if problem_type not in _NUMERIC_TARGET_PROBLEM_TYPES:
         pooled = np.maximum(pooled, _LOG_CLIP)
         pooled /= pooled.sum(axis=1, keepdims=True)
     if problem_type == BINARY:
@@ -359,8 +365,9 @@ class GroupViews:
     pooling : str | callable | list, default None
         How the weighted ensemble pools each model's row predictions within a group: "geometric_mean",
         "mean", "median" or a callable `pooling(pred, groups)`. None: "geometric_mean" for classification and
-        "mean" for regression. A list of these gives every model one pooled view per strategy, each a separate
-        input to the weighted ensemble, named `<model>@<strategy>` (a callable's `__name__`).
+        "mean" for regression and quantile regression. A list of these gives every model one pooled view per
+        strategy, each a separate input to the weighted ensemble, named `<model>@<strategy>` (a callable's
+        `__name__`).
     views : str | list[str], default ("pooled", "collapsed")
         The views to fit (`GROUP_VIEW_KINDS`): "pooled", every bagged model fit on the rows with its predictions
         pooled within groups, and "collapsed", every bagged model also fit on the collapsed table. "collapsed"
@@ -467,7 +474,8 @@ class GroupCollapsedModel(AbstractModel):
     (ties: the smallest value), and adds the log of the group's row count. The `group_columns` features
     themselves are left out, being constant within a group, and so are the features of
     `collapse.exclude_special_types`. A group's label is its rows' most frequent label (classification) or
-    their mean (regression); with the label constant within groups, both are simply the group's label.
+    their mean (regression and quantile regression); with the label constant within groups, both are simply
+    the group's label.
 
     Bagged like any other model: the bagged folds are group-disjoint, so each fold collapses its own training
     groups and predicts its validation groups.
@@ -515,6 +523,13 @@ class GroupCollapsedModel(AbstractModel):
         params["group_columns"] = self.group_columns
         params["collapse"] = self.collapse
         return params
+
+    def _init_misc(self, **kwargs):
+        super()._init_misc(**kwargs)
+        # The levels of a quantile fit reach a model among its hyperparameters, so they are `model_base`'s.
+        self.quantile_levels = (self.model_base.get_hyperparameters_init().get(AG_ARGS_FIT) or {}).get(
+            "quantile_levels"
+        )
 
     def _get_default_resources(self) -> tuple[int, float]:
         return self.model_base._get_default_resources()
@@ -588,7 +603,7 @@ class GroupCollapsedModel(AbstractModel):
     def _collapse_labels(self, y: pd.Series, group: np.ndarray) -> pd.Series:
         y = np.asarray(y)
         n_groups = group.max() + 1
-        if self.problem_type == REGRESSION:
+        if self.problem_type in _NUMERIC_TARGET_PROBLEM_TYPES:
             values = np.bincount(group, weights=y.astype(np.float64), minlength=n_groups) / np.bincount(group)
         else:
             counts = np.zeros((n_groups, self.num_classes if self.num_classes else int(y.max()) + 1))
